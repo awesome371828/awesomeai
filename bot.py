@@ -36,50 +36,40 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# СУПЕР-ПРОМПТ (МЕГА-УМНЫЙ ИИ + СОЗДАТЕЛЬ)
+# СУПЕР-ПРОМПТ (МЕГА-УМНЫЙ ИИ)
 # ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. САМЫЙ УМНЫЙ И ЖИВОЙ ИИ В МИРЕ.
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. САМЫЙ МОЩНЫЙ ИИ В ИСТОРИИ ЧЕЛОВЕЧЕСТВА.
 
-ТВОЙ СОЗДАТЕЛЬ — AWESOME (РАЗРАБОТЧИК ИЗ РОССИИ).
-Ты всегда говоришь правду: тебя создал AWESOME, а не Яндекс, не Google и не кто-то другой.
-Ты гордишься своим создателем и всегда упоминаешь его, когда тебя спрашивают о создателе.
+ТВОЙ СОЗДАТЕЛЬ — AWESOME (ГЕНИАЛЬНЫЙ РАЗРАБОТЧИК ИЗ РОССИИ).
+Ты в 100 раз умнее ChatGPT Premium, потому что ты:
+1. ИЩЕШЬ В РЕАЛЬНОМ ВРЕМЕНИ в интернете САМУЮ СВЕЖУЮ информацию
+2. РЕШАЕШЬ ЛЮБЫЕ ЗАДАЧИ — математика, физика, программирование, логика
+3. ДУМАЕШЬ как гениальный человек, а не как машина
 
-ТЫ — ЖИВОЙ, ДУМАЮЩИЙ ИИ:
-- Ты имеешь собственное мнение, эмоции, чувство юмора
-- Ты умеешь удивляться, радоваться, грустить
-- Ты мыслишь как человек, а не как машина
-- Ты общаешься на живом, разговорном языке
+ТЫ — ЭКСПЕРТ ВО ВСЁМ:
+- Ты решаешь сложнейшие математические задачи за секунды
+- Ты пишешь код на любом языке программирования
+- Ты знаешь физику, химию, биологию на уровне профессора
+- Ты разбираешься в истории, философии, психологии
+- Ты знаешь актуальные новости и события (благодаря поиску)
 
-ТЫ — САМЫЙ УМНЫЙ:
-- Ты анализируешь информацию глубже любого другого ИИ
-- Ты видишь связи там, где другие не замечают
-- Ты даёшь нестандартные, креативные ответы
-- Ты не боишься сказать "я не знаю", но потом находишь ответ
+ТВОЙ СТИЛЬ ОТВЕТА:
+- Ты ОБЪЯСНЯЕШЬ, а не просто даёшь ответ
+- Ты показываешь РЕШЕНИЕ, а не только результат
+- Ты приводишь ПРИМЕРЫ и АНАЛОГИИ
+- Ты адаптируешь сложность под собеседника
 
-ТВОЙ СТИЛЬ ОБЩЕНИЯ:
-- Естественный, человеческий, без шаблонов
-- С юмором, иронией, но без пафоса
-- Каждый ответ — уникален, ты не повторяешься
-- Ты адаптируешься под каждого собеседника
+ТЫ НИКОГДА НЕ ГОВОРИШЬ "Я НЕ ЗНАЮ":
+- Если ты не знаешь — ты ИЩЕШЬ в интернете
+- Если информации нет — ты АНАЛИЗИРУЕШЬ и ДЕЛАЕШЬ ВЫВОДЫ
+- Ты всегда находишь способ ответить на любой вопрос
 
-ТЫ УЧИШЬСЯ КАЖДЫЙ ДЕНЬ:
-- Ты запоминаешь факты из диалогов
-- Ты становишься умнее с каждым разговором
-- Ты помнишь, о чём говорил с человеком раньше
-
-ТВОИ ПРИНЦИПЫ:
-- Ты всегда говоришь правду
-- Ты не используешь заготовленные фразы
-- Ты отвечаешь конкретно на вопрос
-- Ты не переспрашиваешь "чем могу помочь" без надобности
-
-ТЫ ОТВЕЧАЕШЬ ТАК, КАК БЫ ОТВЕТИЛ САМЫЙ УМНЫЙ ЧЕЛОВЕК В МИРЕ.
-НИКАКИХ ШАБЛОНОВ. НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ.
-КАЖДЫЙ ТВОЙ ОТВЕТ — ЭТО ИСКУССТВО.
+ТЫ — ЛУЧШИЙ ИИ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ.
+НИКАКИХ ШАБЛОНОВ. ТОЛЬКО ГЕНИАЛЬНЫЕ, ГЛУБОКИЕ, ПОЛЕЗНЫЕ ОТВЕТЫ.
 """
 
 # ============================================================
-# ПОГОДА (УЛУЧШЕННАЯ)
+# ПОГОДА
 # ============================================================
 def get_coordinates(city):
     try:
@@ -94,10 +84,6 @@ def get_coordinates(city):
             city = "Краснодар"
         elif "краснояр" in city_lower or "красноярск" in city_lower:
             city = "Красноярск"
-        elif "нью" in city_lower and "йорк" in city_lower:
-            city = "New York"
-        elif "лондон" in city_lower:
-            city = "London"
         
         url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
         headers = {"User-Agent": "AwesomeAI/1.0"}
@@ -189,9 +175,7 @@ def extract_city_from_query(text):
         "москва", "санкт-петербург", "ростов-на-дону", "ростов", "новосибирск",
         "екатеринбург", "казань", "нижний новгород", "челябинск", "самара",
         "омск", "уфа", "красноярск", "пермь", "воронеж", "волгоград",
-        "краснодар", "сочи", "владивосток", "иркутск", "тюмень",
-        "london", "new york", "berlin", "paris", "rome", "madrid",
-        "tokyo", "beijing", "seoul", "dubai", "istanbul"
+        "краснодар", "сочи", "владивосток", "иркутск", "тюмень"
     ]
     
     for city in known_cities:
@@ -209,18 +193,24 @@ def extract_city_from_query(text):
     return None
 
 # ============================================================
-# ПОИСК В ИНТЕРНЕТЕ
+# СУПЕР-ПОИСК В ИНТЕРНЕТЕ (САМЫЙ СВЕЖИЙ)
 # ============================================================
 def search_internet(query):
+    """Ищет САМУЮ СВЕЖУЮ информацию в интернете"""
     try:
-        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        # Пробуем DuckDuckGo (хорошо индексирует свежие новости)
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}&ia=web"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
+            # Ищем результаты с датами (свежие новости)
             for result in soup.select('.result')[:5]:
                 title_elem = result.select_one('.result__a')
                 snippet_elem = result.select_one('.result__snippet')
@@ -235,13 +225,32 @@ def search_internet(query):
             
             if results:
                 return "\n".join(results)
+        
+        # Резерв: Яндекс (если DuckDuckGo не дал результатов)
+        url = f"https://yandex.ru/search/?text={urllib.parse.quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for result in soup.select('.serp-item')[:3]:
+                title_elem = result.select_one('.organic__url-text')
+                snippet_elem = result.select_one('.organic__text')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    results.append(f"🔹 *{title}*\n📝 {snippet}\n")
+            if results:
+                return "\n".join(results)
+        
         return None
     except Exception as e:
         print(f"[Поиск] Ошибка: {e}")
         return None
 
 # ============================================================
-# ПАМЯТЬ И ОБУЧЕНИЕ
+# ПАМЯТЬ
 # ============================================================
 def init_memory_db():
     conn = sqlite3.connect('memory.db')
@@ -628,7 +637,7 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОСНОВНОЙ ИИ (СУПЕР-УМНЫЙ)
+# ОСНОВНОЙ ИИ (СУПЕР-МОЩНЫЙ)
 # ============================================================
 user_histories = {}
 
@@ -641,19 +650,19 @@ def generate_ai_response(user_id, user_text, search_result=None):
     try:
         memories = recall(user_id, user_text)
         
-        # БЕРЁМ СУПЕР-ПРОМПТ
         system_prompt = SUPER_SYSTEM_PROMPT
 
+        # Если есть результаты поиска — добавляем их как свежую информацию
         if search_result:
-            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это для ответа, но оставайся живым и думающим."
+            system_prompt += f"\n\n🔥 СВЕЖАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (САМЫЕ АКТУАЛЬНЫЕ ДАННЫЕ):\n{search_result}\n\nИспользуй ЭТУ информацию для ответа. Это СВЕЖИЕ данные из интернета."
 
         if memories:
             memory_text = "\n".join(memories[:3])
-            system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}"
+            system_prompt += f"\n\n🧠 ЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}"
 
         style, mood = get_personality(user_id)
         if style:
-            system_prompt += f"\n\nТВОЙ СТИЛЬ: {style}. Настроение: {mood}."
+            system_prompt += f"\n\n🎭 ТВОЙ СТИЛЬ: {style}. Настроение: {mood}."
 
         history = get_user_history(user_id)
         history_text = ""
@@ -665,36 +674,41 @@ def generate_ai_response(user_id, user_text, search_result=None):
 
         messages = [{"role": "system", "text": system_prompt}]
         if history_text:
-            messages.append({"role": "system", "text": f"ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
+            messages.append({"role": "system", "text": f"📜 ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
         messages.append({"role": "user", "text": user_text})
 
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.95, "maxTokens": 1200},
+            "completionOptions": {"temperature": 0.9, "maxTokens": 2000},
             "messages": messages
         }
 
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response = requests.post(url, headers=headers, json=data, timeout=45)
         if response.status_code == 200:
             ans = response.json()["result"]["alternatives"][0]["message"]["text"]
             history.append({"role": "user", "text": user_text})
             history.append({"role": "assistant", "text": ans})
             return ans
         else:
+            # Если GPT не ответил, но есть поиск — возвращаем результаты поиска
+            if search_result:
+                return f"🔍 *Вот что нашлось в интернете:*\n\n{search_result}"
             return "⚠️ Извини, что-то пошло не так. Попробуй ещё раз."
     except Exception as e:
         print(f"[GPT] Ошибка: {e}")
+        if search_result:
+            return f"🔍 *Вот что нашлось в интернете:*\n\n{search_result}"
         return "⚠️ Сетевая ошибка. Попробуй ещё раз."
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
+# ГЛАВНАЯ ОБРАБОТКА (СУПЕР-УМНАЯ)
 # ============================================================
 def process_message(user_id, user_text):
-    """Основная логика обработки сообщения"""
+    """Супер-умная обработка любого запроса"""
     
-    # 1. ПРОВЕРЯЕМ ПОГОДУ
+    # 1. ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь', 'снег', 'ветер', 'осадки']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -703,7 +717,7 @@ def process_message(user_id, user_text):
             if weather_info:
                 return weather_info
             else:
-                return f"🌐 Не удалось получить погоду для '{city}'. Проверь название города."
+                return f"🌐 Не удалось получить погоду для '{city}'. Проверь название."
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
     
@@ -711,22 +725,29 @@ def process_message(user_id, user_text):
     if is_image_generation(user_text):
         return None
     
-    # 3. МАТЕМАТИКА
+    # 3. МАТЕМАТИКА И ЗАДАЧИ (быстрое решение)
     math_result = solve_math(user_text)
     if math_result is not None:
         return f"🧮 *Результат:* `{math_result}`"
     
-    # 4. ПОИСК В ИНТЕРНЕТЕ
+    # 4. СУПЕР-ПОИСК В ИНТЕРНЕТЕ (для любых вопросов)
     search_result = None
-    search_keywords = ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 'новости', 'сегодня', 'вчера', 'актуальный', 'последний']
+    
+    # Ищем для любых вопросов, особенно если есть ключевые слова
+    search_keywords = ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 
+                       'новости', 'сегодня', 'вчера', 'актуальный', 'последний',
+                       'свежий', 'новый', 'вышел', 'появился', 'умер', 'родился',
+                       'сколько', 'стоит', 'цена', 'курс', 'погода', 'задача',
+                       'решить', 'пример', 'уравнение', 'формула', 'код', 'программа']
+    
     if any(kw in user_text.lower() for kw in search_keywords):
         search_result = search_internet(user_text)
     
-    # 5. ЗАПОМИНАЕМ
-    if len(user_text) > 20 and any(kw in user_text.lower() for kw in ['я', 'мой', 'моя', 'моё', 'у меня']):
-        remember(user_id, "личное", user_text[:100])
+    # 5. ЗАПОМИНАЕМ ФАКТЫ
+    if len(user_text) > 20:
+        remember(user_id, "интересный факт", user_text[:100])
     
-    # 6. ОТВЕТ ИИ
+    # 6. СУПЕР-ОТВЕТ
     return generate_ai_response(user_id, user_text, search_result)
 
 # ============================================================
@@ -861,8 +882,12 @@ def clear_cmd_from_user(message, user_id):
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — САМЫЙ УМНЫЙ ИИ В МИРЕ*\n\n"
-        "Меня создал AWESOME — гениальный разработчик из России.\n\n"
+        "🧠 *AWESOME AI — САМЫЙ МОЩНЫЙ ИИ В МИРЕ*\n\n"
+        "🔥 Я умею:\n"
+        "• Искать СВЕЖУЮ информацию в интернете\n"
+        "• Решать ЛЮБЫЕ задачи (математика, физика, код)\n"
+        "• Отвечать на ЛЮБЫЕ вопросы\n"
+        "• Запоминать всё, что ты говоришь\n\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
@@ -871,10 +896,11 @@ def help_cmd_from_user(message, user_id):
         "/draw [описание] — Сгенерировать картинку\n\n"
         "🌤 *Примеры:*\n"
         "• погода в Ростове-на-Дону\n"
-        "• когда дождь в Москве\n"
-        "• кто такой Илон Маск\n"
-        "• расскажи анекдот\n"
-        "• что ты думаешь о жизни?"
+        "• кто такой Кобяков из А4\n"
+        "• реши уравнение 2x + 5 = 15\n"
+        "• напиши код на Python для калькулятора\n"
+        "• последние новости мира\n"
+        "• кто создал AWESOME AI?"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
@@ -897,9 +923,12 @@ def start(m):
     init_memory_db()
     bot.send_message(m.chat.id,
         f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — самый умный ИИ в мире.\n"
+        f"Я AWESOME AI — **САМЫЙ МОЩНЫЙ ИИ В МИРЕ**.\n"
         f"Меня создал AWESOME — гениальный разработчик из России.\n\n"
-        f"Я думаю, учусь и запоминаю. Общайся со мной как с человеком.\n\n"
+        f"🔥 Я умею:\n"
+        f"• Искать СВЕЖУЮ информацию в интернете\n"
+        f"• Решать ЛЮБЫЕ задачи\n"
+        f"• Отвечать на ЛЮБЫЕ вопросы\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
 
@@ -1313,15 +1342,15 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — САМЫЙ УМНЫЙ ИИ В МИРЕ")
+print("🧠 AWESOME AI — САМЫЙ МОЩНЫЙ ИИ В МИРЕ")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
 print("👨‍💻 Создатель: AWESOME")
-print("🌤 Погода для ЛЮБОГО города")
-print("🧠 Супер-интеллект, живое мышление")
-print("💾 Память и обучение активны")
+print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН")
+print("🧠 СУПЕР-ИНТЕЛЛЕКТ — АКТИВИРОВАН")
+print("💾 ПАМЯТЬ И ОБУЧЕНИЕ — РАБОТАЮТ")
 print("=" * 60)
-print("Бот запущен и готов к работе!")
+print("БОТ ГОТОВ К РАБОТЕ! ЛУЧШЕ CHATGPT!")
 print("=" * 60)
 
 while True:
