@@ -531,7 +531,7 @@ def init_db():
                   last_reset TEXT,
                   premium_expires TEXT,
                   is_admin INTEGER DEFAULT 0,
-                  test_used INTEGER DEFAULT 0)''')  # ← ДОБАВЛЕНО!
+                  test_used INTEGER DEFAULT 0)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS muted
                  (user_id INTEGER PRIMARY KEY)''')
@@ -545,7 +545,7 @@ def init_db():
     try:
         c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
     except:
-        pass  # Колонка уже есть
+        pass
     
     conn.commit()
     conn.close()
@@ -955,6 +955,9 @@ def premium_cmd_from_user(message, user_id):
         "Напиши @flidges — оплати и получи Premium!\n\n"
     )
 
+# ============================================================
+# ИСПРАВЛЕННАЯ ФУНКЦИЯ PROFILE (БЕЗ ОШИБОК)
+# ============================================================
 def profile_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
     conn = sqlite3.connect('users.db')
@@ -983,14 +986,14 @@ def profile_cmd_from_user(message, user_id):
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
+    # УБИРАЕМ parse_mode, ЧТОБЫ НЕ БЫЛО ОШИБОК
     bot.send_message(
         message.chat.id,
-        f"📊 *Твой профиль*\n\n"
-        f"🆔 ID: `{user_id}`\n"
+        f"📊 Твой профиль\n\n"
+        f"🆔 ID: {user_id}\n"
         f"👤 Юзер: {user_link}\n"
         f"💎 Статус: {status}\n"
-        f"✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}",
-        parse_mode='Markdown'
+        f"✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}"
     )
 
 def stats_cmd_from_user(message, user_id):
@@ -1089,7 +1092,6 @@ def test_cmd(m):
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
     
-    # Проверяем, не использовал ли уже
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('SELECT test_used, premium FROM users WHERE user_id = ?', (user_id,))
@@ -1102,12 +1104,10 @@ def test_cmd(m):
     
     test_used, premium = result
     
-    # Если уже есть Premium
     if premium == 1:
         bot.send_message(m.chat.id, "💎 У тебя уже есть Premium! Ты в топе!")
         return
     
-    # Если уже использовал тест
     if test_used == 1:
         bot.send_message(
             m.chat.id,
@@ -1119,7 +1119,6 @@ def test_cmd(m):
         )
         return
     
-    # Выдаём пробный Premium на 1 день
     if set_premium(user_id, "1d"):
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
