@@ -49,7 +49,7 @@ def check_spam(user_id):
     return False
 
 # ============================================================
-# СУПЕР-ПРОМПТ (ДЛЯ ЖИВОГО ИИ)
+# СУПЕР-ПРОМПТ
 # ============================================================
 SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек с супер-интеллектом.
 
@@ -80,107 +80,7 @@ SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий 
 """
 
 # ============================================================
-# 1. РАСШИРЕННЫЙ ПОИСК (Google + Wikipedia + Новости)
-# ============================================================
-
-def search_google(query):
-    """Поиск через Google (html парсинг)"""
-    try:
-        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            
-            for result in soup.select('div.g')[:3]:
-                title_elem = result.select_one('h3')
-                snippet_elem = result.select_one('div.VwiC3b')
-                
-                if title_elem:
-                    title = title_elem.get_text(strip=True)
-                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    if title:
-                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
-            
-            if results:
-                return "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_wikipedia(query):
-    """Поиск через Wikipedia API"""
-    try:
-        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get('query', {}).get('search', [])
-            
-            if results:
-                text = ""
-                for item in results[:2]:
-                    title = item.get('title', '')
-                    snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
-                    snippet = re.sub(r'<[^>]+>', '', snippet)
-                    text += f"🔹 *{title}*\n📝 {snippet}\n\n"
-                return text
-        return None
-    except:
-        return None
-
-def search_news(query):
-    """Поиск новостей через RSS"""
-    try:
-        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'xml')
-            items = soup.find_all('item')[:3]
-            
-            if items:
-                text = ""
-                for item in items:
-                    title = item.find('title')
-                    link = item.find('link')
-                    pub_date = item.find('pubDate')
-                    if title and link:
-                        date = pub_date.text[:16] if pub_date else ""
-                        text += f"📰 *{title.text}*\n🔗 {link.text}\n📅 {date}\n\n"
-                return text
-        return None
-    except:
-        return None
-
-def search_internet(query):
-    """Расширенный поиск по всем источникам"""
-    results = []
-    
-    google_result = search_google(query)
-    if google_result:
-        results.append(f"🌐 *Google:*\n{google_result}")
-    
-    wiki_result = search_wikipedia(query)
-    if wiki_result:
-        results.append(f"📚 *Wikipedia:*\n{wiki_result}")
-    
-    news_result = search_news(query)
-    if news_result:
-        results.append(f"📰 *Новости:*\n{news_result}")
-    
-    if results:
-        return "\n\n---\n\n".join(results)
-    
-    return None
-
-# ============================================================
-# 2. ПОГОДА С ГРАФИКОМ (Open-Meteo)
+# ПОГОДА
 # ============================================================
 def get_coordinates(city):
     try:
@@ -265,11 +165,126 @@ def get_weather(city):
     except:
         return None
 
+def extract_city_from_query(text):
+    text_lower = text.lower()
+    
+    known_cities = [
+        "москва", "санкт-петербург", "ростов-на-дону", "ростов",
+        "новосибирск", "екатеринбург", "казань", "нижний новгород",
+        "краснодар", "сочи", "владивосток", "вологда", "волгодонск",
+    ]
+    
+    for city in known_cities:
+        if city in text_lower:
+            return city
+    
+    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
+    if match:
+        city = match.group(1).strip()
+        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
+            city = city.replace(word, '').strip()
+        if city:
+            return city
+    
+    return None
+
 # ============================================================
-# 3. КУРС ВАЛЮТ И КРИПТОВАЛЮТ
+# РАСШИРЕННЫЙ ПОИСК (Google + Wikipedia + Новости)
+# ============================================================
+def search_google(query):
+    try:
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            for result in soup.select('div.g')[:3]:
+                title_elem = result.select_one('h3')
+                snippet_elem = result.select_one('div.VwiC3b')
+                
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title:
+                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
+            
+            if results:
+                return "\n".join(results)
+        return None
+    except:
+        return None
+
+def search_wikipedia(query):
+    try:
+        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('query', {}).get('search', [])
+            
+            if results:
+                text = ""
+                for item in results[:2]:
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
+                    snippet = re.sub(r'<[^>]+>', '', snippet)
+                    text += f"🔹 *{title}*\n📝 {snippet}\n\n"
+                return text
+        return None
+    except:
+        return None
+
+def search_news(query):
+    try:
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'xml')
+            items = soup.find_all('item')[:3]
+            
+            if items:
+                text = ""
+                for item in items:
+                    title = item.find('title')
+                    link = item.find('link')
+                    pub_date = item.find('pubDate')
+                    if title and link:
+                        date = pub_date.text[:16] if pub_date else ""
+                        text += f"📰 *{title.text}*\n🔗 {link.text}\n📅 {date}\n\n"
+                return text
+        return None
+    except:
+        return None
+
+def search_internet(query):
+    results = []
+    
+    google_result = search_google(query)
+    if google_result:
+        results.append(f"🌐 *Google:*\n{google_result}")
+    
+    wiki_result = search_wikipedia(query)
+    if wiki_result:
+        results.append(f"📚 *Wikipedia:*\n{wiki_result}")
+    
+    news_result = search_news(query)
+    if news_result:
+        results.append(f"📰 *Новости:*\n{news_result}")
+    
+    if results:
+        return "\n\n---\n\n".join(results)
+    
+    return None
+
+# ============================================================
+# КУРС ВАЛЮТ И КРИПТОВАЛЮТ
 # ============================================================
 def get_exchange_rates():
-    """Получение курса валют (бесплатный API)"""
     try:
         url = "https://api.exchangerate-api.com/v4/latest/USD"
         response = requests.get(url, timeout=5)
@@ -287,7 +302,6 @@ def get_exchange_rates():
         return None
 
 def get_crypto_rates():
-    """Получение курса криптовалют"""
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
         response = requests.get(url, timeout=5)
@@ -303,57 +317,9 @@ def get_crypto_rates():
         return None
 
 # ============================================================
-# 4. САМООБУЧЕНИЕ (Анализ настроения, адаптация стиля)
-# ============================================================
-def analyze_mood(text):
-    """Анализирует настроение по тексту"""
-    mood_keywords = {
-        'happy': ['рад', 'счастлив', 'отлично', 'хорошо', 'круто', 'супер', 'класс', 'ого', 'вау'],
-        'sad': ['грустно', 'плохо', 'тоска', 'уныло', 'печально', 'жаль', 'обидно'],
-        'angry': ['злой', 'бесит', 'раздражает', 'нервирует', 'бешеный', 'в ярости'],
-        'calm': ['спокойно', 'нормально', 'тихо', 'мирно', 'ровно', 'уравновешенно'],
-        'curious': ['интересно', 'любопытно', 'хочу узнать', 'расскажи', 'объясни'],
-        'grateful': ['спасибо', 'благодарю', 'приятно', 'ценю', 'спасибо большое'],
-    }
-    
-    text_lower = text.lower()
-    detected_moods = []
-    
-    for mood, keywords in mood_keywords.items():
-        if any(kw in text_lower for kw in keywords):
-            detected_moods.append(mood)
-    
-    if not detected_moods:
-        return 'neutral'
-    
-    return detected_moods[0]
-
-def get_personality_style(user_id):
-    """Получает стиль общения пользователя"""
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('SELECT style FROM personality WHERE user_id = ?', (user_id,))
-    result = c.fetchone()
-    conn.close()
-    
-    if result:
-        return result[0]
-    return None
-
-def update_personality_style(user_id, style):
-    """Обновляет стиль общения пользователя"""
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('INSERT OR REPLACE INTO personality (user_id, style, mood, last_interaction) VALUES (?, ?, ?, ?)',
-              (user_id, style, 'neutral', datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-# ============================================================
-# 5. ОБРАЗОВАНИЕ (Решение задач, программирование)
+# ОБРАЗОВАНИЕ (Решение задач, программирование)
 # ============================================================
 def solve_math(text):
-    """Решает математические задачи"""
     text = text.lower().strip()
     
     # Уравнения вида: "2x + 5 = 15"
@@ -368,7 +334,6 @@ def solve_math(text):
     
     # Простые вычисления
     try:
-        # Заменяем слова на символы
         expr = text
         expr = expr.replace('плюс', '+').replace('минус', '-')
         expr = expr.replace('умножить', '*').replace('разделить', '/')
@@ -383,7 +348,6 @@ def solve_math(text):
     return None
 
 def get_coding_help(query):
-    """Помощь с программированием"""
     if 'python' in query.lower():
         return "🐍 *Python:*\n" + random.choice([
             "Совет: используй list comprehensions для упрощения кода.",
@@ -406,7 +370,32 @@ def get_coding_help(query):
         return None
 
 # ============================================================
-# 6. АНАЛИЗ ИЗОБРАЖЕНИЙ
+# АНАЛИЗ НАСТРОЕНИЯ
+# ============================================================
+def analyze_mood(text):
+    mood_keywords = {
+        'happy': ['рад', 'счастлив', 'отлично', 'хорошо', 'круто', 'супер', 'класс', 'ого', 'вау'],
+        'sad': ['грустно', 'плохо', 'тоска', 'уныло', 'печально', 'жаль', 'обидно'],
+        'angry': ['злой', 'бесит', 'раздражает', 'нервирует', 'бешеный', 'в ярости'],
+        'calm': ['спокойно', 'нормально', 'тихо', 'мирно', 'ровно', 'уравновешенно'],
+        'curious': ['интересно', 'любопытно', 'хочу узнать', 'расскажи', 'объясни'],
+        'grateful': ['спасибо', 'благодарю', 'приятно', 'ценю', 'спасибо большое'],
+    }
+    
+    text_lower = text.lower()
+    detected_moods = []
+    
+    for mood, keywords in mood_keywords.items():
+        if any(kw in text_lower for kw in keywords):
+            detected_moods.append(mood)
+    
+    if not detected_moods:
+        return 'neutral'
+    
+    return detected_moods[0]
+
+# ============================================================
+# АНАЛИЗ ИЗОБРАЖЕНИЙ
 # ============================================================
 def analyze_image_from_file(file_content):
     try:
@@ -458,7 +447,7 @@ def analyze_image_from_file(file_content):
         return "⚠️ Не удалось проанализировать."
 
 # ============================================================
-# 7. ГЕНЕРАЦИЯ КАРТИНОК
+# ГЕНЕРАЦИЯ КАРТИНОК
 # ============================================================
 def generate_image(prompt):
     try:
@@ -488,7 +477,7 @@ def fix_title(prompt):
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
 # ============================================================
-# 8. ПАМЯТЬ
+# ПАМЯТЬ
 # ============================================================
 def init_memory_db():
     conn = sqlite3.connect('memory.db')
@@ -527,11 +516,13 @@ def recall(user_id, topic):
     return []
 
 # ============================================================
-# 9. БАЗА ПОЛЬЗОВАТЕЛЕЙ
+# БАЗА ПОЛЬЗОВАТЕЛЕЙ (С ДОБАВЛЕННЫМ test_used)
 # ============================================================
 def init_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
+    
+    # Основные таблицы
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -539,7 +530,9 @@ def init_db():
                   messages_today INTEGER DEFAULT 0,
                   last_reset TEXT,
                   premium_expires TEXT,
-                  is_admin INTEGER DEFAULT 0)''')
+                  is_admin INTEGER DEFAULT 0,
+                  test_used INTEGER DEFAULT 0)''')  # ← ДОБАВЛЕНО!
+    
     c.execute('''CREATE TABLE IF NOT EXISTS muted
                  (user_id INTEGER PRIMARY KEY)''')
     c.execute('''CREATE TABLE IF NOT EXISTS banned
@@ -547,6 +540,13 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS total_stats
                  (user_id INTEGER PRIMARY KEY,
                   total_messages INTEGER DEFAULT 0)''')
+    
+    # Если таблица уже существовала без test_used — добавляем
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
+    except:
+        pass  # Колонка уже есть
+    
     conn.commit()
     conn.close()
 
@@ -556,8 +556,8 @@ def ensure_user(user_id, username):
     c.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
     user = c.fetchone()
     if user is None:
-        c.execute('INSERT INTO users (user_id, username, messages_today, last_reset, is_admin) VALUES (?, ?, ?, ?, ?)',
-                  (user_id, username, 0, datetime.now().strftime('%Y-%m-%d'), 0))
+        c.execute('INSERT INTO users (user_id, username, messages_today, last_reset, is_admin, test_used) VALUES (?, ?, ?, ?, ?, ?)',
+                  (user_id, username, 0, datetime.now().strftime('%Y-%m-%d'), 0, 0))
         c.execute('INSERT OR IGNORE INTO total_stats (user_id, total_messages) VALUES (?, 0)', (user_id,))
         conn.commit()
         conn.close()
@@ -723,7 +723,7 @@ def unban_user(user_id):
     conn.close()
 
 # ============================================================
-# 10. ОСНОВНАЯ ОБРАБОТКА
+# ОСНОВНАЯ ОБРАБОТКА
 # ============================================================
 user_histories = {}
 
@@ -754,7 +754,6 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         memories = recall(user_id, user_text)
         
-        # Анализ настроения
         mood = analyze_mood(user_text)
         mood_emoji = {
             'happy': '😊', 'sad': '😢', 'angry': '😡',
@@ -834,13 +833,13 @@ def get_fallback_response(user_id, user_text, search_result=None, image_descript
     return random.choice(phrases)
 
 # ============================================================
-# 11. ГЛАВНАЯ ОБРАБОТКА
+# ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
     
-    # 1. ПОГОДА
+    # ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -853,7 +852,7 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
     
-    # 2. КУРС ВАЛЮТ
+    # КУРС ВАЛЮТ
     if any(kw in user_text.lower() for kw in ['курс', 'доллар', 'евро', 'валюта']):
         rates = get_exchange_rates()
         if rates:
@@ -861,7 +860,7 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "💵 Не удалось получить курс валют."
     
-    # 3. КРИПТОВАЛЮТЫ
+    # КРИПТОВАЛЮТЫ
     if any(kw in user_text.lower() for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
         crypto = get_crypto_rates()
         if crypto:
@@ -869,77 +868,35 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "🪙 Не удалось получить курс криптовалют."
     
-    # 4. ИСТОРИЧЕСКИЕ ФАКТЫ
-    if any(kw in user_text.lower() for kw in ['исторический факт', 'что произошло', 'в этот день']):
-        return get_historical_fact()
-    
-    # 5. ПОМОЩЬ С ПРОГРАММИРОВАНИЕМ
+    # ПОМОЩЬ С ПРОГРАММИРОВАНИЕМ
     if any(kw in user_text.lower() for kw in ['python', 'javascript', 'html', 'код', 'программа']):
         coding_help = get_coding_help(user_text)
         if coding_help:
             return coding_help
     
-    # 6. КАРТИНКИ
+    # КАРТИНКИ
     if is_image_generation(user_text):
         return None
     
-    # 7. МАТЕМАТИКА
+    # МАТЕМАТИКА
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
     
-    # 8. ПОИСК В ИНТЕРНЕТЕ
+    # ПОИСК В ИНТЕРНЕТЕ
     search_result = None
     if len(user_text) > 5:
         search_result = search_internet(user_text)
     
-    # 9. ЗАПОМИНАЕМ
+    # ЗАПОМИНАЕМ
     if len(user_text) > 20:
         remember(user_id, "интересное", user_text[:100])
     
-    # 10. ЧИСТЫЙ ОТВЕТ ИИ
+    # ЧИСТЫЙ ОТВЕТ ИИ
     return generate_ai_response(user_id, user_text, search_result, None)
 
-def extract_city_from_query(text):
-    text_lower = text.lower()
-    
-    known_cities = [
-        "москва", "санкт-петербург", "ростов-на-дону", "ростов",
-        "новосибирск", "екатеринбург", "казань", "нижний новгород",
-        "краснодар", "сочи", "владивосток", "вологда", "волгодонск",
-    ]
-    
-    for city in known_cities:
-        if city in text_lower:
-            return city
-    
-    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
-    if match:
-        city = match.group(1).strip()
-        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
-            city = city.replace(word, '').strip()
-        if city:
-            return city
-    
-    return None
-
-def get_historical_fact():
-    """Возвращает случайный исторический факт"""
-    facts = [
-        "📜 *Факт:* В 1969 году человек впервые ступил на Луну.",
-        "📜 *Факт:* Первая мировая война началась в 1914 году.",
-        "📜 *Факт:* Древний Рим был основан в 753 году до н.э.",
-        "📜 *Факт:* Первый компьютер был создан в 1941 году.",
-        "📜 *Факт:* Интернет появился в 1983 году.",
-        "📜 *Факт:* Пифагор жил в VI веке до н.э.",
-        "📜 *Факт:* Первая книга была напечатана в 1455 году.",
-        "📜 *Факт:* Титаник затонул в 1912 году.",
-        "📜 *Факт:* Первый полёт человека в космос состоялся в 1961 году.",
-    ]
-    return random.choice(facts)
-
 # ============================================================
-# 12. МЕНЮ
+# МЕНЮ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -956,7 +913,7 @@ def main_menu():
     return keyboard
 
 # ============================================================
-# 13. КОМАНДЫ
+# КОМАНДЫ
 # ============================================================
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -1026,7 +983,15 @@ def profile_cmd_from_user(message, user_id):
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
-    bot.send_message(message.chat.id, f"📊 Профиль\n🆔 {user_id}\n👤 {user_link}\n💎 {status}\n✉️ {messages}/{FREE_LIMIT}")
+    bot.send_message(
+        message.chat.id,
+        f"📊 *Твой профиль*\n\n"
+        f"🆔 ID: `{user_id}`\n"
+        f"👤 Юзер: {user_link}\n"
+        f"💎 Статус: {status}\n"
+        f"✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}",
+        parse_mode='Markdown'
+    )
 
 def stats_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -1090,21 +1055,93 @@ def help_cmd_from_user(message, user_id):
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
+        "/test — Пробный Premium на 1 день\n"
         "/profile — Профиль\n/stats — Статистика\n"
-        "/clear — Очистить\n/draw [описание] — Картинка\n"
-        "/info [ID] — Инфо о пользователе\n"
-        "/givetest [ID] — Премиум на 1 день\n\n"
+        "/clear — Очистить\n/draw [описание] — Картинка\n\n"
         "💎 *Лимиты:*\n"
         "Бесплатно — 10 сообщений/день\n"
         "Premium — безлимит\n"
         "Купить Premium: /premium"
     )
+    
+    # АДМИН-КОМАНДЫ ТОЛЬКО ДЛЯ АДМИНОВ И ОВНЕРА!
     if user_id == OWNER_ID or is_admin(user_id):
-        text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
+        text += "\n\n👑 *Админ-команды:*\n"
+        text += "/giveadmin [ID] — выдать админа\n"
+        text += "/deladmin [ID] — забрать админа\n"
+        text += "/giveprem [ID] [срок] — выдать премиум\n"
+        text += "/givetest [ID] — премиум на 1 день (принудительно)\n"
+        text += "/delprem [ID] — отключить премиум\n"
+        text += "/info [ID] — инфо о пользователе\n"
+        text += "/mute [ID] — замутить\n"
+        text += "/unmute [ID] — размутить\n"
+        text += "/ban [ID] — забанить\n"
+        text += "/unban [ID] — разбанить"
+    
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# 14. КОМАНДЫ BOT
+# КОМАНДА /test (ПРОБНЫЙ PREMIUM 1 РАЗ)
+# ============================================================
+@bot.message_handler(commands=['test'])
+def test_cmd(m):
+    user_id = m.from_user.id
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    
+    # Проверяем, не использовал ли уже
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT test_used, premium FROM users WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
+    conn.close()
+    
+    if result is None:
+        bot.send_message(m.chat.id, "❌ Сначала напиши /start")
+        return
+    
+    test_used, premium = result
+    
+    # Если уже есть Premium
+    if premium == 1:
+        bot.send_message(m.chat.id, "💎 У тебя уже есть Premium! Ты в топе!")
+        return
+    
+    # Если уже использовал тест
+    if test_used == 1:
+        bot.send_message(
+            m.chat.id,
+            "⛔ *Ты уже использовал пробный период!*\n\n"
+            "Купи полноценный Premium:\n"
+            "`/premium`\n\n"
+            "💰 50₽/месяц — пиши @flidges",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Выдаём пробный Premium на 1 день
+    if set_premium(user_id, "1d"):
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET test_used = 1 WHERE user_id = ?', (user_id,))
+        conn.commit()
+        conn.close()
+        
+        bot.send_message(
+            m.chat.id,
+            "🎉 *Тебе выдан пробный Premium на 1 день!*\n\n"
+            "✅ Безлимит сообщений\n"
+            "✅ Приоритетные ответы\n"
+            "✅ Все функции ИИ\n\n"
+            "⏳ Через 24 часа доступ закончится.\n"
+            "Купить полноценный Premium: `/premium`",
+            parse_mode='Markdown'
+        )
+    else:
+        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода. Попробуй позже.")
+
+# ============================================================
+# КОМАНДЫ BOT
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -1123,6 +1160,8 @@ def start(m):
         f"💵 Показываю курс валют и криптовалют\n"
         f"🧮 Решаю задачи и помогаю с программированием\n"
         f"🧠 Анализирую настроение и адаптируюсь\n\n"
+        f"🎁 *Попробуй Premium бесплатно!*\n"
+        f"Напиши `/test` — получи 1 день безлимита!\n\n"
         f"💎 Бесплатно — 10 сообщений/день\n"
         f"Премиум — безлимит (/premium)\n\n"
         f"👇 *Выбери действие:*",
@@ -1202,7 +1241,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# 15. АДМИН-КОМАНДЫ
+# АДМИН-КОМАНДЫ
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -1242,7 +1281,7 @@ def info_cmd(m):
     ensure_user(target_id, "unknown")
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute('SELECT is_admin, premium, premium_expires, messages_today FROM users WHERE user_id = ?', (target_id,))
+    c.execute('SELECT is_admin, premium, premium_expires, messages_today, test_used FROM users WHERE user_id = ?', (target_id,))
     result = c.fetchone()
     conn.close()
     if result is None:
@@ -1250,7 +1289,8 @@ def info_cmd(m):
         return
     admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
     premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
-    bot.send_message(m.chat.id, f"📊 Инфо о {target_id}\n👑 {admin_status}\n💎 {premium_status}\n✉️ {result[3]} сообщений сегодня")
+    test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
+    bot.send_message(m.chat.id, f"📊 Инфо о {target_id}\n👑 {admin_status}\n💎 {premium_status}\n🎁 Тест: {test_status}\n✉️ {result[3]} сообщений сегодня")
 
 @bot.message_handler(commands=['giveadmin'])
 def giveadmin_cmd(m):
@@ -1420,7 +1460,7 @@ def unban_cmd(m):
     bot.send_message(m.chat.id, f"✅ {target_id} разбанен")
 
 # ============================================================
-# 16. КАРТИНКИ
+# КАРТИНКИ
 # ============================================================
 def generate_and_send_image(m, prompt):
     user_id = m.from_user.id
@@ -1443,7 +1483,7 @@ def generate_and_send_image(m, prompt):
         bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать.")
 
 # ============================================================
-# 17. ФОТО
+# ФОТО
 # ============================================================
 @bot.message_handler(content_types=['photo'])
 def handle_photo(m):
@@ -1476,7 +1516,7 @@ def handle_photo(m):
         bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
-# 18. ГОЛОС
+# ГОЛОС
 # ============================================================
 @bot.message_handler(content_types=['voice'])
 def handle_voice(m):
@@ -1529,7 +1569,7 @@ def stt(audio_data):
         return None
 
 # ============================================================
-# 19. ТЕКСТ (С АНТИ-СПАМОМ)
+# ТЕКСТ
 # ============================================================
 @bot.message_handler(content_types=['text'])
 def handle_text(m):
@@ -1574,7 +1614,7 @@ def handle_text(m):
         ]))
 
 # ============================================================
-# 20. КНОПКИ
+# КНОПКИ
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -1609,14 +1649,14 @@ def handle_callback(call):
         bot.send_message(call.message.chat.id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
-# 21. ОСТАЛЬНОЕ
+# ОСТАЛЬНОЕ
 # ============================================================
 @bot.message_handler(content_types=['video', 'document', 'audio'])
 def other(m):
     bot.send_message(m.chat.id, "📁 Пока не умею обрабатывать этот тип файлов.")
 
 # ============================================================
-# 22. ЗАПУСК
+# ЗАПУСК
 # ============================================================
 init_db()
 init_memory_db()
@@ -1631,6 +1671,8 @@ print("🧮 Решение задач и программирование")
 print("🧠 Анализ настроения и адаптация")
 print("⏳ Анти-спам: 3 секунды")
 print("💎 Бесплатно: 10 сообщений/день")
+print("🎁 Пробный Premium: /test (1 раз)")
+print("👑 Админ-команды скрыты от обычных юзеров")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
