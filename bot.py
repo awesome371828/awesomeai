@@ -581,13 +581,10 @@ def ensure_user(user_id, username):
         
         user_link = f"@{username}" if username and username != "unknown" else "Не указан"
         text = (
-            "✦ ──────── ✦\n"
-            "🆕 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n"
-            "✦ ──────── ✦\n\n"
+            "🆕 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\n"
             f"🆔 ID: {user_id}\n"
             f"👤 Юзер: {user_link}\n"
-            f"📅 Время: {joined_at}\n\n"
-            "✦ ──────── ✦"
+            f"📅 Время: {joined_at}"
         )
         try:
             bot.send_message(OWNER_ID, text, parse_mode='Markdown')
@@ -926,17 +923,15 @@ def main_menu():
 def back_to_menu():
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(
-        types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
+        types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")
     )
     return keyboard
 
 def premium_menu():
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(
-        types.InlineKeyboardButton("📩 Написать владельцу", callback_data="contact_owner")
-    )
-    keyboard.add(
-        types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
+        types.InlineKeyboardButton("💎 Купить Premium", callback_data="contact_owner"),
+        types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")
     )
     return keyboard
 
@@ -960,13 +955,13 @@ def start(m):
     init_memory_db()
     
     text = (
-        "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
+        "🌟 *AWESOME AI — МЕГА-ИИ!*\n\n"
         f"🌸 Привет, {m.from_user.first_name}!\n\n"
         "🌐 Я умею искать в Google, Wikipedia и новостях\n"
         "💵 Показываю курс валют и криптовалют\n"
         "🧮 Решаю задачи и помогаю с программированием\n"
         "🧠 Анализирую настроение и адаптируюсь\n\n"
-        "🎁 Попробуй Premium бесплатно!\n"
+        "🎁 *Попробуй Premium бесплатно!*\n"
         "Нажми кнопку «Тест Premium» 👇\n\n"
         "💎 Бесплатно — 10 сообщений/день\n"
         "💎 Премиум — безлимит (/premium)"
@@ -1125,7 +1120,7 @@ def admin_panel(m):
         return
     
     text = (
-        "🛡️ АДМИН-ПАНЕЛЬ\n\n"
+        "🛡️ *АДМИН-ПАНЕЛЬ*\n\n"
         "👋 Привет, админ!\n"
         "Выбери действие ниже 👇"
     )
@@ -1166,7 +1161,7 @@ def status_cmd_from_user(message, user_id):
             status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
     
     text = (
-        "📊 ТВОЙ СТАТУС\n\n"
+        "📊 *ТВОЙ СТАТУС*\n\n"
         f"{status_text}"
     )
     
@@ -1177,12 +1172,12 @@ def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
     text = (
-        "💎 PREMIUM AWESOME AI\n\n"
+        "💎 *PREMIUM AWESOME AI*\n\n"
         "✅ Безлимит сообщений\n"
         "✅ Приоритетные ответы\n"
         "✅ Эксклюзивные функции\n\n"
         "💰 Цена: 50₽/месяц\n\n"
-        "📩 Для покупки напиши владельцу:"
+        "📩 Нажми кнопку ниже, чтобы связаться с владельцем:"
     )
     
     msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='Markdown')
@@ -1220,8 +1215,8 @@ def profile_cmd_from_user(message, user_id):
     user_link = f"@{username}" if username else "Не указан"
 
     text = (
-        "📊 ТВОЙ ПРОФИЛЬ\n\n"
-        f"🆔 ID: {user_id}\n"
+        "📊 *ТВОЙ ПРОФИЛЬ*\n\n"
+        f"🆔 ID: `{user_id}`\n"
         f"👤 Юзер: {user_link}\n"
         f"💎 Статус: {status}\n"
         f"✉️ Сегодня: {messages}/{FREE_LIMIT}\n"
@@ -1248,7 +1243,7 @@ def stats_cmd_from_user(message, user_id):
         conn.close()
         
         text = (
-            "📊 СТАТИСТИКА СЕРВЕРА\n\n"
+            "📊 *СТАТИСТИКА СЕРВЕРА*\n\n"
             f"👥 Всего: {total_users}\n"
             f"💎 Premium: {premium_users}\n"
             f"🔓 Бесплатных: {total_users - premium_users}\n"
@@ -1282,7 +1277,7 @@ def stats_cmd_from_user(message, user_id):
     conn.close()
 
     text = (
-        "📊 ТВОЯ СТАТИСТИКА\n\n"
+        "📊 *ТВОЯ СТАТИСТИКА*\n\n"
         f"👤 Статус: {user_status}\n"
         f"✉️ Сегодня: {user_messages}\n"
         f"📨 Всего: {total_user_messages}"
@@ -1300,7 +1295,7 @@ def clear_cmd_from_user(message, user_id):
         user_message_ids[user_id] = []
     
     text = (
-        "🧹 ИСТОРИЯ ОЧИЩЕНА\n\n"
+        "🧹 *ИСТОРИЯ ОЧИЩЕНА*\n\n"
         "🌸 Теперь я ничего не помню.\n"
         "Начинаем с чистого листа! 📝"
     )
@@ -1312,8 +1307,8 @@ def help_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
     text = (
-        "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
-        "🌐 Что я умею:\n"
+        "🧠 *AWESOME AI — МЕГА-ИИ!*\n\n"
+        "🌐 *Что я умею:*\n"
         "🔍 Ищу в Google, Wikipedia и новостях\n"
         "🌤 Погода с прогнозом на неделю\n"
         "💵 Курс валют и криптовалют\n"
@@ -1323,7 +1318,7 @@ def help_cmd_from_user(message, user_id):
         "🧠 Анализирую настроение\n"
         "🧹 Запоминаю факты из диалогов\n"
         "🎨 Генерирую картинки\n\n"
-        "📋 Команды:\n"
+        "📋 *Команды:*\n"
         "/start — Меню\n"
         "/help — Помощь\n"
         "/status — Статус\n"
@@ -1333,7 +1328,7 @@ def help_cmd_from_user(message, user_id):
         "/stats — Статистика\n"
         "/clear — Очистить\n"
         "/draw [описание] — Картинка\n\n"
-        "💎 Лимиты:\n"
+        "💎 *Лимиты:*\n"
         "🔓 Бесплатно — 10 сообщений/день\n"
         "💎 Premium — безлимит\n"
         "Купить Premium: /premium"
@@ -1341,7 +1336,7 @@ def help_cmd_from_user(message, user_id):
     
     if user_id == OWNER_ID or is_admin(user_id):
         text += (
-            "\n\n👑 Админ-панель: /admin"
+            "\n\n👑 *Админ-панель:* /admin"
         )
     
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
@@ -1366,7 +1361,7 @@ def process_test_premium(chat_id, user_id):
     
     if premium == 1:
         text = (
-            "💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n"
+            "💎 *У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!*\n\n"
             "Ты уже в топе! 🚀"
         )
         msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
@@ -1375,7 +1370,7 @@ def process_test_premium(chat_id, user_id):
     
     if test_used == 1:
         text = (
-            "⛔ ТЫ УЖЕ ИСПОЛЬЗОВАЛ ТЕСТ!\n\n"
+            "⛔ *ТЫ УЖЕ ИСПОЛЬЗОВАЛ ТЕСТ!*\n\n"
             "Пробный период закончился.\n"
             "Купи Premium: /premium\n\n"
             "💰 50₽/месяц — @flidges"
@@ -1392,7 +1387,7 @@ def process_test_premium(chat_id, user_id):
         conn.close()
         
         text = (
-            "🎉 ПРОБНЫЙ PREMIUM АКТИВИРОВАН!\n\n"
+            "🎉 *ПРОБНЫЙ PREMIUM АКТИВИРОВАН!*\n\n"
             "✅ Безлимит сообщений\n"
             "✅ Приоритетные ответы\n"
             "✅ Все функции ИИ\n\n"
@@ -1680,8 +1675,8 @@ def info_cmd(m):
     test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
     
     text = (
-        "📊 ИНФО О ПОЛЬЗОВАТЕЛЕ\n\n"
-        f"🆔 ID: {target_id}\n"
+        "📊 *ИНФО О ПОЛЬЗОВАТЕЛЕ*\n\n"
+        f"🆔 ID: `{target_id}`\n"
         f"👑 Админ: {admin_status}\n"
         f"💎 Premium: {premium_status}\n"
         f"🎁 Тест: {test_status}\n"
@@ -2023,7 +2018,7 @@ def handle_text(m):
         user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# АДМИН-МЕНЮ (ДЛЯ КНОПОК)
+# АДМИН-МЕНЮ
 # ============================================================
 def admin_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -2060,17 +2055,17 @@ def handle_callback(call):
         except:
             pass
         
-        # === КНОПКА "НАЗАД" ===
+        # === КНОПКА "ГЛАВНОЕ МЕНЮ" ===
         if call.data == "back_to_menu":
             bot.answer_callback_query(call.id)
             text = (
-                "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
+                "🌟 *AWESOME AI — МЕГА-ИИ!*\n\n"
                 f"🌸 Привет, {call.from_user.first_name}!\n\n"
                 "🌐 Я умею искать в Google, Wikipedia и новостях\n"
                 "💵 Показываю курс валют и криптовалют\n"
                 "🧮 Решаю задачи и помогаю с программированием\n"
                 "🧠 Анализирую настроение и адаптируюсь\n\n"
-                "🎁 Попробуй Premium бесплатно!\n"
+                "🎁 *Попробуй Premium бесплатно!*\n"
                 "Нажми кнопку «Тест Premium» 👇\n\n"
                 "💎 Бесплатно — 10 сообщений/день\n"
                 "💎 Премиум — безлимит (/premium)"
@@ -2084,8 +2079,11 @@ def handle_callback(call):
             bot.answer_callback_query(call.id)
             msg = bot.send_message(
                 chat_id,
-                "📩 Напиши владельцу @flidges для покупки Premium!\n\n"
-                "Он ответит на все вопросы и оформит доступ."
+                "📩 *Связь с владельцем*\n\n"
+                "Напиши @flidges для покупки Premium!\n\n"
+                "Он ответит на все вопросы и оформит доступ ✅",
+                reply_markup=back_to_menu(),
+                parse_mode='Markdown'
             )
             user_message_ids[user_id].append(msg.message_id)
             return
@@ -2164,9 +2162,9 @@ def handle_callback(call):
             conn.close()
             
             if not admins:
-                text = "👑 АДМИНЫ\n\nНет админов."
+                text = "👑 *АДМИНЫ*\n\nНет админов."
             else:
-                text = "👑 АДМИНЫ\n\n"
+                text = "👑 *АДМИНЫ*\n\n"
                 for admin in admins:
                     user_link = f"@{admin[1]}" if admin[1] else f"`{admin[0]}`"
                     text += f"• {user_link}\n"
@@ -2292,7 +2290,7 @@ def other(m):
         pass
     
     text = (
-        "📁 ПОКА НЕ УМЕЮ\n\n"
+        "📁 *ПОКА НЕ УМЕЮ*\n\n"
         "Пришли текст, фото или голосовое."
     )
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
@@ -2311,7 +2309,7 @@ print(f"🤖 Бот: @{bot.get_me().username}")
 print("👤 ПРАВИЛЬНЫЙ ЮЗЕРНЕЙМ — ВКЛЮЧЁН!")
 print("🔙 КНОПКА НАЗАД — ВКЛЮЧЕНА!")
 print("📩 КНОПКА СВЯЗИ С ВЛАДЕЛЬЦЕМ — ВКЛЮЧЕНА!")
-print("🎨 МИНИМАЛИСТИЧНЫЙ ДИЗАЙН — ВКЛЮЧЁН!")
+print("🎨 КРАСИВЫЙ ДИЗАЙН — ВКЛЮЧЁН!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
