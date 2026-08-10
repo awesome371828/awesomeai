@@ -1,6 +1,3 @@
-# Устанавливаем библиотеки (Colab часто сбрасывает их)
-!pip install telebot requests beautifulsoup4 Pillow speechrecognition python-dateutil
-
 #!/usr/bin/env python3
 
 import telebot
