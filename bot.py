@@ -38,19 +38,18 @@ FREE_LIMIT = 10
 # ============================================================
 # АНТИ-СПАМ (1 СООБЩЕНИЕ В 5 СЕКУНД)
 # ============================================================
-user_last_message = {}  # user_id -> timestamp
+user_last_message = {}
 
 def check_spam(user_id):
-    """Проверяет, не спамит ли пользователь"""
     now = time.time()
     if user_id in user_last_message:
         if now - user_last_message[user_id] < 5:
-            return True  # Спам!
+            return True
     user_last_message[user_id] = now
-    return False  # Не спам
+    return False
 
 # ============================================================
-# СУПЕР-ПРОМПТ (БЕЗ ШАБЛОНОВ!)
+# СУПЕР-ПРОМПТ
 # ============================================================
 SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек.
 
@@ -75,6 +74,8 @@ SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий 
 
 НИКАКИХ ШАБЛОНОВ! НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ!
 ОТВЕЧАЙ КАК УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК!
+
+ВАЖНО: Если пользователь спрашивает про покупку Premium — отправь ему команду /premium и скажи, что там всё написано.
 """
 
 # ============================================================
@@ -539,9 +540,25 @@ def solve_math(text):
     except:
         return None
 
+def is_premium_question(text):
+    """Проверяет, спрашивает ли пользователь про покупку Premium"""
+    keywords = ['премиум', 'premium', 'купить', 'оплатить', 'приобрести', 'безлимит', 'лимит', 'ограничение', 'сколько стоит']
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in keywords)
+
 def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
     """ЧИСТЫЙ ИИ — БЕЗ ШАБЛОНОВ!"""
     try:
+        # ЕСЛИ СПРАШИВАЕТ ПРО PREMIUM — ОТВЕЧАЕМ СРАЗУ!
+        if is_premium_question(user_text):
+            return (
+                "💎 *Premium AWESOME AI*\n\n"
+                "Чтобы купить Premium, напиши команду:\n"
+                "`/premium`\n\n"
+                "Там вся информация: цена, что даёт и как оплатить.\n\n"
+                "Если хочешь сразу — пиши @flidges, он оформит!"
+            )
+        
         memories = recall(user_id, user_text)
         
         system_prompt = SUPER_SYSTEM_PROMPT
@@ -603,7 +620,6 @@ def get_fallback_response(user_id, user_text, search_result=None, image_descript
     if memories:
         return f"🧠 Я помню: {memories[0]}"
     
-    # Генерируем случайный живой ответ
     phrases = [
         f"Хм, дай подумать... Что ты имеешь в виду под '{user_text[:20]}'?",
         f"Интересный вопрос! Я тут думаю... Что именно тебя интересует?",
@@ -716,7 +732,7 @@ def premium_cmd_from_user(message, user_id):
         "📩 *Как купить:*\n"
         "Напиши @flidges — оплати и получи Premium!\n\n"
         "После оплаты я выдам тебе доступ командой:\n"
-        "/giveprem [твой ID] 1mes"
+        "`/giveprem [твой ID] 1mes`"
     )
 
 def profile_cmd_from_user(message, user_id):
@@ -1248,7 +1264,6 @@ def handle_text(m):
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
     
-    # АНТИ-СПАМ: 1 сообщение в 5 секунд
     if check_spam(user_id):
         bot.send_message(m.chat.id, "⏳ Не спамь! Подожди 5 секунд.")
         return
@@ -1338,6 +1353,7 @@ print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
 print("⏳ Анти-спам: 5 секунд на сообщение")
 print("💎 Бесплатно: 10 сообщений/день")
+print("✅ Premium: /premium")
 print("🚫 НИКАКИХ ШАБЛОНОВ!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
