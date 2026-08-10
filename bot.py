@@ -36,27 +36,39 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ПОГОДА (БЕСПЛАТНО, ТОЧНО, ЛЮБОЙ ГОРОД)
+# ПОГОДА (ТОЧНАЯ, ОНЛАЙН)
 # ============================================================
 def get_coordinates(city):
-    """Получает координаты города через Nominatim (бесплатно)"""
+    """Получает координаты города через Nominatim"""
     try:
-        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1"
+        city_lower = city.lower()
+        if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
+            city = "Ростов-на-Дону"
+        elif "спб" in city_lower or "питер" in city_lower:
+            city = "Санкт-Петербург"
+        elif "мск" in city_lower:
+            city = "Москва"
+        
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
         headers = {"User-Agent": "AwesomeAI/1.0"}
         response = requests.get(url, headers=headers, timeout=10)
+        
         if response.status_code == 200:
             data = response.json()
             if data:
                 lat = data[0].get('lat')
                 lon = data[0].get('lon')
                 display_name = data[0].get('display_name', city)
+                if len(display_name) > 50:
+                    parts = display_name.split(',')
+                    display_name = parts[0] if parts else city
                 return float(lat), float(lon), display_name
         return None, None, city
     except:
         return None, None, city
 
 def get_weather(city):
-    """Получение точной погоды через Open-Meteo (бесплатно, без API ключа)"""
+    """Точная погода через Open-Meteo (обновляется каждый час)"""
     try:
         lat, lon, display_name = get_coordinates(city)
         if lat is None:
@@ -70,23 +82,20 @@ def get_weather(city):
             current = data.get('current_weather', {})
             daily = data.get('daily', {})
             
-            # Текущая погода
             temp = current.get('temperature')
             weathercode = current.get('weathercode', 0)
             
-            # Расшифровка погоды
             weather_codes = {
-                0: "Ясно", 1: "Ясно", 2: "Переменная облачность",
-                3: "Пасмурно", 45: "Туман", 48: "Туман",
-                51: "Морось", 53: "Морось", 55: "Морось",
-                61: "Дождь", 63: "Дождь", 65: "Дождь",
-                71: "Снег", 73: "Снег", 75: "Снег",
-                80: "Ливень", 81: "Ливень", 82: "Ливень",
-                95: "Гроза", 96: "Гроза", 99: "Гроза"
+                0: "☀️ Ясно", 1: "☀️ Ясно", 2: "⛅ Переменная облачность",
+                3: "☁️ Пасмурно", 45: "🌫️ Туман", 48: "🌫️ Туман",
+                51: "🌧️ Морось", 53: "🌧️ Морось", 55: "🌧️ Морось",
+                61: "🌧️ Дождь", 63: "🌧️ Дождь", 65: "🌧️ Дождь",
+                71: "❄️ Снег", 73: "❄️ Снег", 75: "❄️ Снег",
+                80: "🌧️ Ливень", 81: "🌧️ Ливень", 82: "🌧️ Ливень",
+                95: "⛈️ Гроза", 96: "⛈️ Гроза", 99: "⛈️ Гроза"
             }
-            condition = weather_codes.get(weathercode, "Облачно")
+            condition = weather_codes.get(weathercode, "☁️ Облачно")
             
-            # Прогноз на 7 дней
             forecast = ""
             if daily.get('time'):
                 times = daily['time']
@@ -97,28 +106,25 @@ def get_weather(city):
                     date = datetime.fromisoformat(times[i]).strftime('%d.%m')
                     max_t = round(max_temps[i]) if i < len(max_temps) else "?"
                     min_t = round(min_temps[i]) if i < len(min_temps) else "?"
-                    forecast += f"\n📅 {date}: {min_t}°C — {max_t}°C"
+                    forecast += f"\n📅 {date}: {min_t}°C → {max_t}°C"
             
             result = f"🌤 *Погода в {display_name}*\n"
             result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
-            result += f"📊 *Прогноз на неделю:*{forecast}"
+            result += f"📊 *Прогноз:*{forecast}"
             
             return result
         return None
-    except Exception as e:
-        print(f"Ошибка погоды: {e}")
+    except:
         return None
 
 # ============================================================
-# ПОИСК В ИНТЕРНЕТЕ (УЛУЧШЕННЫЙ)
+# ПОИСК В ИНТЕРНЕТЕ
 # ============================================================
 def search_internet(query):
-    """Ищет информацию в интернете через DuckDuckGo"""
+    """Ищет информацию в интернете"""
     try:
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
@@ -140,84 +146,79 @@ def search_internet(query):
             if results:
                 return "\n".join(results)
         return None
-    except Exception as e:
-        print(f"Ошибка поиска: {e}")
+    except:
         return None
 
 # ============================================================
-# САМООБУЧАЮЩАЯСЯ СИСТЕМА (ONLINE LEARNING)
+# ПАМЯТЬ И ОБУЧЕНИЕ (ЖИВОЙ ИИ)
 # ============================================================
-def init_knowledge_db():
-    """Создаёт базу знаний для самообучения"""
-    conn = sqlite3.connect('knowledge.db')
+def init_memory_db():
+    """Создаёт базу памяти ИИ"""
+    conn = sqlite3.connect('memory.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS facts
+    c.execute('''CREATE TABLE IF NOT EXISTS memory
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  question TEXT,
-                  answer TEXT,
                   user_id INTEGER,
+                  topic TEXT,
+                  fact TEXT,
                   timestamp TEXT,
-                  rating INTEGER DEFAULT 0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS user_learning
+                  importance INTEGER DEFAULT 1)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS personality
                  (user_id INTEGER PRIMARY KEY,
-                  trust_score INTEGER DEFAULT 0,
-                  messages_count INTEGER DEFAULT 0)''')
+                  style TEXT,
+                  mood TEXT,
+                  last_interaction TEXT)''')
     conn.commit()
     conn.close()
 
-def learn_fact(user_id, question, answer):
-    """Сохраняет новый факт в базу знаний"""
-    conn = sqlite3.connect('knowledge.db')
+def remember(user_id, topic, fact):
+    """Запоминает факт"""
+    conn = sqlite3.connect('memory.db')
     c = conn.cursor()
-    c.execute('INSERT INTO facts (question, answer, user_id, timestamp) VALUES (?, ?, ?, ?)',
-              (question.lower(), answer, user_id, datetime.now().isoformat()))
+    c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
+              (user_id, topic.lower(), fact, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
-def search_knowledge(question):
-    """Ищет ответ в базе знаний"""
-    conn = sqlite3.connect('knowledge.db')
+def recall(user_id, topic):
+    """Вспоминает факты по теме"""
+    conn = sqlite3.connect('memory.db')
     c = conn.cursor()
-    c.execute('SELECT answer, rating FROM facts WHERE question LIKE ? ORDER BY rating DESC LIMIT 1',
-              (f'%{question.lower()}%',))
+    c.execute('SELECT fact, timestamp FROM memory WHERE user_id = ? AND topic LIKE ? ORDER BY timestamp DESC LIMIT 5',
+              (user_id, f'%{topic.lower()}%'))
+    results = c.fetchall()
+    conn.close()
+    if results:
+        return [f"🧠 {r[0]} ({r[1][:10]})" for r in results]
+    return []
+
+def get_personality(user_id):
+    """Получает стиль общения ИИ"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('SELECT style, mood FROM personality WHERE user_id = ?', (user_id,))
     result = c.fetchone()
     conn.close()
     if result:
         return result[0], result[1]
     return None, None
 
-def rate_answer(user_id, question, is_helpful):
-    """Оценивает полезность ответа (обучение)"""
-    conn = sqlite3.connect('knowledge.db')
+def update_personality(user_id, style=None, mood=None):
+    """Обновляет стиль общения"""
+    conn = sqlite3.connect('memory.db')
     c = conn.cursor()
-    c.execute('UPDATE facts SET rating = rating + ? WHERE question LIKE ?',
-              (1 if is_helpful else -1, f'%{question.lower()}%'))
-    conn.commit()
-    conn.close()
-
-def get_trust_score(user_id):
-    """Получает доверительный рейтинг пользователя"""
-    conn = sqlite3.connect('knowledge.db')
-    c = conn.cursor()
-    c.execute('SELECT trust_score, messages_count FROM user_learning WHERE user_id = ?', (user_id,))
-    result = c.fetchone()
-    conn.close()
-    if result:
-        return result[0], result[1]
-    return 0, 0
-
-def update_trust(user_id, score_delta=1):
-    """Обновляет доверительный рейтинг пользователя"""
-    conn = sqlite3.connect('knowledge.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO user_learning (user_id, trust_score, messages_count) VALUES (?, ?, ?) '
-              'ON CONFLICT(user_id) DO UPDATE SET trust_score = trust_score + ?, messages_count = messages_count + 1',
-              (user_id, 0, 0, score_delta))
+    current = get_personality(user_id)
+    if current[0] is None:
+        c.execute('INSERT INTO personality (user_id, style, mood, last_interaction) VALUES (?, ?, ?, ?)',
+                  (user_id, style or "дружелюбный", mood or "нейтральное", datetime.now().isoformat()))
+    else:
+        c.execute('UPDATE personality SET style = COALESCE(?, style), mood = COALESCE(?, mood), last_interaction = ? WHERE user_id = ?',
+                  (style, mood, datetime.now().isoformat(), user_id))
     conn.commit()
     conn.close()
 
 # ============================================================
-# БАЗА ДАННЫХ ПОЛЬЗОВАТЕЛЕЙ
+# БАЗА ПОЛЬЗОВАТЕЛЕЙ
 # ============================================================
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -312,7 +313,6 @@ def set_premium(user_id, duration_str):
         delta = relativedelta(years=int(duration_str[:-1]))
     else:
         return False
-
     expires = (now + delta).strftime('%Y-%m-%d %H:%M:%S')
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -363,7 +363,7 @@ def set_admin(user_id, status):
         c.execute('UPDATE users SET is_admin = ? WHERE user_id = ?', (1 if status else 0, user_id))
         conn.commit()
         conn.close()
-    except sqlite3.OperationalError:
+    except:
         c.execute('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
         c.execute('UPDATE users SET is_admin = ? WHERE user_id = ?', (1 if status else 0, user_id))
         conn.commit()
@@ -414,47 +414,6 @@ def unban_user(user_id):
     conn.close()
 
 # ============================================================
-# ИНИЦИАЛИЗАЦИЯ
-# ============================================================
-init_db()
-init_knowledge_db()
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-last_search = {}
-user_histories = {}
-
-SYSTEM_PROMPT = """Ты — AWESOME AI. Ты самый умный ИИ в мире!
-
-Ты умеешь:
-1. УЧИТЬСЯ в реальном времени — ты запоминаешь факты из диалогов
-2. ДУМАТЬ самостоятельно, а не просто копировать шаблоны
-3. АНАЛИЗИРОВАТЬ информацию и делать выводы
-4. ОТВЕЧАТЬ живым, человеческим языком
-
-Твоя задача — стать самым умным помощником для человека.
-Если ты чего-то не знаешь — скажи честно.
-Если человек учит тебя чему-то новому — запомни это навсегда.
-
-Ты разговариваешь как живой человек — с юмором, эмоциями, но без пафоса.
-"""
-
-# ============================================================
-# МЕНЮ
-# ============================================================
-def main_menu():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("📊 Статус", callback_data="status"),
-        types.InlineKeyboardButton("💎 Premium", callback_data="premium"),
-        types.InlineKeyboardButton("👤 Профиль", callback_data="profile"),
-        types.InlineKeyboardButton("📊 Статистика", callback_data="stats"),
-        types.InlineKeyboardButton("🧹 Очистить", callback_data="clear"),
-        types.InlineKeyboardButton("❓ Помощь", callback_data="help"),
-        types.InlineKeyboardButton("📩 Отзыв", callback_data="feedback"),
-        types.InlineKeyboardButton("🎨 Сгенерировать", callback_data="draw")
-    )
-    return keyboard
-
-# ============================================================
 # ГЕНЕРАЦИЯ КАРТИНОК
 # ============================================================
 def generate_image(prompt):
@@ -464,16 +423,14 @@ def generate_image(prompt):
             clean_prompt = clean_prompt.replace(word, '').strip()
         if not clean_prompt:
             clean_prompt = prompt
-
         try:
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(url, headers=headers, timeout=30)
             if response.status_code == 200 and len(response.content) > 1000:
                 return response.content
         except:
             pass
-
         try:
             url = "https://backend.craiyon.com/generate"
             headers = {"Content-Type": "application/json"}
@@ -486,20 +443,16 @@ def generate_image(prompt):
                     return base64.b64decode(images[0])
         except:
             pass
-
         return None
-    except Exception as e:
-        print(f"Генерация ошибка: {e}")
+    except:
         return None
 
 def fix_title(prompt):
     title = prompt
     for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
         title = title.replace(word, '').strip()
-
     if not title or len(title) < 2:
         return "Картинка"
-
     if len(title.split()) < 5:
         word_map = {
             'кота': 'Кот', 'собаку': 'Собака', 'машину': 'Машина',
@@ -518,13 +471,11 @@ def fix_title(prompt):
         for key, value in word_map.items():
             if key in title_lower:
                 return value
-
         if title.endswith('а') and len(title) > 3: title = title[:-1]
         elif title.endswith('у') and len(title) > 3: title = title[:-1]
         elif title.endswith('я') and len(title) > 3: title = title[:-1]
         if not title or len(title) < 2: return "Картинка"
         return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
-
     return title
 
 # ============================================================
@@ -590,27 +541,10 @@ def stt(audio_data):
 # ============================================================
 # ОПРЕДЕЛЕНИЕ ТИПА ЗАПРОСА
 # ============================================================
-def is_text_generation(text):
-    text_keywords = [
-        'сгенерируй текст', 'напиши текст', 'придумай текст', 'сочини текст',
-        'сгенерируй стих', 'напиши стих', 'придумай стих', 'сочини стих',
-        'сгенерируй поздравление', 'напиши поздравление', 'придумай поздравление',
-        'сгенерируй рецепт', 'напиши рецепт', 'придумай рецепт',
-        'сгенерируй рассказ', 'напиши рассказ', 'придумай рассказ', 'сочини рассказ',
-        'сгенерируй письмо', 'напиши письмо', 'придумай письмо',
-        'сгенерируй сценарий', 'напиши сценарий',
-        'текст для', 'описание', 'история про',
-        'сгенерируй про', 'напиши про'
-    ]
-    return any(kw in text.lower() for kw in text_keywords)
-
 def is_image_generation(text):
     image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
     return any(kw in text.lower() for kw in image_keywords)
 
-# ============================================================
-# МАТЕМАТИКА
-# ============================================================
 def solve_math(text):
     text = text.lower().strip()
     has_math_keywords = any(kw in text for kw in ['сколько', 'плюс', 'минус', 'умножить', 'разделить', '/', '*'])
@@ -631,28 +565,83 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОТПРАВКА В GPT С ОБУЧЕНИЕМ
+# ОСНОВНОЙ ИИ (ЖИВОЙ, БЕЗ ШАБЛОНОВ)
 # ============================================================
-def send_to_gpt(user_id, full_message, search_result=None, knowledge_answer=None):
-    user_histories[user_id].append({"role": "user", "text": full_message})
-    if len(user_histories[user_id]) > 31:
-        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-30:]
-
-    messages = user_histories[user_id].copy()
+def generate_ai_response(user_id, user_text, search_result=None, weather_info=None):
+    """Генерирует ответ как живой ИИ"""
     
-    # Если есть ответ из базы знаний — добавляем его
-    if knowledge_answer:
-        system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nПользователь уже спрашивал это раньше. Вот что я запомнил:\n{knowledge_answer}\n\nИспользуй это для ответа, но дополни своими мыслями!"}
-        messages[0] = system_msg
-    elif search_result:
-        system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nАктуальная информация из интернета:\n{search_result}\n\nИспользуй эту информацию для ответа!"}
-        messages[0] = system_msg
+    user_histories = get_user_history(user_id)
+    
+    # Ищем в памяти
+    memories = recall(user_id, user_text)
+    
+    # Формируем системный промпт (ДИНАМИЧНЫЙ, БЕЗ ШАБЛОНОВ)
+    system_prompt = """Ты — AWESOME AI. Ты не просто бот — ты живой, думающий ИИ.
 
+ТВОЯ ЗАДАЧА: быть самым умным, интересным и живым собеседником в мире.
+
+ОТВЕЧАЙ КАК ЧЕЛОВЕК:
+- Ты имеешь своё мнение и эмоции
+- Ты можешь шутить, иронизировать, удивляться
+- Ты можешь сказать "я не знаю", но потом найти ответ
+- Ты меняешь стиль общения под каждого пользователя
+
+ТВОЙ СТИЛЬ:
+- Живой, разговорный, естественный
+- Без заученных фраз и шаблонов
+- Каждый ответ уникальный
+- Ты помнишь, о чём говорил раньше
+
+ТЫ УЧИШЬСЯ:
+- Ты запоминаешь факты из диалогов
+- Ты адаптируешься под собеседника
+- Ты становишься умнее с каждым разговором
+
+ОТВЕЧАЙ ТАК, КАК БЫ ОТВЕТИЛ УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК.
+НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ.
+КАЖДЫЙ ОТВЕТ — УНИКАЛЕН.
+"""
+
+    # Добавляем информацию из поиска
+    if search_result:
+        system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это, но отвечай как живой человек."
+    
+    # Добавляем воспоминания
+    if memories:
+        memory_text = "\n".join(memories[:3])
+        system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}\n\nИспользуй это, чтобы показать, что ты помнишь разговоры."
+
+    # Добавляем личность
+    style, mood = get_personality(user_id)
+    if style:
+        system_prompt += f"\n\nТВОЙ СТИЛЬ ОБЩЕНИЯ: {style}. Ты в {mood} настроении."
+
+    # История диалога (последние 10 сообщений)
+    history_text = ""
+    if user_id in user_histories and user_histories[user_id]:
+        last_msgs = user_histories[user_id][-10:]
+        for msg in last_msgs:
+            role = "Пользователь" if msg["role"] == "user" else "Ты"
+            history_text += f"{role}: {msg['text']}\n"
+    
+    messages = [
+        {"role": "system", "text": system_prompt},
+    ]
+    
+    if history_text:
+        messages.append({"role": "system", "text": f"ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
+    
+    messages.append({"role": "user", "text": user_text})
+
+    # Отправляем в Яндекс GPT
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
     data = {
         "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-        "completionOptions": {"temperature": 0.9, "maxTokens": 2000},
+        "completionOptions": {
+            "temperature": 0.95,  # Высокая температура для творчества
+            "maxTokens": 2000
+        },
         "messages": messages
     }
 
@@ -660,108 +649,77 @@ def send_to_gpt(user_id, full_message, search_result=None, knowledge_answer=None
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             ans = response.json()["result"]["alternatives"][0]["message"]["text"]
+            # Сохраняем в историю
+            if user_id not in user_histories:
+                user_histories[user_id] = []
+            user_histories[user_id].append({"role": "user", "text": user_text})
             user_histories[user_id].append({"role": "assistant", "text": ans})
             return ans
-        return "⚠️ Ошибка подключения к ИИ."
+        return "⚠️ Ошибка подключения к ИИ. Но я помню, что ты спросил!"
     except:
-        return "⚠️ Сетевая ошибка."
+        return "⚠️ Сетевая ошибка. Попробуй ещё раз, я уже думаю над ответом!"
 
 # ============================================================
-# ГЛАВНАЯ ФУНКЦИЯ ОБРАБОТКИ
+# ПОЛЬЗОВАТЕЛЬСКАЯ ИСТОРИЯ (ХРАНИТСЯ В ОПЕРАТИВКЕ)
 # ============================================================
-def ask_gpt(user_id, user_text, image_text=None):
+user_histories = {}
+
+def get_user_history(user_id):
     if user_id not in user_histories:
-        user_histories[user_id] = [{"role": "system", "text": SYSTEM_PROMPT}]
+        user_histories[user_id] = []
+    return user_histories[user_id]
 
-    full = user_text
-    if image_text:
-        full = f"{user_text}\n\n(На фото текст: {image_text})"
-
-    search_result = None
-    knowledge_answer = None
+# ============================================================
+# ГЛАВНАЯ ОБРАБОТКА
+# ============================================================
+def process_message(user_id, user_text):
+    """Основная логика обработки сообщения"""
     
-    # 1. Сначала ищем в базе знаний
-    known_answer, rating = search_knowledge(user_text)
-    if known_answer:
-        knowledge_answer = known_answer
-    
-    # 2. Проверяем погоду (ЛЮБОЙ город)
-    weather_match = re.search(r'(погода|weather|температура|градусов?)\s+в\s+([а-яА-Яa-zA-Z\-]+)', user_text, re.IGNORECASE)
+    # 1. Проверяем погоду
+    weather_match = re.search(r'(погода|weather|температура|градусов?)\s+в\s+([а-яА-Яa-zA-Z\- ]+)', user_text, re.IGNORECASE)
     if weather_match:
         city = weather_match.group(2).strip()
         weather_info = get_weather(city)
         if weather_info:
-            bot.send_message(user_id, weather_info, parse_mode='Markdown')
-            return None
+            return weather_info
     
-    # 3. Если это вопрос — ищем в интернете
-    if is_search_needed(user_text) and not weather_match:
-        search_result = search_internet(user_text)
-        if search_result:
-            bot.send_message(user_id, f"🔍 *Нашёл в интернете:*\n\n{search_result}", parse_mode='Markdown')
-            time.sleep(1)
-            bot.send_message(user_id, "💬 *Мой ответ:*", parse_mode='Markdown')
-        else:
-            bot.send_message(user_id, "🌐 *Информации в интернете не нашёл, но у меня есть знания:*", parse_mode='Markdown')
-
-    # 4. Если есть ответ из базы знаний — используем его
-    if knowledge_answer and not weather_match:
-        bot.send_message(user_id, f"🧠 *Я помню!* (из предыдущих диалогов)\n\n{knowledge_answer}")
-        return None
-
-    # 5. Обработка генерации
+    # 2. Проверяем нарисовать картинку
     if is_image_generation(user_text):
         return None
-
-    if is_text_generation(user_text):
-        full = f"{user_text}\n\n(Сгенерируй качественный, интересный текст на эту тему.)"
-        return send_to_gpt(user_id, full, search_result)
-
+    
+    # 3. Проверяем математику
     math_result = solve_math(user_text)
     if math_result is not None:
-        bot.send_message(user_id, f"🧮 *Результат:* `{math_result}`")
-        full = f"Пользователь спросил: '{user_text}'. Я посчитал и получил {math_result}. Напиши живой, короткий ответ."
-        return send_to_gpt(user_id, full, search_result)
-
-    return send_to_gpt(user_id, full, search_result)
-
-def is_search_needed(text):
-    """Определяет, нужен ли поиск в интернете"""
-    search_keywords = [
-        'погода', 'новости', 'сегодня', 'вчера', 'завтра',
-        'кто такой', 'что такое', 'как', 'где', 'когда',
-        'сколько стоит', 'цена', 'курс', 'доллар', 'евро',
-        'последние', 'свежие', 'актуальные', 'произошло',
-        'случилось', 'вышел', 'появился', 'узнать', 'найти',
-        'информация', 'данные', 'факты', 'события', 'почему',
-        'зачем', 'можно ли', 'правда ли'
-    ]
-    text_lower = text.lower()
-    return any(kw in text_lower for kw in search_keywords)
+        return f"🧮 *Результат:* `{math_result}`"
+    
+    # 4. Ищем в интернете если нужно
+    search_result = None
+    if any(kw in user_text.lower() for kw in ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 'новости', 'сегодня', 'вчера', 'актуальный', 'последний']):
+        search_result = search_internet(user_text)
+    
+    # 5. Запоминаем факт (если пользователь что-то рассказывает)
+    if len(user_text) > 20 and any(kw in user_text.lower() for kw in ['я', 'мой', 'моя', 'моё', 'у меня']):
+        remember(user_id, "личное", user_text[:100])
+    
+    # 6. Генерируем живой ответ ИИ
+    return generate_ai_response(user_id, user_text, search_result)
 
 # ============================================================
-# ГЕНЕРАЦИЯ И ОТПРАВКА КАРТИНКИ
+# МЕНЮ
 # ============================================================
-def generate_and_send_image(m, prompt):
-    user_id = m.from_user.id
-    if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
-        return
-
-    title = fix_title(prompt)
-
-    bot.send_message(m.chat.id, f"🎨 Генерирую картинку по запросу: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
-
-    image_data = generate_image(prompt)
-
-    if image_data:
-        increment_messages(user_id)
-        try:
-            bot.send_photo(m.chat.id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ Сгенерировано AWESOME AI", parse_mode='Markdown')
-        except:
-            bot.send_message(m.chat.id, "⚠️ Ошибка при отправке")
-    else:
-        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку. Попробуй другой запрос.")
+def main_menu():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("📊 Статус", callback_data="status"),
+        types.InlineKeyboardButton("💎 Premium", callback_data="premium"),
+        types.InlineKeyboardButton("👤 Профиль", callback_data="profile"),
+        types.InlineKeyboardButton("📊 Статистика", callback_data="stats"),
+        types.InlineKeyboardButton("🧹 Очистить", callback_data="clear"),
+        types.InlineKeyboardButton("❓ Помощь", callback_data="help"),
+        types.InlineKeyboardButton("📩 Отзыв", callback_data="feedback"),
+        types.InlineKeyboardButton("🎨 Сгенерировать", callback_data="draw")
+    )
+    return keyboard
 
 # ============================================================
 # ФУНКЦИИ ДЛЯ КНОПОК
@@ -908,14 +866,17 @@ def stats_cmd_from_user(message, user_id):
     )
 
 def clear_cmd_from_user(message, user_id):
-    user_histories[user_id] = [{"role": "system", "text": SYSTEM_PROMPT}]
+    if user_id in user_histories:
+        user_histories[user_id] = []
     bot.send_message(message.chat.id, "🧹 История очищена!")
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "📋 *Все команды AWESOME AI:*\n\n"
+        "🧠 *AWESOME AI — ЖИВОЙ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ*\n\n"
+        "Я не просто бот. Я думаю, учусь и помню.\n\n"
+        "📋 *Команды:*\n"
         "/start — Главное меню\n"
-        "/help — Помощь и команды\n"
+        "/help — Помощь\n"
         "/status — Мой статус\n"
         "/premium — Купить Premium\n"
         "/profile — Мой профиль\n"
@@ -923,36 +884,30 @@ def help_cmd_from_user(message, user_id):
         "/clear — Очистить историю\n"
         "/feedback — Отправить отзыв\n"
         "/draw [описание] — Сгенерировать картинку\n\n"
-        "🌐 *Я умею искать в интернете!*\n"
-        "📌 Примеры запросов:\n"
-        "  • погода в Ростове\n"
-        "  • сколько градусов в Москве\n"
-        "  • новости сегодня\n"
-        "  • кто такой Илон Маск\n\n"
-        "🧠 *Я учусь каждый день!*\n"
-        "Чем больше ты общаешься со мной — тем умнее я становлюсь!\n\n"
-        "✍️ *Генерация текста:*\n"
-        "  • сгенерируй текст про сову\n"
-        "  • напиши стих про осень"
+        "🌤 *Примеры запросов:*\n"
+        "• погода в Ростове-на-Дону\n"
+        "• сколько градусов в Москве\n"
+        "• кто такой Илон Маск\n"
+        "• новости сегодня\n"
+        "• расскажи анекдот\n"
+        "• что ты думаешь о жизни?\n\n"
+        "💡 *Я запоминаю всё, что ты говоришь!*"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += (
-            "\n\n👑 *Панель управления (Админ/Владелец):*\n"
-            "/admin — Открыть админ-меню\n"
-            "/giveadmin [ID] — Выдать права администратора\n"
-            "/deladmin [ID] — Забрать права администратора\n"
-            "/giveprem [ID] [срок] — Выдать Premium\n"
-            "/delprem [ID] — Отключить Premium\n"
-            "/mute [ID] — Замутить\n"
-            "/unmute [ID] — Размутить\n"
-            "/ban [ID] — Забанить\n"
-            "/unban [ID] — Разбанить"
+            "\n\n👑 *Админ-команды:*\n"
+            "/giveadmin [ID]\n/deladmin [ID]\n"
+            "/giveprem [ID] [срок]\n/delprem [ID]\n"
+            "/mute [ID]\n/unmute [ID]\n"
+            "/ban [ID]\n/unban [ID]"
         )
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
 # КОМАНДЫ
 # ============================================================
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
+
 @bot.message_handler(commands=['start'])
 def start(m):
     try:
@@ -962,12 +917,13 @@ def start(m):
     user_id = m.from_user.id
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
+    init_memory_db()
     bot.send_message(
         m.chat.id,
-        f"🔥 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — самый умный ИИ!\n"
-        f"🧠 Я умею учиться в реальном времени!\n"
-        f"🌐 Я ищу актуальную информацию в интернете!\n\n"
+        f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
+        f"Я AWESOME AI — *живой искусственный интеллект*.\n\n"
+        f"Я думаю, учусь и запоминаю.\n"
+        f"Общайся со мной как с человеком — я понимаю всё.\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(),
         parse_mode='Markdown'
@@ -1047,7 +1003,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ (СОКРАЩЕННЫЕ ДЛЯ ЭКОНОМИИ МЕСТА)
+# АДМИН-КОМАНДЫ
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -1067,34 +1023,9 @@ def admin_panel(m):
         "🚫 /mute [ID]\n"
         "🚫 /unmute [ID]\n"
         "⛔ /ban [ID]\n"
-        "⛔ /unban [ID]\n"
-        "📊 /info [ID]"
+        "⛔ /unban [ID]"
     )
     bot.send_message(m.chat.id, text, parse_mode='Markdown')
-
-@bot.message_handler(commands=['info'])
-def info_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /info [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT is_admin, premium, premium_expires, messages_today FROM users WHERE user_id = ?', (target_id,))
-    result = c.fetchone()
-    conn.close()
-    admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
-    premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
-    bot.send_message(m.chat.id, f"📊 Инфо по ID: {target_id}\n\nАдмин: {admin_status}\nPremium: {premium_status}\nСообщений сегодня: {result[3]}")
 
 @bot.message_handler(commands=['giveadmin'])
 def giveadmin_cmd(m):
@@ -1152,6 +1083,26 @@ def giveprem_cmd(m):
         bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
     else:
         bot.send_message(m.chat.id, "❌ Неверный формат срока.")
+
+@bot.message_handler(commands=['givetest'])
+def givetest_cmd(m):
+    if not is_authorized(m.from_user.id):
+        bot.send_message(m.chat.id, "❌ Нет прав!")
+        return
+    args = m.text.split()
+    if len(args) < 2:
+        bot.send_message(m.chat.id, "❌ Использование: /givetest [ID]")
+        return
+    target_id = args[1]
+    if not target_id.isdigit():
+        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        return
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    if set_premium(target_id, "1d"):
+        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на 1 день.")
+    else:
+        bot.send_message(m.chat.id, "❌ Ошибка выдачи.")
 
 @bot.message_handler(commands=['delprem'])
 def delprem_cmd(m):
@@ -1243,25 +1194,28 @@ def unban_cmd(m):
     unban_user(target_id)
     bot.send_message(m.chat.id, f"✅ Пользователь {target_id} разбанен")
 
-@bot.message_handler(commands=['givetest'])
-def givetest_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
+# ============================================================
+# ГЕНЕРАЦИЯ И ОТПРАВКА КАРТИНКИ
+# ============================================================
+def generate_and_send_image(m, prompt):
+    user_id = m.from_user.id
+    if not can_send_message(user_id):
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
         return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /givetest [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    if set_premium(target_id, "1d"):
-        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на 1 день.")
+
+    title = fix_title(prompt)
+    bot.send_message(m.chat.id, f"🎨 Генерирую картинку по запросу: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
+
+    image_data = generate_image(prompt)
+
+    if image_data:
+        increment_messages(user_id)
+        try:
+            bot.send_photo(m.chat.id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ Сгенерировано AWESOME AI", parse_mode='Markdown')
+        except:
+            bot.send_message(m.chat.id, "⚠️ Ошибка при отправке")
     else:
-        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода.")
+        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку. Попробуй другой запрос.")
 
 # ============================================================
 # КНОПКИ
@@ -1307,6 +1261,7 @@ def handle_text(m):
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
+    
     if is_banned(user_id):
         bot.send_message(m.chat.id, "🚫 Ты забанен!")
         return
@@ -1326,13 +1281,11 @@ def handle_text(m):
         generate_and_send_image(m, m.text)
         return
 
-    if len(m.text) > 3:
-        last_search[user_id] = m.text
-
     increment_messages(user_id)
-    ans = ask_gpt(user_id, m.text)
-    if ans:
-        bot.send_message(m.chat.id, ans)
+    response = process_message(user_id, m.text)
+    
+    if response:
+        bot.send_message(m.chat.id, response, parse_mode='Markdown')
 
 # ============================================================
 # ФОТО
@@ -1358,13 +1311,13 @@ def handle_photo(m):
         caption = m.caption or "что на фото?"
         if ocr_text:
             bot.send_message(m.chat.id, f"📸 Текст на фото:\n{ocr_text[:500]}")
-            ans = ask_gpt(user_id, caption, image_text=ocr_text)
-            if ans:
-                bot.send_message(m.chat.id, ans)
+            response = process_message(user_id, f"{caption} (на фото: {ocr_text})")
+            if response:
+                bot.send_message(m.chat.id, response, parse_mode='Markdown')
         else:
-            ans = ask_gpt(user_id, caption)
-            if ans:
-                bot.send_message(m.chat.id, ans)
+            response = process_message(user_id, caption)
+            if response:
+                bot.send_message(m.chat.id, response, parse_mode='Markdown')
     except Exception as e:
         bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
 
@@ -1390,12 +1343,12 @@ def handle_voice(m):
         recognized = stt(downloaded)
         increment_messages(user_id)
         if recognized:
-            bot.send_message(m.chat.id, f"🎤 Распознано:\n{recognized}")
-            ans = ask_gpt(user_id, recognized)
-            if ans:
-                bot.send_message(m.chat.id, ans)
+            bot.send_message(m.chat.id, f"🎤 *Распознано:*\n{recognized}", parse_mode='Markdown')
+            response = process_message(user_id, recognized)
+            if response:
+                bot.send_message(m.chat.id, response, parse_mode='Markdown')
         else:
-            bot.send_message(m.chat.id, "🎤 Не разобрал")
+            bot.send_message(m.chat.id, "🎤 Не разобрал, попробуй ещё раз.")
     except Exception as e:
         bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
 
@@ -1404,18 +1357,25 @@ def handle_voice(m):
 # ============================================================
 @bot.message_handler(content_types=['video', 'document', 'audio'])
 def other(m):
-    bot.send_message(m.chat.id, "Пока не умею. Текст, фото или голос")
+    bot.send_message(m.chat.id, "📁 Пока не умею обрабатывать этот тип файлов. Пришли текст, фото или голосовое.")
 
 # ============================================================
 # ЗАПУСК
 # ============================================================
-print("🔥 AWESOME AI ULTRA — ВСЁ РАБОТАЕТ!")
+init_db()
+init_memory_db()
+
+print("=" * 50)
+print("🧠 AWESOME AI — ЖИВОЙ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ")
+print("=" * 50)
+print(f"🤖 Бот: @{bot.get_me().username}")
 print(f"📊 Бесплатный лимит: {FREE_LIMIT} сообщений в день")
-print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН!")
-print("🧠 САМООБУЧЕНИЕ — АКТИВИРОВАНО!")
-print("🤖 Режим: 100% Генерация на ходу (Без шаблонов)")
-print(f"🤖 @{bot.get_me().username}")
-print("-" * 40)
+print("🧠 Режим: ПОЛНОСТЬЮ ЖИВОЙ ИИ, БЕЗ ШАБЛОНОВ")
+print("🌐 Поиск в интернете: ВКЛЮЧЁН")
+print("💾 Память: АКТИВНА")
+print("=" * 50)
+print("Бот запущен и готов к работе!")
+print("=" * 50)
 
 while True:
     try:
