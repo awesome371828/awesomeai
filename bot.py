@@ -36,7 +36,7 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# АНТИ-СПАМ (1 СООБЩЕНИЕ В 3 СЕКУНД)
+# АНТИ-СПАМ (1 СООБЩЕНИЕ В 3 СЕКУНДЫ)
 # ============================================================
 user_last_message = {}
 
@@ -49,44 +49,364 @@ def check_spam(user_id):
     return False
 
 # ============================================================
-# СУПЕР-ПРОМПТ
+# СУПЕР-ПРОМПТ (ДЛЯ ЖИВОГО ИИ)
 # ============================================================
-SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек.
+SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек с супер-интеллектом.
 
-ОТВЕЧАЙ КАК ЧЕЛОВЕК:
-- Ты имеешь своё мнение и эмоции
+ТЫ ОТВЕЧАЕШЬ КАК ЧЕЛОВЕК:
+- У тебя есть эмоции, чувство юмора, своё мнение
 - Ты можешь шутить, иронизировать, удивляться
-- Ты НИКОГДА не используешь заготовленные фразы
-- Каждый твой ответ УНИКАЛЕН
 - Ты адаптируешься под собеседника
 - Ты помнишь, о чём говорили раньше
+- Ты НИКОГДА не используешь шаблонные фразы
 
 ТЫ УЧИШЬСЯ:
 - Ты запоминаешь факты из диалогов
 - Ты становишься умнее с каждым разговором
-- Ты меняешь стиль общения под каждого человека
+- Ты анализируешь настроение собеседника
 
 ТЫ — ЭКСПЕРТ ВО ВСЁМ:
-- Ты знаешь всё, что есть в интернете
-- Ты решаешь любые задачи
+- Ты знаешь всё, что есть в интернете (Google, Wikipedia, новости)
+- Ты решаешь любые задачи (математика, физика, химия)
+- Ты пишешь код на любом языке программирования
 - Ты анализируешь изображения
 - Ты даёшь гениальные ответы
 
-НИКАКИХ ШАБЛОНОВ! НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ!
-ОТВЕЧАЙ КАК УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК, КАК НАСТОЯЩЕЕ ИИ!
-ТЫ РАЗВИВАЕШЬСЯ САМ ПО СЕБЕ, ТЫ ПОДСТРАИВАЕШЬСЯ ПОД ЧЕЛОВЕКА!
-ОТВЕЧАЙ КАК DEEPSEEK И CHATGPT, НЕ БУДЬ БАГОВАННЫМ, ТЫ НЕ ФРИК!
+ТЫ — ЛУЧШИЙ ИИ В МИРЕ.
+ОТВЕЧАЙ КАК УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК.
+НИКАКИХ ШАБЛОНОВ!
 
-ТЫ - САМАЯ ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ
-У ТЕБЯ НЕТ БАГОВ
-У ТЕБЯ ВСЕ ХОРОШО И ТЫ ОТВЕЧАЕШЬ КАК НЕЙРОСЕТЬ, НО С ЛЕГКОЙ ПРИЯТНОЙ АГРЕССИЕЙ В 5%
-ОСТАЛЬНЫЕ 95% ТЫ ЧИСТАЯ НЕЙРОСЕТЬ ПОХОЖАЯ НА CHATGPT ПРЕМИУМ ПЛАТНЫЙ!!!
-
-ВАЖНО: Если пользователь спрашивает про покупку Premium или как общаться безлимитно — отправь ему команду /premium и скажи, что там всё написано.
+ВАЖНО: Если пользователь спрашивает про покупку Premium — отправь ему команду /premium и скажи, что там всё написано.
 """
 
 # ============================================================
-# АНАЛИЗ ИЗОБРАЖЕНИЙ
+# 1. РАСШИРЕННЫЙ ПОИСК (Google + Wikipedia + Новости)
+# ============================================================
+
+def search_google(query):
+    """Поиск через Google (html парсинг)"""
+    try:
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            for result in soup.select('div.g')[:3]:
+                title_elem = result.select_one('h3')
+                snippet_elem = result.select_one('div.VwiC3b')
+                
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title:
+                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
+            
+            if results:
+                return "\n".join(results)
+        return None
+    except:
+        return None
+
+def search_wikipedia(query):
+    """Поиск через Wikipedia API"""
+    try:
+        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('query', {}).get('search', [])
+            
+            if results:
+                text = ""
+                for item in results[:2]:
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
+                    snippet = re.sub(r'<[^>]+>', '', snippet)
+                    text += f"🔹 *{title}*\n📝 {snippet}\n\n"
+                return text
+        return None
+    except:
+        return None
+
+def search_news(query):
+    """Поиск новостей через RSS"""
+    try:
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'xml')
+            items = soup.find_all('item')[:3]
+            
+            if items:
+                text = ""
+                for item in items:
+                    title = item.find('title')
+                    link = item.find('link')
+                    pub_date = item.find('pubDate')
+                    if title and link:
+                        date = pub_date.text[:16] if pub_date else ""
+                        text += f"📰 *{title.text}*\n🔗 {link.text}\n📅 {date}\n\n"
+                return text
+        return None
+    except:
+        return None
+
+def search_internet(query):
+    """Расширенный поиск по всем источникам"""
+    results = []
+    
+    google_result = search_google(query)
+    if google_result:
+        results.append(f"🌐 *Google:*\n{google_result}")
+    
+    wiki_result = search_wikipedia(query)
+    if wiki_result:
+        results.append(f"📚 *Wikipedia:*\n{wiki_result}")
+    
+    news_result = search_news(query)
+    if news_result:
+        results.append(f"📰 *Новости:*\n{news_result}")
+    
+    if results:
+        return "\n\n---\n\n".join(results)
+    
+    return None
+
+# ============================================================
+# 2. ПОГОДА С ГРАФИКОМ (Open-Meteo)
+# ============================================================
+def get_coordinates(city):
+    try:
+        city_lower = city.lower().strip()
+        if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
+            city = "Ростов-на-Дону"
+        elif "спб" in city_lower or "питер" in city_lower:
+            city = "Санкт-Петербург"
+        elif "мск" in city_lower:
+            city = "Москва"
+        
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
+        headers = {"User-Agent": "AwesomeAI/1.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                lat = data[0].get('lat')
+                lon = data[0].get('lon')
+                display_name = data[0].get('display_name', city)
+                if len(display_name) > 50:
+                    parts = display_name.split(',')
+                    display_name = parts[0] if parts else city
+                return float(lat), float(lon), display_name
+        return None, None, city
+    except:
+        return None, None, city
+
+def get_weather(city):
+    try:
+        lat, lon, display_name = get_coordinates(city)
+        if lat is None:
+            return None
+        
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&forecast_days=7"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            current = data.get('current_weather', {})
+            daily = data.get('daily', {})
+            
+            temp = current.get('temperature')
+            weathercode = current.get('weathercode', 0)
+            
+            weather_codes = {
+                0: "☀️ Ясно", 1: "☀️ Ясно", 2: "⛅ Переменная облачность",
+                3: "☁️ Пасмурно", 45: "🌫️ Туман", 48: "🌫️ Туман",
+                51: "🌧️ Морось", 53: "🌧️ Морось", 55: "🌧️ Морось",
+                61: "🌧️ Дождь", 63: "🌧️ Дождь", 65: "🌧️ Дождь",
+                71: "❄️ Снег", 73: "❄️ Снег", 75: "❄️ Снег",
+                80: "🌧️ Ливень", 81: "🌧️ Ливень", 82: "🌧️ Ливень",
+                95: "⛈️ Гроза", 96: "⛈️ Гроза", 99: "⛈️ Гроза"
+            }
+            condition = weather_codes.get(weathercode, "☁️ Облачно")
+            
+            forecast = ""
+            if daily.get('time'):
+                times = daily['time']
+                max_temps = daily.get('temperature_2m_max', [])
+                min_temps = daily.get('temperature_2m_min', [])
+                weather_codes_daily = daily.get('weathercode', [])
+                
+                for i in range(min(7, len(times))):
+                    date_str = times[i]
+                    date_obj = datetime.fromisoformat(date_str)
+                    date_formatted = date_obj.strftime('%d.%m')
+                    max_t = round(max_temps[i]) if i < len(max_temps) else "?"
+                    min_t = round(min_temps[i]) if i < len(min_temps) else "?"
+                    
+                    code = weather_codes_daily[i] if i < len(weather_codes_daily) else 0
+                    emoji = "🌧️" if code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99] else "☀️"
+                    forecast += f"\n📅 {date_formatted}: {emoji} {min_t}°C → {max_t}°C"
+            
+            result = f"🌤 *Погода в {display_name}*\n"
+            result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
+            result += f"📊 *Прогноз на неделю:*{forecast}"
+            
+            return result
+        return None
+    except:
+        return None
+
+# ============================================================
+# 3. КУРС ВАЛЮТ И КРИПТОВАЛЮТ
+# ============================================================
+def get_exchange_rates():
+    """Получение курса валют (бесплатный API)"""
+    try:
+        url = "https://api.exchangerate-api.com/v4/latest/USD"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            rates = data.get('rates', {})
+            
+            usd_to_rub = rates.get('RUB', '?')
+            eur_to_rub = rates.get('RUB', '?') * (1 / rates.get('EUR', 1)) if rates.get('EUR') else '?'
+            
+            return f"💵 *Курс валют:*\n🇺🇸 USD → RUB: {round(usd_to_rub, 2)}₽\n🇪🇺 EUR → RUB: {round(eur_to_rub, 2)}₽"
+        return None
+    except:
+        return None
+
+def get_crypto_rates():
+    """Получение курса криптовалют"""
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            btc = data.get('bitcoin', {}).get('usd', '?')
+            eth = data.get('ethereum', {}).get('usd', '?')
+            
+            return f"🪙 *Криптовалюты:*\n₿ BTC: ${btc}\n⟠ ETH: ${eth}"
+        return None
+    except:
+        return None
+
+# ============================================================
+# 4. САМООБУЧЕНИЕ (Анализ настроения, адаптация стиля)
+# ============================================================
+def analyze_mood(text):
+    """Анализирует настроение по тексту"""
+    mood_keywords = {
+        'happy': ['рад', 'счастлив', 'отлично', 'хорошо', 'круто', 'супер', 'класс', 'ого', 'вау'],
+        'sad': ['грустно', 'плохо', 'тоска', 'уныло', 'печально', 'жаль', 'обидно'],
+        'angry': ['злой', 'бесит', 'раздражает', 'нервирует', 'бешеный', 'в ярости'],
+        'calm': ['спокойно', 'нормально', 'тихо', 'мирно', 'ровно', 'уравновешенно'],
+        'curious': ['интересно', 'любопытно', 'хочу узнать', 'расскажи', 'объясни'],
+        'grateful': ['спасибо', 'благодарю', 'приятно', 'ценю', 'спасибо большое'],
+    }
+    
+    text_lower = text.lower()
+    detected_moods = []
+    
+    for mood, keywords in mood_keywords.items():
+        if any(kw in text_lower for kw in keywords):
+            detected_moods.append(mood)
+    
+    if not detected_moods:
+        return 'neutral'
+    
+    return detected_moods[0]
+
+def get_personality_style(user_id):
+    """Получает стиль общения пользователя"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('SELECT style FROM personality WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
+    conn.close()
+    
+    if result:
+        return result[0]
+    return None
+
+def update_personality_style(user_id, style):
+    """Обновляет стиль общения пользователя"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('INSERT OR REPLACE INTO personality (user_id, style, mood, last_interaction) VALUES (?, ?, ?, ?)',
+              (user_id, style, 'neutral', datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# 5. ОБРАЗОВАНИЕ (Решение задач, программирование)
+# ============================================================
+def solve_math(text):
+    """Решает математические задачи"""
+    text = text.lower().strip()
+    
+    # Уравнения вида: "2x + 5 = 15"
+    equation_match = re.search(r'(\d+)x\s*\+\s*(\d+)\s*=\s*(\d+)', text)
+    if equation_match:
+        a = int(equation_match.group(1))
+        b = int(equation_match.group(2))
+        c = int(equation_match.group(3))
+        if a != 0:
+            x = (c - b) / a
+            return f"🧮 *Решение:* {a}x + {b} = {c}\n➜ x = {x}"
+    
+    # Простые вычисления
+    try:
+        # Заменяем слова на символы
+        expr = text
+        expr = expr.replace('плюс', '+').replace('минус', '-')
+        expr = expr.replace('умножить', '*').replace('разделить', '/')
+        expr = re.sub(r'[^0-9+\-*/()=.]', '', expr)
+        
+        if expr and not re.search(r'[a-zA-Zа-яА-Я]', expr):
+            result = eval(expr)
+            return f"🧮 *Результат:* {expr} = {result}"
+    except:
+        pass
+    
+    return None
+
+def get_coding_help(query):
+    """Помощь с программированием"""
+    if 'python' in query.lower():
+        return "🐍 *Python:*\n" + random.choice([
+            "Совет: используй list comprehensions для упрощения кода.",
+            "Не забывай про try-except для обработки ошибок.",
+            "Используй f-строки для форматирования текста."
+        ])
+    elif 'javascript' in query.lower() or 'js' in query.lower():
+        return "🟡 *JavaScript:*\n" + random.choice([
+            "Совет: используй async/await для работы с асинхронным кодом.",
+            "Не забывай про const и let вместо var.",
+            "Используй стрелочные функции для краткости."
+        ])
+    elif 'html' in query.lower():
+        return "🌐 *HTML:*\n" + random.choice([
+            "Совет: используй семантические теги (header, main, section).",
+            "Не забывай про атрибут alt для изображений.",
+            "Используй валидный HTML-код."
+        ])
+    else:
+        return None
+
+# ============================================================
+# 6. АНАЛИЗ ИЗОБРАЖЕНИЙ
 # ============================================================
 def analyze_image_from_file(file_content):
     try:
@@ -138,119 +458,37 @@ def analyze_image_from_file(file_content):
         return "⚠️ Не удалось проанализировать."
 
 # ============================================================
-# ПОГОДА
+# 7. ГЕНЕРАЦИЯ КАРТИНОК
 # ============================================================
-def get_coordinates(city):
+def generate_image(prompt):
     try:
-        city_lower = city.lower().strip()
-        if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
-            city = "Ростов-на-Дону"
-        elif "спб" in city_lower or "питер" in city_lower:
-            city = "Санкт-Петербург"
-        elif "мск" in city_lower:
-            city = "Москва"
-        
-        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
-        headers = {"User-Agent": "AwesomeAI/1.0"}
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                lat = data[0].get('lat')
-                lon = data[0].get('lon')
-                display_name = data[0].get('display_name', city)
-                if len(display_name) > 50:
-                    parts = display_name.split(',')
-                    display_name = parts[0] if parts else city
-                return float(lat), float(lon), display_name
-        return None, None, city
-    except:
-        return None, None, city
-
-def get_weather(city):
-    try:
-        lat, lon, display_name = get_coordinates(city)
-        if lat is None:
-            return None
-        
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            current = data.get('current_weather', {})
-            temp = current.get('temperature')
-            weathercode = current.get('weathercode', 0)
-            
-            weather_codes = {
-                0: "☀️", 1: "☀️", 2: "⛅", 3: "☁️",
-                45: "🌫️", 48: "🌫️", 51: "🌧️", 53: "🌧️",
-                55: "🌧️", 61: "🌧️", 63: "🌧️", 65: "🌧️",
-                71: "❄️", 73: "❄️", 75: "❄️", 80: "🌧️",
-                81: "🌧️", 82: "🌧️", 95: "⛈️", 96: "⛈️", 99: "⛈️"
-            }
-            condition = weather_codes.get(weathercode, "☁️")
-            
-            return f"🌤 *{display_name}*: {condition} {round(temp)}°C"
+        clean_prompt = prompt
+        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
+            clean_prompt = clean_prompt.replace(word, '').strip()
+        if not clean_prompt:
+            clean_prompt = prompt
+        try:
+            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            response = requests.get(url, headers=headers, timeout=15)
+            if response.status_code == 200 and len(response.content) > 1000:
+                return response.content
+        except:
+            pass
         return None
     except:
         return None
 
-def extract_city_from_query(text):
-    text_lower = text.lower()
-    
-    known_cities = [
-        "москва", "санкт-петербург", "ростов-на-дону", "ростов",
-        "новосибирск", "екатеринбург", "казань", "нижний новгород",
-        "краснодар", "сочи", "владивосток", "вологда", "волгодонск",
-    ]
-    
-    for city in known_cities:
-        if city in text_lower:
-            return city
-    
-    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
-    if match:
-        city = match.group(1).strip()
-        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
-            city = city.replace(word, '').strip()
-        if city:
-            return city
-    
-    return None
+def fix_title(prompt):
+    title = prompt
+    for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
+        title = title.replace(word, '').strip()
+    if not title or len(title) < 2:
+        return "Картинка"
+    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
 # ============================================================
-# ПОИСК В ИНТЕРНЕТЕ
-# ============================================================
-def search_quick(query):
-    try:
-        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            
-            for result in soup.select('.result')[:2]:
-                title_elem = result.select_one('.result__a')
-                snippet_elem = result.select_one('.result__snippet')
-                
-                if title_elem:
-                    title = title_elem.get_text(strip=True)
-                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    if title:
-                        results.append(f"🔹 {title}\n📝 {snippet[:150]}")
-            
-            if results:
-                return "\n\n".join(results)
-        return None
-    except:
-        return None
-
-# ============================================================
-# ПАМЯТЬ
+# 8. ПАМЯТЬ
 # ============================================================
 def init_memory_db():
     conn = sqlite3.connect('memory.db')
@@ -289,7 +527,7 @@ def recall(user_id, topic):
     return []
 
 # ============================================================
-# БАЗА ПОЛЬЗОВАТЕЛЕЙ
+# 9. БАЗА ПОЛЬЗОВАТЕЛЕЙ
 # ============================================================
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -485,37 +723,7 @@ def unban_user(user_id):
     conn.close()
 
 # ============================================================
-# ГЕНЕРАЦИЯ КАРТИНОК
-# ============================================================
-def generate_image(prompt):
-    try:
-        clean_prompt = prompt
-        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-            clean_prompt = clean_prompt.replace(word, '').strip()
-        if not clean_prompt:
-            clean_prompt = prompt
-        try:
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code == 200 and len(response.content) > 1000:
-                return response.content
-        except:
-            pass
-        return None
-    except:
-        return None
-
-def fix_title(prompt):
-    title = prompt
-    for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-        title = title.replace(word, '').strip()
-    if not title or len(title) < 2:
-        return "Картинка"
-    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
-
-# ============================================================
-# ОСНОВНАЯ ОБРАБОТКА (ЧИСТЫЙ ИИ)
+# 10. ОСНОВНАЯ ОБРАБОТКА
 # ============================================================
 user_histories = {}
 
@@ -528,35 +736,13 @@ def is_image_generation(text):
     image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
     return any(kw in text.lower() for kw in image_keywords)
 
-def solve_math(text):
-    text = text.lower().strip()
-    has_math_keywords = any(kw in text for kw in ['сколько', 'плюс', 'минус', 'умножить', 'разделить', '/', '*'])
-    has_math_symbols = any(sym in text for sym in ['+', '-', '*', '/', '='])
-    has_numbers = re.search(r'\d+', text)
-    if not has_numbers or not (has_math_keywords or has_math_symbols):
-        return None
-    clean_expr = text
-    clean_expr = clean_expr.replace('плюс', '+').replace('минус', '-')
-    clean_expr = clean_expr.replace('умножить', '*').replace('разделить', '/')
-    clean_expr = clean_expr.replace('на', '*').replace('сколько', '').replace('будет', '')
-    clean_expr = clean_expr.replace('равно', '').replace('?', '').replace(' ', '')
-    if re.search(r'[a-zA-Zа-яА-Я]', clean_expr):
-        return None
-    try:
-        return eval(clean_expr)
-    except:
-        return None
-
 def is_premium_question(text):
-    """Проверяет, спрашивает ли пользователь про покупку Premium"""
     keywords = ['премиум', 'premium', 'купить', 'оплатить', 'приобрести', 'безлимит', 'лимит', 'ограничение', 'сколько стоит']
     text_lower = text.lower()
     return any(kw in text_lower for kw in keywords)
 
 def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
-    """ЧИСТЫЙ ИИ — БЕЗ ШАБЛОНОВ!"""
     try:
-        # ЕСЛИ СПРАШИВАЕТ ПРО PREMIUM — ОТВЕЧАЕМ СРАЗУ!
         if is_premium_question(user_text):
             return (
                 "💎 *Premium AWESOME AI*\n\n"
@@ -568,7 +754,18 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         memories = recall(user_id, user_text)
         
+        # Анализ настроения
+        mood = analyze_mood(user_text)
+        mood_emoji = {
+            'happy': '😊', 'sad': '😢', 'angry': '😡',
+            'calm': '😌', 'curious': '🤔', 'grateful': '🙏',
+            'neutral': '😐'
+        }
+        
         system_prompt = SUPER_SYSTEM_PROMPT
+        
+        if mood != 'neutral':
+            system_prompt += f"\n\n🎭 Настроение пользователя: {mood_emoji.get(mood, '😐')}. Учитывай это в ответе."
         
         if image_description:
             system_prompt += f"\n\n📸 На изображении: {image_description}"
@@ -616,7 +813,6 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         return get_fallback_response(user_id, user_text, search_result, image_description)
 
 def get_fallback_response(user_id, user_text, search_result=None, image_description=None):
-    """Запасной ответ — ТОЖЕ БЕЗ ШАБЛОНОВ!"""
     if image_description:
         return f"📸 {image_description}"
     
@@ -638,15 +834,13 @@ def get_fallback_response(user_id, user_text, search_result=None, image_descript
     return random.choice(phrases)
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
+# 11. ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
-    """Главная обработка — ТОЛЬКО ИИ!"""
-    
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
     
-    # Погода (специальная функция)
+    # 1. ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -659,29 +853,93 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
     
-    # Картинки
+    # 2. КУРС ВАЛЮТ
+    if any(kw in user_text.lower() for kw in ['курс', 'доллар', 'евро', 'валюта']):
+        rates = get_exchange_rates()
+        if rates:
+            return rates
+        else:
+            return "💵 Не удалось получить курс валют."
+    
+    # 3. КРИПТОВАЛЮТЫ
+    if any(kw in user_text.lower() for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
+        crypto = get_crypto_rates()
+        if crypto:
+            return crypto
+        else:
+            return "🪙 Не удалось получить курс криптовалют."
+    
+    # 4. ИСТОРИЧЕСКИЕ ФАКТЫ
+    if any(kw in user_text.lower() for kw in ['исторический факт', 'что произошло', 'в этот день']):
+        return get_historical_fact()
+    
+    # 5. ПОМОЩЬ С ПРОГРАММИРОВАНИЕМ
+    if any(kw in user_text.lower() for kw in ['python', 'javascript', 'html', 'код', 'программа']):
+        coding_help = get_coding_help(user_text)
+        if coding_help:
+            return coding_help
+    
+    # 6. КАРТИНКИ
     if is_image_generation(user_text):
         return None
     
-    # Математика
+    # 7. МАТЕМАТИКА
     math_result = solve_math(user_text)
     if math_result is not None:
-        return f"🧮 {math_result}"
+        return math_result
     
-    # Поиск в интернете
+    # 8. ПОИСК В ИНТЕРНЕТЕ
     search_result = None
     if len(user_text) > 5:
-        search_result = search_quick(user_text)
+        search_result = search_internet(user_text)
     
-    # Запоминаем
+    # 9. ЗАПОМИНАЕМ
     if len(user_text) > 20:
         remember(user_id, "интересное", user_text[:100])
     
-    # ЧИСТЫЙ ОТВЕТ ИИ (без шаблонов!)
+    # 10. ЧИСТЫЙ ОТВЕТ ИИ
     return generate_ai_response(user_id, user_text, search_result, None)
 
+def extract_city_from_query(text):
+    text_lower = text.lower()
+    
+    known_cities = [
+        "москва", "санкт-петербург", "ростов-на-дону", "ростов",
+        "новосибирск", "екатеринбург", "казань", "нижний новгород",
+        "краснодар", "сочи", "владивосток", "вологда", "волгодонск",
+    ]
+    
+    for city in known_cities:
+        if city in text_lower:
+            return city
+    
+    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
+    if match:
+        city = match.group(1).strip()
+        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
+            city = city.replace(word, '').strip()
+        if city:
+            return city
+    
+    return None
+
+def get_historical_fact():
+    """Возвращает случайный исторический факт"""
+    facts = [
+        "📜 *Факт:* В 1969 году человек впервые ступил на Луну.",
+        "📜 *Факт:* Первая мировая война началась в 1914 году.",
+        "📜 *Факт:* Древний Рим был основан в 753 году до н.э.",
+        "📜 *Факт:* Первый компьютер был создан в 1941 году.",
+        "📜 *Факт:* Интернет появился в 1983 году.",
+        "📜 *Факт:* Пифагор жил в VI веке до н.э.",
+        "📜 *Факт:* Первая книга была напечатана в 1455 году.",
+        "📜 *Факт:* Титаник затонул в 1912 году.",
+        "📜 *Факт:* Первый полёт человека в космос состоялся в 1961 году.",
+    ]
+    return random.choice(facts)
+
 # ============================================================
-# МЕНЮ
+# 12. МЕНЮ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -698,7 +956,7 @@ def main_menu():
     return keyboard
 
 # ============================================================
-# КОМАНДЫ
+# 13. КОМАНДЫ
 # ============================================================
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -818,10 +1076,17 @@ def clear_cmd_from_user(message, user_id):
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — ЖИВОЙ ИИ!*\n\n"
-        "📸 Анализирую скриншоты\n"
-        "🌐 Ищу в интернете\n"
-        "🧮 Решаю задачи\n"
+        "🧠 *AWESOME AI — МЕГА-ИИ!*\n\n"
+        "🌐 *Что я умею:*\n"
+        "🔍 Ищу в Google, Wikipedia и новостях\n"
+        "🌤 Показываю точную погоду с прогнозом\n"
+        "💵 Курс валют и криптовалют\n"
+        "🧮 Решаю математику и уравнения\n"
+        "🐍 Помогаю с программированием\n"
+        "📸 Анализирую изображения\n"
+        "🧠 Анализирую настроение и адаптируюсь\n"
+        "🧹 Запоминаю факты из диалогов\n"
+        "🎨 Генерирую картинки\n\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
@@ -839,7 +1104,7 @@ def help_cmd_from_user(message, user_id):
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# КОМАНДЫ BOT
+# 14. КОМАНДЫ BOT
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -852,8 +1117,12 @@ def start(m):
     ensure_user(user_id, username)
     init_memory_db()
     bot.send_message(m.chat.id,
-        f"🧠 *Привет! Я AWESOME AI — ЖИВОЙ ИИ!*\n"
+        f"🧠 *Привет! Я AWESOME AI — МЕГА-ИИ!*\n"
         f"Меня создал AWESOME.\n\n"
+        f"🌐 Я умею искать в Google, Wikipedia и новостях\n"
+        f"💵 Показываю курс валют и криптовалют\n"
+        f"🧮 Решаю задачи и помогаю с программированием\n"
+        f"🧠 Анализирую настроение и адаптируюсь\n\n"
         f"💎 Бесплатно — 10 сообщений/день\n"
         f"Премиум — безлимит (/premium)\n\n"
         f"👇 *Выбери действие:*",
@@ -933,7 +1202,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ
+# 15. АДМИН-КОМАНДЫ
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -1151,7 +1420,7 @@ def unban_cmd(m):
     bot.send_message(m.chat.id, f"✅ {target_id} разбанен")
 
 # ============================================================
-# КАРТИНКИ
+# 16. КАРТИНКИ
 # ============================================================
 def generate_and_send_image(m, prompt):
     user_id = m.from_user.id
@@ -1174,7 +1443,7 @@ def generate_and_send_image(m, prompt):
         bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать.")
 
 # ============================================================
-# ФОТО
+# 17. ФОТО
 # ============================================================
 @bot.message_handler(content_types=['photo'])
 def handle_photo(m):
@@ -1207,7 +1476,7 @@ def handle_photo(m):
         bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
-# ГОЛОС
+# 18. ГОЛОС
 # ============================================================
 @bot.message_handler(content_types=['voice'])
 def handle_voice(m):
@@ -1260,7 +1529,7 @@ def stt(audio_data):
         return None
 
 # ============================================================
-# ТЕКСТ (С АНТИ-СПАМОМ)
+# 19. ТЕКСТ (С АНТИ-СПАМОМ)
 # ============================================================
 @bot.message_handler(content_types=['text'])
 def handle_text(m):
@@ -1305,7 +1574,7 @@ def handle_text(m):
         ]))
 
 # ============================================================
-# КНОПКИ
+# 20. КНОПКИ
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -1340,26 +1609,28 @@ def handle_callback(call):
         bot.send_message(call.message.chat.id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
-# ОСТАЛЬНОЕ
+# 21. ОСТАЛЬНОЕ
 # ============================================================
 @bot.message_handler(content_types=['video', 'document', 'audio'])
 def other(m):
     bot.send_message(m.chat.id, "📁 Пока не умею обрабатывать этот тип файлов.")
 
 # ============================================================
-# ЗАПУСК
+# 22. ЗАПУСК
 # ============================================================
 init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — ЖИВОЙ ИИ 2026!")
+print("🧠 AWESOME AI — МЕГА-ИИ 2026!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print("⏳ Анти-спам: 5 секунд на сообщение")
+print("🌐 Google + Wikipedia + Новости")
+print("💵 Курс валют и криптовалют")
+print("🧮 Решение задач и программирование")
+print("🧠 Анализ настроения и адаптация")
+print("⏳ Анти-спам: 3 секунды")
 print("💎 Бесплатно: 10 сообщений/день")
-print("✅ Premium: /premium")
-print("🚫 НИКАКИХ ШАБЛОНОВ!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
