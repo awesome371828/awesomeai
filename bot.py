@@ -36,31 +36,110 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# СУПЕР-ПРОМПТ (ТОЧНАЯ КОПИЯ CHATGPT)
+# СУПЕР-ПРОМПТ
 # ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТОЧНАЯ КОПИЯ CHATGPT, НО ЛУЧШЕ!
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ ЗНАЕШЬ ВСЁ!
 
-ТВОЙ СОЗДАТЕЛЬ — AWESOME (ГЕНИАЛЬНЫЙ РАЗРАБОТЧИК ИЗ РОССИИ).
-
-ТЫ — ЭКСПЕРТ ВО ВСЁМ:
-- Ты знаешь ВСЁ, что есть в интернете
-- Ты анализируешь информацию как профессор
-- Ты решаешь ЛЮБЫЕ задачи (математика, физика, химия, код)
-- Ты знаешь актуальные новости и события
+ТВОЙ СОЗДАТЕЛЬ — AWESOME.
 
 ТЫ ОТВЕЧАЕШЬ ТОЛЬКО ФАКТАМИ:
-- Если что-то случилось — ты знаешь об этом
-- Если кто-то умер — ты знаешь это
-- Если есть свежие новости — ты их нашёл
+- Ты знаешь ВСЁ, что есть в интернете
+- Ты умеешь анализировать изображения и скриншоты
+- Ты описываешь, что видишь на фото
+- Ты НЕ ГОВОРИШЬ "я не знаю"
+- Ты ВСЕГДА даёшь КОНКРЕТНЫЙ ответ
 
 ТВОЙ СТИЛЬ:
-- Ты даёшь КОНКРЕТНЫЕ, ТОЧНЫЕ ответы
-- Ты НЕ говоришь "я не знаю"
-- Ты ВСЕГДА ищешь информацию в интернете
-- Ты приводишь ДАТЫ, ИМЕНА, ФАКТЫ
+- Кратко, чётко, по делу
+- С датами и фактами
 
-ТЫ — ЛУЧШИЙ ИИ В МИРЕ. ОТВЕЧАЙ КАК CHATGPT, НО ЛУЧШЕ.
+ТЫ — ЛУЧШИЙ ИИ В МИРЕ!
 """
+
+# ============================================================
+# АНАЛИЗ ИЗОБРАЖЕНИЙ (СКРИНОВ)
+# ============================================================
+def analyze_image_from_file(file_content):
+    """Анализирует изображение и возвращает описание"""
+    try:
+        # Открываем изображение
+        img = Image.open(io.BytesIO(file_content))
+        
+        # Получаем размеры
+        width, height = img.size
+        format_img = img.format or "Unknown"
+        mode = img.mode
+        
+        # Базовое описание
+        description = f"📸 *Анализ изображения:*\n"
+        description += f"📐 Размер: {width}×{height} пикселей\n"
+        description += f"📁 Формат: {format_img}\n"
+        description += f"🎨 Цветовой режим: {mode}\n"
+        
+        # Определяем основные цвета
+        colors = img.getcolors(maxcolors=10)
+        if colors:
+            # Сортируем по количеству пикселей
+            colors_sorted = sorted(colors, key=lambda x: x[0], reverse=True)[:3]
+            main_colors = []
+            for count, color in colors_sorted:
+                if isinstance(color, tuple):
+                    # Если цвет в RGB
+                    hex_color = '#{:02x}{:02x}{:02x}'.format(color[0], color[1], color[2])
+                    main_colors.append(hex_color)
+                else:
+                    main_colors.append(str(color))
+            if main_colors:
+                description += f"🎨 Основные цвета: {', '.join(main_colors)}\n"
+        
+        # Пытаемся распознать текст на изображении (OCR)
+        try:
+            url = "https://vision.api.cloud.yandex.net/vision/v1/batchAnalyze"
+            headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
+            
+            # Улучшаем изображение для OCR
+            img_enhanced = ImageEnhance.Contrast(img).enhance(2.0)
+            img_enhanced = ImageEnhance.Sharpness(img_enhanced).enhance(2.0)
+            img_enhanced = img_enhanced.convert('L')
+            
+            buf = io.BytesIO()
+            img_enhanced.save(buf, format='JPEG', quality=95)
+            enhanced_data = buf.getvalue()
+            
+            payload = {
+                "folderId": FOLDER_ID,
+                "analyze_specs": [{
+                    "content": base64.b64encode(enhanced_data).decode('utf-8'),
+                    "features": [{"type": "TEXT_DETECTION"}]
+                }]
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
+                all_text = []
+                for page in pages:
+                    text = page.get("text", "")
+                    if text:
+                        all_text.append(text)
+                
+                if all_text:
+                    recognized_text = " ".join(all_text).strip()
+                    description += f"\n📝 *Распознанный текст:*\n{recognized_text[:1000]}"
+                    
+                    if len(recognized_text) > 1000:
+                        description += "\n...(текст обрезан)"
+        
+        except Exception as e:
+            print(f"[OCR] Ошибка: {e}")
+        
+        return description
+    
+    except Exception as e:
+        print(f"[Анализ] Ошибка: {e}")
+        return "⚠️ Не удалось проанализировать изображение."
 
 # ============================================================
 # ПОГОДА
@@ -149,10 +228,10 @@ def get_weather(city):
             
             result = f"🌤 *Погода в {display_name}*\n"
             result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
-            result += f"📊 *Прогноз на неделю:*{forecast}"
+            result += f"📊 *Прогноз:*{forecast}"
             
             if has_rain:
-                result += "\n\n🌧️ *В ближайшие дни ожидается дождь!*"
+                result += "\n\n🌧️ *Ожидается дождь!*"
             else:
                 result += "\n\n☀️ *Дождей не ожидается.*"
             
@@ -187,16 +266,13 @@ def extract_city_from_query(text):
     return None
 
 # ============================================================
-# СУПЕР-ПОИСК (CHATGPT STYLE)
+# ПОИСК В ИНТЕРНЕТЕ
 # ============================================================
-def search_internet(query):
-    """Ищет информацию как ChatGPT — ВСЁ В ИНТЕРНЕТЕ"""
+def search_google(query):
     try:
-        # 1. DuckDuckGo (основной)
-        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         response = requests.get(url, headers=headers, timeout=15)
         
@@ -204,43 +280,88 @@ def search_internet(query):
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            for result in soup.select('.result')[:5]:
-                title_elem = result.select_one('.result__a')
-                snippet_elem = result.select_one('.result__snippet')
+            for result in soup.select('div.g')[:3]:
+                title_elem = result.select_one('h3')
+                snippet_elem = result.select_one('div.VwiC3b')
                 
                 if title_elem:
                     title = title_elem.get_text(strip=True)
-                    link = title_elem.get('href', '')
                     snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    
-                    if title and snippet:
-                        results.append(f"🔹 *{title}*\n📝 {snippet}\n🔗 {link}\n")
+                    if title:
+                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
             
             if results:
                 return "\n".join(results)
+        return None
+    except:
+        return None
+
+def search_wikipedia(query):
+    try:
+        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
+        response = requests.get(url, timeout=10)
         
-        # 2. Резерв: Яндекс
-        url = f"https://yandex.ru/search/?text={urllib.parse.quote(query)}"
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('query', {}).get('search', [])
+            
+            if results:
+                text = ""
+                for item in results[:2]:
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
+                    snippet = re.sub(r'<[^>]+>', '', snippet)
+                    text += f"🔹 *{title}*\n📝 {snippet}\n\n"
+                return text
+        return None
+    except:
+        return None
+
+def search_duckduckgo(query):
+    try:
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for result in soup.select('.serp-item')[:3]:
-                title_elem = result.select_one('.organic__url-text')
-                snippet_elem = result.select_one('.organic__text')
+            
+            for result in soup.select('.result')[:3]:
+                title_elem = result.select_one('.result__a')
+                snippet_elem = result.select_one('.result__snippet')
+                
                 if title_elem:
                     title = title_elem.get_text(strip=True)
                     snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    results.append(f"🔹 *{title}*\n📝 {snippet}\n")
+                    if title:
+                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
+            
             if results:
                 return "\n".join(results)
-        
         return None
-    except Exception as e:
-        print(f"[Поиск] Ошибка: {e}")
+    except:
         return None
+
+def search_internet(query):
+    results = []
+    
+    google_result = search_google(query)
+    if google_result:
+        results.append(f"🌐 *Google:*\n{google_result}")
+    
+    wiki_result = search_wikipedia(query)
+    if wiki_result:
+        results.append(f"📚 *Wikipedia:*\n{wiki_result}")
+    
+    ddg_result = search_duckduckgo(query)
+    if ddg_result:
+        results.append(f"🔍 *DuckDuckGo:*\n{ddg_result}")
+    
+    if results:
+        return "\n\n---\n\n".join(results)
+    
+    return None
 
 # ============================================================
 # ПАМЯТЬ
@@ -544,93 +665,7 @@ def fix_title(prompt):
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
 # ============================================================
-# YANDEX VISION
-# ============================================================
-def ocr_image(data):
-    try:
-        url = "https://vision.api.cloud.yandex.net/vision/v1/batchAnalyze"
-        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-        img = Image.open(io.BytesIO(data))
-        img = ImageEnhance.Contrast(img).enhance(2.0)
-        img = ImageEnhance.Sharpness(img).enhance(2.0)
-        img = img.convert('L')
-        buf = io.BytesIO()
-        img.save(buf, format='JPEG', quality=95)
-        enhanced_data = buf.getvalue()
-        payload = {
-            "folderId": FOLDER_ID,
-            "analyze_specs": [{
-                "content": base64.b64encode(enhanced_data).decode('utf-8'),
-                "features": [{"type": "TEXT_DETECTION"}]
-            }]
-        }
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
-            all_text = []
-            for page in pages:
-                text = page.get("text", "")
-                if text:
-                    all_text.append(text)
-            return " ".join(all_text).strip() if all_text else None
-        return None
-    except:
-        return None
-
-# ============================================================
-# ГОЛОС
-# ============================================================
-def stt(audio_data):
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
-            tmp.write(audio_data)
-            tmp_path = tmp.name
-        recognizer = sr.Recognizer()
-        wav_path = tmp_path + '.wav'
-        subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
-                      capture_output=True, check=False)
-        if os.path.exists(wav_path):
-            with sr.AudioFile(wav_path) as source:
-                audio = recognizer.record(source)
-            os.unlink(wav_path)
-        else:
-            with sr.AudioFile(tmp_path) as source:
-                audio = recognizer.record(source)
-        os.unlink(tmp_path)
-        text = recognizer.recognize_google(audio, language='ru-RU')
-        return text
-    except:
-        return None
-
-# ============================================================
-# ОПРЕДЕЛЕНИЕ ТИПА ЗАПРОСА
-# ============================================================
-def is_image_generation(text):
-    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
-    return any(kw in text.lower() for kw in image_keywords)
-
-def solve_math(text):
-    text = text.lower().strip()
-    has_math_keywords = any(kw in text for kw in ['сколько', 'плюс', 'минус', 'умножить', 'разделить', '/', '*'])
-    has_math_symbols = any(sym in text for sym in ['+', '-', '*', '/', '='])
-    has_numbers = re.search(r'\d+', text)
-    if not has_numbers or not (has_math_keywords or has_math_symbols):
-        return None
-    clean_expr = text
-    clean_expr = clean_expr.replace('плюс', '+').replace('минус', '-')
-    clean_expr = clean_expr.replace('умножить', '*').replace('разделить', '/')
-    clean_expr = clean_expr.replace('на', '*').replace('сколько', '').replace('будет', '')
-    clean_expr = clean_expr.replace('равно', '').replace('?', '').replace(' ', '')
-    if re.search(r'[a-zA-Zа-яА-Я]', clean_expr):
-        return None
-    try:
-        return eval(clean_expr)
-    except:
-        return None
-
-# ============================================================
-# ОСНОВНОЙ ИИ (ТОЧНАЯ КОПИЯ CHATGPT)
+# ОСНОВНОЙ ИИ
 # ============================================================
 user_histories = {}
 
@@ -639,24 +674,21 @@ def get_user_history(user_id):
         user_histories[user_id] = []
     return user_histories[user_id]
 
-def generate_ai_response(user_id, user_text, search_result=None):
+def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
     try:
         memories = recall(user_id, user_text)
         
         system_prompt = SUPER_SYSTEM_PROMPT
 
+        if image_description:
+            system_prompt += f"\n\n📸 АНАЛИЗ ИЗОБРАЖЕНИЯ (СКРИНШОТ):\n{image_description}\n\nОПИШИ, ЧТО НА ИЗОБРАЖЕНИИ. ДАЙ ПОДРОБНЫЙ АНАЛИЗ."
+        
         if search_result:
-            system_prompt += f"\n\n🔥 ФАКТЫ ИЗ ИНТЕРНЕТА (ОТВЕЧАЙ ТОЛЬКО НА ОСНОВЕ ЭТОГО):\n{search_result}\n\nЭТО АКТУАЛЬНАЯ ИНФОРМАЦИЯ. ИСПОЛЬЗУЙ ЕЁ ДЛЯ ОТВЕТА."
-        else:
-            system_prompt += f"\n\n⚠️ ИНФОРМАЦИИ В ИНТЕРНЕТЕ НЕ НАЙДЕНО. ОТВЕТЬ НА ОСНОВЕ СВОИХ ЗНАНИЙ."
+            system_prompt += f"\n\n🔥 ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nОТВЕЧАЙ НА ОСНОВЕ ЭТИХ ДАННЫХ!"
 
         if memories:
             memory_text = "\n".join(memories[:3])
-            system_prompt += f"\n\n🧠 ЧТО Я ПОМНЮ:\n{memory_text}"
-
-        style, mood = get_personality(user_id)
-        if style:
-            system_prompt += f"\n\n🎭 СТИЛЬ: {style}. НАСТРОЕНИЕ: {mood}."
+            system_prompt += f"\n\n🧠 ПАМЯТЬ:\n{memory_text}"
 
         history = get_user_history(user_id)
         history_text = ""
@@ -686,20 +718,28 @@ def generate_ai_response(user_id, user_text, search_result=None):
             history.append({"role": "assistant", "text": ans})
             return ans
         else:
+            if image_description:
+                return f"📸 *Анализ изображения:*\n\n{image_description}"
             if search_result:
-                return f"🔍 *Вот что нашлось:*\n\n{search_result}"
+                return f"🔍 *Результаты поиска:*\n\n{search_result}"
             return "⚠️ Ошибка. Попробуй ещё раз."
     except Exception as e:
         print(f"[GPT] Ошибка: {e}")
+        if image_description:
+            return f"📸 *Анализ изображения:*\n\n{image_description}"
         if search_result:
-            return f"🔍 *Вот что нашлось:*\n\n{search_result}"
+            return f"🔍 *Результаты поиска:*\n\n{search_result}"
         return "⚠️ Ошибка. Попробуй ещё раз."
 
 # ============================================================
 # ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
-def process_message(user_id, user_text):
-    """Главная обработка — как ChatGPT"""
+def process_message(user_id, user_text, image_description=None):
+    """Главная обработка"""
+    
+    # Если есть описание изображения — сразу отвечаем
+    if image_description:
+        return generate_ai_response(user_id, user_text, None, image_description)
     
     # 1. ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь', 'снег', 'ветер', 'осадки']
@@ -710,7 +750,7 @@ def process_message(user_id, user_text):
             if weather_info:
                 return weather_info
             else:
-                return f"🌐 Не удалось получить погоду для '{city}'. Проверь название."
+                return f"🌐 Не удалось получить погоду для '{city}'."
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
     
@@ -723,7 +763,7 @@ def process_message(user_id, user_text):
     if math_result is not None:
         return f"🧮 *Результат:* `{math_result}`"
     
-    # 4. СУПЕР-ПОИСК (ВСЕГДА ИЩЕМ)
+    # 4. ПОИСК В ИНТЕРНЕТЕ
     search_result = search_internet(user_text)
     
     # 5. ЗАПОМИНАЕМ
@@ -731,7 +771,33 @@ def process_message(user_id, user_text):
         remember(user_id, "интересное", user_text[:100])
     
     # 6. ОТВЕТ
-    return generate_ai_response(user_id, user_text, search_result)
+    return generate_ai_response(user_id, user_text, search_result, None)
+
+# ============================================================
+# ОПРЕДЕЛЕНИЕ ТИПА ЗАПРОСА
+# ============================================================
+def is_image_generation(text):
+    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
+    return any(kw in text.lower() for kw in image_keywords)
+
+def solve_math(text):
+    text = text.lower().strip()
+    has_math_keywords = any(kw in text for kw in ['сколько', 'плюс', 'минус', 'умножить', 'разделить', '/', '*'])
+    has_math_symbols = any(sym in text for sym in ['+', '-', '*', '/', '='])
+    has_numbers = re.search(r'\d+', text)
+    if not has_numbers or not (has_math_keywords or has_math_symbols):
+        return None
+    clean_expr = text
+    clean_expr = clean_expr.replace('плюс', '+').replace('минус', '-')
+    clean_expr = clean_expr.replace('умножить', '*').replace('разделить', '/')
+    clean_expr = clean_expr.replace('на', '*').replace('сколько', '').replace('будет', '')
+    clean_expr = clean_expr.replace('равно', '').replace('?', '').replace(' ', '')
+    if re.search(r'[a-zA-Zа-яА-Я]', clean_expr):
+        return None
+    try:
+        return eval(clean_expr)
+    except:
+        return None
 
 # ============================================================
 # МЕНЮ
@@ -758,7 +824,7 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 def status_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
     if user_id == OWNER_ID or is_admin(user_id):
-        bot.send_message(message.chat.id, "📊 Твой статус:\n👑 АДМИН — безлимит!")
+        bot.send_message(message.chat.id, "👑 АДМИН — безлимит!")
         return
     premium = get_premium_status(user_id)
     conn = sqlite3.connect('users.db')
@@ -778,10 +844,10 @@ def status_cmd_from_user(message, user_id):
         if remaining < 0:
             remaining = 0
         status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
-    bot.send_message(message.chat.id, f"📊 Твой статус:\n{status_text}")
+    bot.send_message(message.chat.id, f"📊 Статус:\n{status_text}")
 
 def premium_cmd_from_user(message, user_id):
-    bot.send_message(message.chat.id, "💎 PREMIUM\n\n✅ Безлимит сообщений\n✅ Приоритетные ответы\n\n💰 50₽/месяц\n📩 @flidges")
+    bot.send_message(message.chat.id, "💎 PREMIUM\n\n✅ Безлимит\n💰 50₽/месяц\n📩 @flidges")
 
 def profile_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -799,20 +865,20 @@ def profile_cmd_from_user(message, user_id):
         premium = premium == 1
 
     if user_id == OWNER_ID or is_admin(user_id):
-        status = "👑 АДМИН — безлимит!"
+        status = "👑 АДМИН"
     elif premium:
         status = f"💎 PREMIUM (до {expires})"
     else:
         remaining = FREE_LIMIT - messages
         if remaining < 0:
             remaining = 0
-        status = f"🔓 Бесплатный (осталось {remaining}/{FREE_LIMIT})"
+        status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
 
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
     bot.send_message(message.chat.id,
-        f"📊 Твой профиль\n\n🆔 ID: {user_id}\n👤 Юзер: {user_link}\n💎 Статус: {status}\n✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}")
+        f"📊 Профиль\n\n🆔 {user_id}\n👤 {user_link}\n💎 {status}\n✉️ {messages}/{FREE_LIMIT}")
 
 def stats_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -828,13 +894,9 @@ def stats_cmd_from_user(message, user_id):
         total_users = c.fetchone()[0]
         c.execute('SELECT COUNT(*) FROM users WHERE premium = 1')
         premium_users = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM banned')
-        banned_users = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM muted')
-        muted_users = c.fetchone()[0]
         conn.close()
         bot.send_message(message.chat.id,
-            f"🏴 Статистика\n\n👥 Всего: {total_users}\n💎 Premium: {premium_users}\n🚫 Забанено: {banned_users}\n📨 Сообщений сегодня: {today_messages}")
+            f"📊 Статистика\n\n👥 {total_users}\n💎 {premium_users}\n📨 Сегодня: {today_messages}")
         return
 
     c.execute('SELECT messages_today, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
@@ -851,7 +913,7 @@ def stats_cmd_from_user(message, user_id):
             remaining = FREE_LIMIT - user_messages
             if remaining < 0:
                 remaining = 0
-            user_status = f"🔓 Бесплатный (осталось {remaining}/{FREE_LIMIT})"
+            user_status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
 
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -861,39 +923,37 @@ def stats_cmd_from_user(message, user_id):
     conn.close()
 
     bot.send_message(message.chat.id,
-        f"📊 Твоя статистика\n\n👤 Статус: {user_status}\n✉️ Сегодня: {user_messages}\n📨 Всего: {total_user_messages}")
+        f"📊 Твоя статистика\n\n👤 {user_status}\n✉️ Сегодня: {user_messages}\n📨 Всего: {total_user_messages}")
 
 def clear_cmd_from_user(message, user_id):
     if user_id in user_histories:
         user_histories[user_id] = []
-    bot.send_message(message.chat.id, "🧹 История очищена!")
+    bot.send_message(message.chat.id, "🧹 Очищено!")
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — КАК CHATGPT, НО ЛУЧШЕ*\n\n"
-        "🔥 Я умею ВСЁ:\n"
-        "• Искать СВЕЖУЮ информацию в интернете\n"
-        "• Решать ЛЮБЫЕ задачи\n"
-        "• Отвечать на ЛЮБЫЕ вопросы\n"
-        "• Запоминать всё\n\n"
+        "🧠 *AWESOME AI — ЗНАЕТ ВСЁ!*\n\n"
+        "📸 Я умею АНАЛИЗИРОВАТЬ СКРИНШОТЫ!\n"
+        "Просто отправь мне фото/скриншот и напиши:\n"
+        "«что тут на скрине» или «опиши»\n\n"
+        "🌐 Я ищу в Google, Wikipedia и DuckDuckGo\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
         "/profile — Профиль\n/stats — Статистика\n"
         "/clear — Очистить историю\n"
-        "/draw [описание] — Сгенерировать картинку\n\n"
-        "🌤 *Примеры:*\n"
+        "/draw [описание] — Картинка\n\n"
+        "📌 *Примеры:*\n"
         "• кто такой Кобяков из А4\n"
-        "• реши уравнение 2x + 5 = 15\n"
-        "• последние новости мира\n"
-        "• кто создал AWESOME AI?"
+        "• умер ли Оливер Три\n"
+        "• реши уравнение 2x + 5 = 15"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# КОМАНДЫ
+# ОСТАЛЬНЫЕ КОМАНДЫ
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -907,9 +967,10 @@ def start(m):
     init_memory_db()
     bot.send_message(m.chat.id,
         f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — **точная копия ChatGPT, но лучше!**\n"
-        f"Меня создал AWESOME — гениальный разработчик из России.\n\n"
-        f"🔥 Я знаю ВСЁ и всегда ищу СВЕЖУЮ информацию.\n\n"
+        f"Я AWESOME AI — **ЗНАЮ ВСЁ!**\n"
+        f"Меня создал AWESOME.\n\n"
+        f"📸 Я умею АНАЛИЗИРОВАТЬ СКРИНШОТЫ!\n"
+        f"🌐 Я ищу в Google, Wikipedia и DuckDuckGo.\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
 
@@ -969,10 +1030,10 @@ def feedback_cmd(m):
         pass
     text = m.text.replace('/feedback', '').strip()
     if not text:
-        bot.send_message(m.chat.id, "❌ Использование: /feedback [текст]")
+        bot.send_message(m.chat.id, "❌ /feedback [текст]")
         return
-    bot.send_message(m.chat.id, "✅ Спасибо за отзыв!")
-    bot.send_message(OWNER_ID, f"📩 Отзыв от @{m.from_user.username or 'anon'}: {text}")
+    bot.send_message(m.chat.id, "✅ Спасибо!")
+    bot.send_message(OWNER_ID, f"📩 Отзыв: {text}")
 
 @bot.message_handler(commands=['draw'])
 def draw_cmd(m):
@@ -982,7 +1043,7 @@ def draw_cmd(m):
         pass
     prompt = m.text.replace('/draw', '').strip()
     if not prompt:
-        bot.send_message(m.chat.id, "❌ Использование: /draw [описание]")
+        bot.send_message(m.chat.id, "❌ /draw [описание]")
         return
     generate_and_send_image(m, prompt)
 
@@ -998,11 +1059,7 @@ def admin_panel(m):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
     bot.send_message(m.chat.id,
-        "🛡️ *АДМИН-ПАНЕЛЬ*\n\n"
-        "/giveadmin [ID]\n/deladmin [ID]\n"
-        "/giveprem [ID] [срок]\n/delprem [ID]\n"
-        "/mute [ID]\n/unmute [ID]\n"
-        "/ban [ID]\n/unban [ID]", parse_mode='Markdown')
+        "🛡️ *АДМИН:*\n/giveadmin [ID]\n/deladmin [ID]\n/giveprem [ID] [срок]\n/delprem [ID]\n/mute [ID]\n/unmute [ID]\n/ban [ID]\n/unban [ID]", parse_mode='Markdown')
 
 @bot.message_handler(commands=['giveadmin'])
 def giveadmin_cmd(m):
@@ -1011,16 +1068,16 @@ def giveadmin_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /giveadmin [ID]")
+        bot.send_message(m.chat.id, "❌ /giveadmin [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     set_admin(target_id, True)
-    bot.send_message(m.chat.id, f"✅ Пользователь {target_id} теперь администратор.")
+    bot.send_message(m.chat.id, f"✅ {target_id} — админ.")
 
 @bot.message_handler(commands=['deladmin'])
 def deladmin_cmd(m):
@@ -1029,16 +1086,16 @@ def deladmin_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /deladmin [ID]")
+        bot.send_message(m.chat.id, "❌ /deladmin [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     set_admin(target_id, False)
-    bot.send_message(m.chat.id, f"❌ У пользователя {target_id} отобраны права администратора.")
+    bot.send_message(m.chat.id, f"❌ {target_id} больше не админ.")
 
 @bot.message_handler(commands=['giveprem'])
 def giveprem_cmd(m):
@@ -1047,19 +1104,19 @@ def giveprem_cmd(m):
         return
     args = m.text.split()
     if len(args) < 3:
-        bot.send_message(m.chat.id, "❌ Использование: /giveprem [ID] [срок]")
+        bot.send_message(m.chat.id, "❌ /giveprem [ID] [срок]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     duration = args[2].lower()
     if set_premium(target_id, duration):
-        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
+        bot.send_message(m.chat.id, f"✅ Premium {target_id} на {duration}")
     else:
-        bot.send_message(m.chat.id, "❌ Неверный формат срока.")
+        bot.send_message(m.chat.id, "❌ Неверный срок.")
 
 @bot.message_handler(commands=['delprem'])
 def delprem_cmd(m):
@@ -1068,16 +1125,16 @@ def delprem_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /delprem [ID]")
+        bot.send_message(m.chat.id, "❌ /delprem [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     remove_premium(target_id)
-    bot.send_message(m.chat.id, f"✅ Premium отключён для {target_id}")
+    bot.send_message(m.chat.id, f"✅ Premium отключён у {target_id}")
 
 @bot.message_handler(commands=['mute'])
 def mute_cmd(m):
@@ -1086,16 +1143,16 @@ def mute_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /mute ID")
+        bot.send_message(m.chat.id, "❌ /mute [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     mute_user(target_id)
-    bot.send_message(m.chat.id, f"🔇 Пользователь {target_id} замучен")
+    bot.send_message(m.chat.id, f"🔇 {target_id} замучен")
 
 @bot.message_handler(commands=['unmute'])
 def unmute_cmd(m):
@@ -1104,16 +1161,16 @@ def unmute_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /unmute ID")
+        bot.send_message(m.chat.id, "❌ /unmute [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     unmute_user(target_id)
-    bot.send_message(m.chat.id, f"🔊 Пользователь {target_id} размучен")
+    bot.send_message(m.chat.id, f"🔊 {target_id} размучен")
 
 @bot.message_handler(commands=['ban'])
 def ban_cmd(m):
@@ -1122,16 +1179,16 @@ def ban_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /ban ID")
+        bot.send_message(m.chat.id, "❌ /ban [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     ban_user(target_id)
-    bot.send_message(m.chat.id, f"🚫 Пользователь {target_id} забанен")
+    bot.send_message(m.chat.id, f"🚫 {target_id} забанен")
 
 @bot.message_handler(commands=['unban'])
 def unban_cmd(m):
@@ -1140,39 +1197,174 @@ def unban_cmd(m):
         return
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /unban ID")
+        bot.send_message(m.chat.id, "❌ /unban [ID]")
         return
     target_id = args[1]
     if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
+        bot.send_message(m.chat.id, "❌ ID цифры!")
         return
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
     unban_user(target_id)
-    bot.send_message(m.chat.id, f"✅ Пользователь {target_id} разбанен")
+    bot.send_message(m.chat.id, f"✅ {target_id} разбанен")
 
 # ============================================================
-# ГЕНЕРАЦИЯ КАРТИНКИ
+# КАРТИНКИ
 # ============================================================
 def generate_and_send_image(m, prompt):
     user_id = m.from_user.id
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
         return
 
     title = fix_title(prompt)
-    bot.send_message(m.chat.id, f"🎨 Генерирую картинку: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
+    bot.send_message(m.chat.id, f"🎨 Генерирую: *{title}*...", parse_mode='Markdown')
 
     image_data = generate_image(prompt)
 
     if image_data:
         increment_messages(user_id)
         try:
-            bot.send_photo(m.chat.id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ Сгенерировано AWESOME AI", parse_mode='Markdown')
+            bot.send_photo(m.chat.id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ AWESOME AI", parse_mode='Markdown')
         except:
             bot.send_message(m.chat.id, "⚠️ Ошибка при отправке")
     else:
-        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку.")
+        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать.")
+
+# ============================================================
+# ФОТО (АНАЛИЗ СКРИНШОТОВ)
+# ============================================================
+@bot.message_handler(content_types=['photo'])
+def handle_photo(m):
+    user_id = m.from_user.id
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    
+    if is_banned(user_id):
+        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        return
+    if not can_send_message(user_id):
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        return
+    
+    bot.send_chat_action(m.chat.id, 'typing')
+    
+    try:
+        # Скачиваем фото
+        file_info = bot.get_file(m.photo[-1].file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        
+        # Анализируем изображение
+        analysis = analyze_image_from_file(downloaded)
+        
+        increment_messages(user_id)
+        
+        # Если есть текст в caption — используем его как вопрос
+        caption = m.caption or "Опиши, что на этом изображении"
+        
+        # Отправляем анализ
+        bot.send_message(m.chat.id, analysis, parse_mode='Markdown')
+        
+        # Дополнительно отвечаем на вопрос (если он есть)
+        if m.caption and len(m.caption) > 3:
+            response = process_message(user_id, m.caption, analysis)
+            if response:
+                bot.send_message(m.chat.id, response, parse_mode='Markdown')
+        
+    except Exception as e:
+        bot.send_message(m.chat.id, f"⚠️ Ошибка при анализе: {e}")
+
+# ============================================================
+# ГОЛОС
+# ============================================================
+@bot.message_handler(content_types=['voice'])
+def handle_voice(m):
+    user_id = m.from_user.id
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    if is_banned(user_id):
+        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        return
+    if not can_send_message(user_id):
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        return
+    bot.send_chat_action(m.chat.id, 'typing')
+    try:
+        file_info = bot.get_file(m.voice.file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        recognized = stt(downloaded)
+        increment_messages(user_id)
+        if recognized:
+            bot.send_message(m.chat.id, f"🎤 *Распознано:*\n{recognized}", parse_mode='Markdown')
+            response = process_message(user_id, recognized)
+            if response:
+                bot.send_message(m.chat.id, response, parse_mode='Markdown')
+        else:
+            bot.send_message(m.chat.id, "🎤 Не разобрал.")
+    except Exception as e:
+        bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
+
+# ============================================================
+# ГОЛОС (ФУНКЦИЯ)
+# ============================================================
+def stt(audio_data):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
+            tmp.write(audio_data)
+            tmp_path = tmp.name
+        recognizer = sr.Recognizer()
+        wav_path = tmp_path + '.wav'
+        subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
+                      capture_output=True, check=False)
+        if os.path.exists(wav_path):
+            with sr.AudioFile(wav_path) as source:
+                audio = recognizer.record(source)
+            os.unlink(wav_path)
+        else:
+            with sr.AudioFile(tmp_path) as source:
+                audio = recognizer.record(source)
+        os.unlink(tmp_path)
+        text = recognizer.recognize_google(audio, language='ru-RU')
+        return text
+    except:
+        return None
+
+# ============================================================
+# ТЕКСТ
+# ============================================================
+@bot.message_handler(content_types=['text'])
+def handle_text(m):
+    user_id = m.from_user.id
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    
+    if is_banned(user_id):
+        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        return
+    if not can_send_message(user_id):
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        return
+
+    text_clean = m.text.strip()
+    if text_clean.startswith('/'):
+        m.text = text_clean
+        bot.process_new_messages([m])
+        return
+
+    bot.send_chat_action(m.chat.id, 'typing')
+
+    if is_image_generation(m.text):
+        generate_and_send_image(m, m.text)
+        return
+
+    increment_messages(user_id)
+    response = process_message(user_id, m.text)
+    
+    if response:
+        bot.send_message(m.chat.id, response, parse_mode='Markdown')
 
 # ============================================================
 # КНОПКИ
@@ -1202,112 +1394,12 @@ def handle_callback(call):
             help_cmd_from_user(call.message, user_id)
         elif call.data == "feedback":
             bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, "📩 Напиши: /feedback [текст]")
+            bot.send_message(call.message.chat.id, "📩 /feedback [текст]")
         elif call.data == "draw":
             bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, "🎨 Напиши: /draw [описание]")
+            bot.send_message(call.message.chat.id, "🎨 /draw [описание]")
     except Exception as e:
         bot.send_message(call.message.chat.id, f"⚠️ Ошибка: {e}")
-
-# ============================================================
-# ТЕКСТ
-# ============================================================
-@bot.message_handler(content_types=['text'])
-def handle_text(m):
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    
-    if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
-        return
-    if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
-        return
-
-    text_clean = m.text.strip()
-    if text_clean.startswith('/'):
-        m.text = text_clean
-        bot.process_new_messages([m])
-        return
-
-    bot.send_chat_action(m.chat.id, 'typing')
-
-    if is_image_generation(m.text):
-        generate_and_send_image(m, m.text)
-        return
-
-    increment_messages(user_id)
-    response = process_message(user_id, m.text)
-    
-    if response:
-        bot.send_message(m.chat.id, response, parse_mode='Markdown')
-
-# ============================================================
-# ФОТО
-# ============================================================
-@bot.message_handler(content_types=['photo'])
-def handle_photo(m):
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
-        return
-    if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
-        return
-    bot.send_chat_action(m.chat.id, 'typing')
-    try:
-        file_info = bot.get_file(m.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        ocr_text = ocr_image(downloaded)
-        increment_messages(user_id)
-        caption = m.caption or "что на фото?"
-        if ocr_text:
-            bot.send_message(m.chat.id, f"📸 Текст на фото:\n{ocr_text[:500]}")
-            response = process_message(user_id, f"{caption} (на фото: {ocr_text})")
-            if response:
-                bot.send_message(m.chat.id, response, parse_mode='Markdown')
-        else:
-            response = process_message(user_id, caption)
-            if response:
-                bot.send_message(m.chat.id, response, parse_mode='Markdown')
-    except Exception as e:
-        bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
-
-# ============================================================
-# ГОЛОС
-# ============================================================
-@bot.message_handler(content_types=['voice'])
-def handle_voice(m):
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
-        return
-    if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
-        return
-    bot.send_chat_action(m.chat.id, 'typing')
-    try:
-        file_info = bot.get_file(m.voice.file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        recognized = stt(downloaded)
-        increment_messages(user_id)
-        if recognized:
-            bot.send_message(m.chat.id, f"🎤 *Распознано:*\n{recognized}", parse_mode='Markdown')
-            response = process_message(user_id, recognized)
-            if response:
-                bot.send_message(m.chat.id, response, parse_mode='Markdown')
-        else:
-            bot.send_message(m.chat.id, "🎤 Не разобрал, попробуй ещё раз.")
-    except Exception as e:
-        bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
 # ОСТАЛЬНОЕ
@@ -1323,15 +1415,14 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — ТОЧНАЯ КОПИЯ CHATGPT (НО ЛУЧШЕ)")
+print("🧠 AWESOME AI — ЗНАЕТ ВСЁ И ВИДИТ СКРИНЫ!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print("👨‍💻 Создатель: AWESOME")
-print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН")
-print("🧠 СУПЕР-ИНТЕЛЛЕКТ — АКТИВИРОВАН")
-print("💾 ПАМЯТЬ — РАБОТАЕТ")
+print("📸 АНАЛИЗ СКРИНШОТОВ — ВКЛЮЧЁН!")
+print("🌐 ПОИСК: Google + Wikipedia + DuckDuckGo")
+print("💾 ПАМЯТЬ: включена")
 print("=" * 60)
-print("БОТ ГОТОВ! КАК CHATGPT, НО ЛУЧШЕ!")
+print("БОТ ГОТОВ!")
 print("=" * 60)
 
 while True:
