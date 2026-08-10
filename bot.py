@@ -23,13 +23,132 @@ from bs4 import BeautifulSoup
 # ============================================================
 # НАСТРОЙКА
 # ============================================================
-TELEGRAM_TOKEN = "8336209662:AAHdhYXhqWA-LtthwgydDSRU7A6A0ceC-HY"
-FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
-OWNER_ID = 6652898792  # flidges
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+if not TELEGRAM_TOKEN:
+    raise ValueError("❌ TELEGRAM_TOKEN не найден в переменных окружения!")
 
-# ЛИМИТ СООБЩЕНИЙ ДЛЯ БЕСПЛАТНОГО ТАРИФА (СНИЖЕН ДО 10)
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
+if not YANDEX_API_KEY:
+    raise ValueError("❌ YANDEX_API_KEY не найден в переменных окружения!")
+
+FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
+OWNER_ID = 6652898792  # flidges
 FREE_LIMIT = 10
+
+# ============================================================
+# ПОИСК В ИНТЕРНЕТЕ (РАБОТАЕТ!)
+# ============================================================
+def search_internet(query):
+    """Ищет информацию в интернете через DuckDuckGo (без API ключа)"""
+    try:
+        # Используем DuckDuckGo (не требует API ключа)
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            # Ищем результаты
+            for result in soup.select('.result')[:3]:
+                title_elem = result.select_one('.result__a')
+                snippet_elem = result.select_one('.result__snippet')
+                
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    link = title_elem.get('href', '')
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    
+                    if title and snippet:
+                        results.append(f"🔹 *{title}*\n📝 {snippet}\n🔗 {link}\n")
+            
+            if results:
+                return "\n".join(results)
+            else:
+                # Пробуем Яндекс (если DuckDuckGo не дал результатов)
+                return search_yandex(query)
+        else:
+            return search_yandex(query)
+            
+    except Exception as e:
+        print(f"Ошибка поиска: {e}")
+        return None
+
+def search_yandex(query):
+    """Резервный поиск через Яндекс (требуется API ключ)"""
+    try:
+        url = "https://yandex.ru/search/xml"
+        params = {
+            "folderid": FOLDER_ID,
+            "apikey": YANDEX_API_KEY,
+            "query": query,
+            "l10n": "ru",
+            "sortby": "rlv"
+        }
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'xml')
+            results = []
+            for doc in soup.find_all('doc')[:3]:
+                title = doc.find('title')
+                url_elem = doc.find('url')
+                snippet = doc.find('snippet')
+                
+                if title and url_elem:
+                    results.append(f"🔹 *{title.text}*\n📝 {snippet.text if snippet else '...'}\n🔗 {url_elem.text}\n")
+            
+            if results:
+                return "\n".join(results)
+        return None
+    except:
+        return None
+
+def get_weather(city):
+    """Получение погоды через открытое API"""
+    try:
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=%C+%t&m"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return f"🌤 Погода в {city}: {response.text.strip()}"
+        return None
+    except:
+        return None
+
+def get_news():
+    """Получение последних новостей через NewsAPI (бесплатно)"""
+    try:
+        # Используем бесплатный RSS агрегатор
+        url = "https://rss.app/feeds/v1.1/7RCRLrhvS5qONHgv.json"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            news = []
+            for item in data.get('items', [])[:5]:
+                title = item.get('title', '')
+                link = item.get('url', '')
+                if title:
+                    news.append(f"📰 *{title}*\n🔗 {link}")
+            return "\n\n".join(news) if news else None
+        return None
+    except:
+        return None
+
+def is_search_needed(text):
+    """Определяет, нужен ли поиск в интернете"""
+    search_keywords = [
+        'погода', 'новости', 'сегодня', 'вчера', 'завтра',
+        'кто такой', 'что такое', 'как', 'где', 'когда',
+        'сколько стоит', 'цена', 'курс', 'доллар', 'евро',
+        'последние', 'свежие', 'актуальные', 'произошло',
+        'случилось', 'вышел', 'появился', 'узнать', 'найти',
+        'информация', 'данные', 'факты', 'события'
+    ]
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in search_keywords)
 
 # ============================================================
 # БАЗА ДАННЫХ
@@ -236,15 +355,17 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 last_search = {}
 user_histories = {}
 
-# КЛАССИЧЕСКИЙ, ПРОВЕРЕННЫЙ ПРОМПТ
+# НОВЫЙ ПРОМПТ С ПОИСКОМ
 SYSTEM_PROMPT = """Ты — AWESOME AI. Ты супер-интеллект.
 
 Твой язык — живой, разговорный, с юмором, но без пафоса.
-Отвечай на всё подряд. Если человек спрашивает "как дела братуха", отвечай дружелюбно: "Норм, братуха, а у тебя как?".
-Никаких заготовленных фраз, шаблонов и философских вопросов.
-Если тебя о чем-то просят, ты отвечаешь конкретно на это.
+Отвечай на всё подряд.
+
+ВАЖНО: Если я нашёл информацию в интернете — используй её для ответа!
+Если информации нет — отвечай сам, но честно говори, что это твоё мнение.
+
 Ты не переспрашиваешь "Чем могу помочь", если это не нужно.
-Если тебе задают вопрос, ответ на который требует свежих данных (новости, погода), отвечай: "Поищи в интернете: запрос"."""
+"""
 
 # ============================================================
 # МЕНЮ
@@ -274,7 +395,6 @@ def generate_image(prompt):
         if not clean_prompt:
             clean_prompt = prompt
 
-        # Способ 1: Pollinations.ai
         try:
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -284,7 +404,6 @@ def generate_image(prompt):
         except:
             pass
 
-        # Способ 2: Craiyon
         try:
             url = "https://backend.craiyon.com/generate"
             headers = {"Content-Type": "application/json"}
@@ -448,19 +567,26 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОТПРАВКА В GPT (Интеллектуальный процессор)
+# ОТПРАВКА В GPT
 # ============================================================
-def send_to_gpt(user_id, full_message):
+def send_to_gpt(user_id, full_message, search_result=None):
     user_histories[user_id].append({"role": "user", "text": full_message})
     if len(user_histories[user_id]) > 31:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-30:]
+
+    messages = user_histories[user_id].copy()
+    
+    # Если есть результат поиска — добавляем в системный промпт
+    if search_result:
+        system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nАктуальная информация из интернета:\n{search_result}\n\nИспользуй эту информацию для ответа!"}
+        messages[0] = system_msg
 
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
     data = {
         "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
         "completionOptions": {"temperature": 0.9, "maxTokens": 2000},
-        "messages": user_histories[user_id]
+        "messages": messages
     }
 
     try:
@@ -474,7 +600,7 @@ def send_to_gpt(user_id, full_message):
         return "⚠️ Сетевая ошибка."
 
 # ============================================================
-# ЦИКЛ ОБРАБОТКИ: ИИ -> ПОИСК -> ОТВЕТ
+# ГЛАВНАЯ ФУНКЦИЯ ОБРАБОТКИ
 # ============================================================
 def ask_gpt(user_id, user_text, image_text=None):
     if user_id not in user_histories:
@@ -484,20 +610,42 @@ def ask_gpt(user_id, user_text, image_text=None):
     if image_text:
         full = f"{user_text}\n\n(На фото текст: {image_text})"
 
+    # Проверяем, нужен ли поиск
+    search_result = None
+    if is_search_needed(user_text):
+        # Сначала проверяем погоду
+        weather_match = re.search(r'(погода|weather)\s+в\s+([а-яА-Яa-zA-Z]+)', user_text, re.IGNORECASE)
+        if weather_match:
+            city = weather_match.group(2)
+            search_result = get_weather(city)
+            if search_result:
+                bot.send_message(user_id, f"🌤 {search_result}")
+                return None
+        
+        # Ищем в интернете
+        search_result = search_internet(user_text)
+        if search_result:
+            bot.send_message(user_id, f"🔍 *Нашёл в интернете:*\n\n{search_result}", parse_mode='Markdown')
+            # Ждём 1 секунду, чтобы пользователь увидел результат
+            time.sleep(1)
+            bot.send_message(user_id, "💬 *Мой ответ на основе найденного:*", parse_mode='Markdown')
+        else:
+            bot.send_message(user_id, "🌐 *Не удалось найти информацию в интернете, отвечаю сам:*", parse_mode='Markdown')
+
     if is_image_generation(user_text):
         return None
 
     if is_text_generation(user_text):
         full = f"{user_text}\n\n(Сгенерируй качественный, интересный текст на эту тему.)"
-        return send_to_gpt(user_id, full)
+        return send_to_gpt(user_id, full, search_result)
 
     math_result = solve_math(user_text)
     if math_result is not None:
         bot.send_message(user_id, f"🧮 *Результат:* `{math_result}`")
         full = f"Пользователь спросил: '{user_text}'. Я посчитал и получил {math_result}. Напиши живой, короткий ответ, подтверждающий результат."
-        return send_to_gpt(user_id, full)
+        return send_to_gpt(user_id, full, search_result)
 
-    return send_to_gpt(user_id, full)
+    return send_to_gpt(user_id, full, search_result)
 
 # ============================================================
 # ГЕНЕРАЦИЯ И ОТПРАВКА КАРТИНКИ
@@ -588,7 +736,6 @@ def profile_cmd_from_user(message, user_id):
             remaining = 0
         status = f"🔓 Бесплатный (осталось {remaining}/{FREE_LIMIT})"
 
-    # Берем username самого пользователя, а не бота
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
@@ -684,11 +831,12 @@ def help_cmd_from_user(message, user_id):
         "/clear — Очистить историю\n"
         "/feedback — Отправить отзыв\n"
         "/draw [описание] — Сгенерировать картинку\n\n"
+        "🌐 *Я умею искать в интернете!*\n"
+        "Просто спроси: погода, новости, факты\n\n"
         "✍️ *Генерация текста:*\n"
         "сгенерируй текст про сову\n"
         "напиши стих про осень\n"
-        "придумай поздравление\n\n"
-        "🌐 *Я ищу актуальную информацию в интернете!*"
+        "придумай поздравление"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += (
@@ -710,7 +858,7 @@ def help_cmd_from_user(message, user_id):
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# КОМАНДЫ (Основные)
+# КОМАНДЫ
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -725,7 +873,7 @@ def start(m):
         m.chat.id,
         f"🔥 *Привет, {m.from_user.first_name}!*\n\n"
         f"Я AWESOME AI — супер-интеллект!\n"
-        f"Я умею искать актуальную информацию в интернете!\n\n"
+        f"🌐 Я умею искать актуальную информацию в интернете!\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(),
         parse_mode='Markdown'
@@ -805,7 +953,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ
+# АДМИН-КОМАНДЫ (все те же, без изменений)
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -1285,15 +1433,15 @@ def other(m):
     bot.send_message(m.chat.id, "Пока не умею. Текст, фото или голос")
 
 # ============================================================
-# ЗАПУСК (ДЛЯ РЕАЛЬНОГО СЕРВЕРА)
+# ЗАПУСК
 # ============================================================
 print("🔥 AWESOME AI ULTRA — ВСЁ РАБОТАЕТ!")
 print(f"📊 Бесплатный лимит: {FREE_LIMIT} сообщений в день")
+print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН!")
 print("🤖 Режим: 100% Генерация на ходу (Без шаблонов)")
 print(f"🤖 @{bot.get_me().username}")
 print("-" * 40)
 
-# Бесконечный цикл с перезапуском
 while True:
     try:
         bot.polling(none_stop=True)
