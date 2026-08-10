@@ -25,29 +25,33 @@ from bs4 import BeautifulSoup
 # ============================================================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
-    raise ValueError("❌ TELEGRAM_TOKEN не найден в переменных окружения!")
+    raise ValueError("❌ TELEGRAM_TOKEN не найден!")
 
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 if not YANDEX_API_KEY:
-    raise ValueError("❌ YANDEX_API_KEY не найден в переменных окружения!")
+    raise ValueError("❌ YANDEX_API_KEY не найден!")
 
 FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
 OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ПОГОДА (ТОЧНАЯ, ОНЛАЙН)
+# ПОГОДА (ИСПРАВЛЕНА)
 # ============================================================
 def get_coordinates(city):
     """Получает координаты города через Nominatim"""
     try:
-        city_lower = city.lower()
+        city_lower = city.lower().strip()
         if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
             city = "Ростов-на-Дону"
         elif "спб" in city_lower or "питер" in city_lower:
             city = "Санкт-Петербург"
         elif "мск" in city_lower:
             city = "Москва"
+        elif "нью" in city_lower and "йорк" in city_lower:
+            city = "New York"
+        elif "лондон" in city_lower:
+            city = "London"
         
         url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
         headers = {"User-Agent": "AwesomeAI/1.0"}
@@ -68,7 +72,7 @@ def get_coordinates(city):
         return None, None, city
 
 def get_weather(city):
-    """Точная погода через Open-Meteo (обновляется каждый час)"""
+    """Точная погода через Open-Meteo"""
     try:
         lat, lon, display_name = get_coordinates(city)
         if lat is None:
@@ -96,24 +100,39 @@ def get_weather(city):
             }
             condition = weather_codes.get(weathercode, "☁️ Облачно")
             
+            # Проверяем наличие дождя в прогнозе
+            has_rain = False
             forecast = ""
             if daily.get('time'):
                 times = daily['time']
                 max_temps = daily.get('temperature_2m_max', [])
                 min_temps = daily.get('temperature_2m_min', [])
+                weather_codes_daily = daily.get('weathercode', [])
                 
                 for i in range(min(7, len(times))):
-                    # Исправлено: теперь правильно парсим дату
                     date_str = times[i]
                     date_obj = datetime.fromisoformat(date_str)
                     date_formatted = date_obj.strftime('%d.%m')
                     max_t = round(max_temps[i]) if i < len(max_temps) else "?"
                     min_t = round(min_temps[i]) if i < len(min_temps) else "?"
-                    forecast += f"\n📅 {date_formatted}: {min_t}°C → {max_t}°C"
+                    
+                    # Проверяем, будет ли дождь в этот день
+                    code = weather_codes_daily[i] if i < len(weather_codes_daily) else 0
+                    if code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]:
+                        has_rain = True
+                        forecast += f"\n📅 {date_formatted}: 🌧️ {min_t}°C → {max_t}°C"
+                    else:
+                        forecast += f"\n📅 {date_formatted}: ☀️ {min_t}°C → {max_t}°C"
             
             result = f"🌤 *Погода в {display_name}*\n"
             result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
-            result += f"📊 *Прогноз:*{forecast}"
+            result += f"📊 *Прогноз на неделю:*{forecast}"
+            
+            # Добавляем информацию о дожде
+            if has_rain:
+                result += "\n\n🌧️ *В ближайшие дни ожидается дождь!*"
+            else:
+                result += "\n\n☀️ *Дождей не ожидается.*"
             
             return result
         return None
@@ -121,11 +140,41 @@ def get_weather(city):
         print(f"[Погода] Ошибка: {e}")
         return None
 
+def extract_city_from_query(text):
+    """Извлекает название города из запроса"""
+    text_lower = text.lower()
+    
+    # Список известных городов для быстрого поиска
+    known_cities = [
+        "москва", "санкт-петербург", "ростов-на-дону", "ростов", "новосибирск",
+        "екатеринбург", "казань", "нижний новгород", "челябинск", "самара",
+        "омск", "уфа", "красноярск", "пермь", "воронеж", "волгоград",
+        "краснодар", "сочи", "владивосток", "иркутск", "тюмень",
+        "london", "new york", "berlin", "paris", "rome", "madrid",
+        "tokyo", "beijing", "seoul", "dubai", "istanbul"
+    ]
+    
+    for city in known_cities:
+        if city in text_lower:
+            return city
+    
+    # Если известных городов нет — ищем по шаблону "в [город]"
+    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
+    if match:
+        city = match.group(1).strip()
+        # Обрезаем лишние слова
+        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
+            city = city.replace(word, '').strip()
+        if city:
+            return city
+    
+    # Если ничего не нашли
+    return None
+
 # ============================================================
 # ПОИСК В ИНТЕРНЕТЕ
 # ============================================================
 def search_internet(query):
-    """Ищет информацию в интернете"""
     try:
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -155,10 +204,9 @@ def search_internet(query):
         return None
 
 # ============================================================
-# ПАМЯТЬ И ОБУЧЕНИЕ (ЖИВОЙ ИИ)
+# ПАМЯТЬ И ОБУЧЕНИЕ
 # ============================================================
 def init_memory_db():
-    """Создаёт базу памяти ИИ"""
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS memory
@@ -177,7 +225,6 @@ def init_memory_db():
     conn.close()
 
 def remember(user_id, topic, fact):
-    """Запоминает факт"""
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
@@ -186,7 +233,6 @@ def remember(user_id, topic, fact):
     conn.close()
 
 def recall(user_id, topic):
-    """Вспоминает факты по теме"""
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     c.execute('SELECT fact, timestamp FROM memory WHERE user_id = ? AND topic LIKE ? ORDER BY timestamp DESC LIMIT 5',
@@ -198,7 +244,6 @@ def recall(user_id, topic):
     return []
 
 def get_personality(user_id):
-    """Получает стиль общения ИИ"""
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     c.execute('SELECT style, mood FROM personality WHERE user_id = ?', (user_id,))
@@ -209,7 +254,6 @@ def get_personality(user_id):
     return None, None
 
 def update_personality(user_id, style=None, mood=None):
-    """Обновляет стиль общения"""
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     current = get_personality(user_id)
@@ -458,30 +502,7 @@ def fix_title(prompt):
         title = title.replace(word, '').strip()
     if not title or len(title) < 2:
         return "Картинка"
-    if len(title.split()) < 5:
-        word_map = {
-            'кота': 'Кот', 'собаку': 'Собака', 'машину': 'Машина',
-            'цветок': 'Цветок', 'дерево': 'Дерево', 'солнце': 'Солнце',
-            'луну': 'Луна', 'звезду': 'Звезда', 'гору': 'Гора',
-            'море': 'Море', 'лес': 'Лес', 'поле': 'Поле',
-            'город': 'Город', 'страну': 'Страна', 'мир': 'Мир',
-            'человека': 'Человек', 'друга': 'Друг', 'врага': 'Враг',
-            'героя': 'Герой', 'злодея': 'Злодей', 'птицу': 'Птица',
-            'рыбу': 'Рыба', 'змею': 'Змея', 'волка': 'Волк',
-            'лису': 'Лиса', 'медведя': 'Медведь', 'зайца': 'Заяц',
-            'ежа': 'Ёж', 'белку': 'Белка', 'фотку': 'Фотка',
-            'аватарку': 'Аватарка', 'картинку': 'Картинка'
-        }
-        title_lower = title.lower()
-        for key, value in word_map.items():
-            if key in title_lower:
-                return value
-        if title.endswith('а') and len(title) > 3: title = title[:-1]
-        elif title.endswith('у') and len(title) > 3: title = title[:-1]
-        elif title.endswith('я') and len(title) > 3: title = title[:-1]
-        if not title or len(title) < 2: return "Картинка"
-        return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
-    return title
+    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
 # ============================================================
 # YANDEX VISION
@@ -570,9 +591,9 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОСНОВНОЙ ИИ (ЖИВОЙ, БЕЗ ШАБЛОНОВ)
+# ОСНОВНОЙ ИИ
 # ============================================================
-user_histories = {}  # глобальная история диалогов
+user_histories = {}
 
 def get_user_history(user_id):
     if user_id not in user_histories:
@@ -580,13 +601,10 @@ def get_user_history(user_id):
     return user_histories[user_id]
 
 def generate_ai_response(user_id, user_text, search_result=None):
-    """Генерирует ответ как живой ИИ"""
     try:
-        # Ищем в памяти
         memories = recall(user_id, user_text)
         
-        # Формируем системный промпт (ДИНАМИЧНЫЙ, БЕЗ ШАБЛОНОВ)
-        system_prompt = """Ты — AWESOME AI. Ты не просто бот — ты живой, думающий ИИ.
+        system_prompt = """Ты — AWESOME AI. Ты живой, думающий ИИ.
 
 ТВОЯ ЗАДАЧА: быть самым умным, интересным и живым собеседником в мире.
 
@@ -606,24 +624,19 @@ def generate_ai_response(user_id, user_text, search_result=None):
 - Ты запоминаешь факты из диалогов
 - Ты адаптируешься под собеседника
 - Ты становишься умнее с каждым разговором
-
-ОТВЕЧАЙ ТАК, КАК БЫ ОТВЕТИЛ УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК.
-НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ.
-КАЖДЫЙ ОТВЕТ — УНИКАЛЕН.
 """
 
         if search_result:
-            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это, но отвечай как живой человек."
+            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это для ответа."
 
         if memories:
             memory_text = "\n".join(memories[:3])
-            system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}\n\nИспользуй это, чтобы показать, что ты помнишь разговоры."
+            system_prompt += f"\n\nЧТО Я ПОМНЮ:\n{memory_text}"
 
         style, mood = get_personality(user_id)
         if style:
-            system_prompt += f"\n\nТВОЙ СТИЛЬ ОБЩЕНИЯ: {style}. Ты в {mood} настроении."
+            system_prompt += f"\n\nТВОЙ СТИЛЬ: {style}. Настроение: {mood}."
 
-        # История диалога (последние 10 сообщений)
         history = get_user_history(user_id)
         history_text = ""
         if history:
@@ -632,82 +645,74 @@ def generate_ai_response(user_id, user_text, search_result=None):
                 role = "Пользователь" if msg["role"] == "user" else "Ты"
                 history_text += f"{role}: {msg['text']}\n"
 
-        messages = [
-            {"role": "system", "text": system_prompt},
-        ]
+        messages = [{"role": "system", "text": system_prompt}]
         if history_text:
             messages.append({"role": "system", "text": f"ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
         messages.append({"role": "user", "text": user_text})
 
-        # Отправляем в Яндекс GPT
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {
-                "temperature": 0.95,
-                "maxTokens": 1000
-            },
+            "completionOptions": {"temperature": 0.95, "maxTokens": 1000},
             "messages": messages
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             ans = response.json()["result"]["alternatives"][0]["message"]["text"]
-            # Сохраняем в историю
             history.append({"role": "user", "text": user_text})
             history.append({"role": "assistant", "text": ans})
             return ans
         else:
-            print(f"[GPT] Ошибка {response.status_code}: {response.text}")
-            return "⚠️ Извини, что-то пошло не так с ИИ. Попробуй ещё раз."
+            return "⚠️ Извини, что-то пошло не так. Попробуй ещё раз."
     except Exception as e:
-        print(f"[GPT] Исключение: {e}")
-        return "⚠️ Сетевая ошибка. Попробуй ещё раз, я уже думаю над ответом!"
+        print(f"[GPT] Ошибка: {e}")
+        return "⚠️ Сетевая ошибка. Попробуй ещё раз."
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
+# ГЛАВНАЯ ОБРАБОТКА (ИСПРАВЛЕНА)
 # ============================================================
 def process_message(user_id, user_text):
     """Основная логика обработки сообщения"""
     
-    # 1. Проверяем погоду
-    weather_match = re.search(r'(погода|weather|температура|градусов?)\s+в\s+([а-яА-Яa-zA-Z\- ]+)', user_text, re.IGNORECASE)
-    if weather_match:
-        city = weather_match.group(2).strip()
-        weather_info = get_weather(city)
-        if weather_info:
-            return weather_info
+    # 1. ПРОВЕРЯЕМ ПОГОДУ (ЛЮБОЙ ЗАПРОС О ПОГОДЕ)
+    weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь', 'снег', 'ветер', 'осадки']
+    if any(kw in user_text.lower() for kw in weather_keywords):
+        city = extract_city_from_query(user_text)
+        if city:
+            weather_info = get_weather(city)
+            if weather_info:
+                return weather_info
+            else:
+                return f"🌐 Не удалось получить погоду для '{city}'. Проверь название города."
         else:
-            return "🌐 Не удалось получить погоду для этого города. Проверь название."
+            return "🌐 В каком городе? Напиши: погода в [город]"
     
-    # 2. Проверяем нарисовать картинку
+    # 2. КАРТИНКИ
     if is_image_generation(user_text):
-        return None  # обрабатывается отдельно
+        return None
     
-    # 3. Проверяем математику
+    # 3. МАТЕМАТИКА
     math_result = solve_math(user_text)
     if math_result is not None:
         return f"🧮 *Результат:* `{math_result}`"
     
-    # 4. Ищем в интернете если нужно
+    # 4. ПОИСК В ИНТЕРНЕТЕ
     search_result = None
-    if any(kw in user_text.lower() for kw in ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 'новости', 'сегодня', 'вчера', 'актуальный', 'последний']):
+    search_keywords = ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 'новости', 'сегодня', 'вчера', 'актуальный', 'последний']
+    if any(kw in user_text.lower() for kw in search_keywords):
         search_result = search_internet(user_text)
-        if search_result:
-            # Отправляем найденное отдельно, а потом ответ ИИ
-            # Но мы можем просто передать в ИИ
-            pass
     
-    # 5. Запоминаем факт (если пользователь что-то рассказывает)
+    # 5. ЗАПОМИНАЕМ
     if len(user_text) > 20 and any(kw in user_text.lower() for kw in ['я', 'мой', 'моя', 'моё', 'у меня']):
         remember(user_id, "личное", user_text[:100])
     
-    # 6. Генерируем живой ответ ИИ
+    # 6. ОТВЕТ ИИ
     return generate_ai_response(user_id, user_text, search_result)
 
 # ============================================================
-# МЕНЮ
+# МЕНЮ И КОМАНДЫ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -723,9 +728,6 @@ def main_menu():
     )
     return keyboard
 
-# ============================================================
-# ФУНКЦИИ ДЛЯ КНОПОК
-# ============================================================
 def status_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
     if user_id == OWNER_ID or is_admin(user_id):
@@ -752,16 +754,7 @@ def status_cmd_from_user(message, user_id):
     bot.send_message(message.chat.id, f"📊 Твой статус:\n{status_text}")
 
 def premium_cmd_from_user(message, user_id):
-    bot.send_message(
-        message.chat.id,
-        "💎 PREMIUM\n\n"
-        "Что даёт Premium:\n"
-        "✅ Безлимит сообщений\n"
-        "✅ Приоритетные ответы\n"
-        "✅ Эксклюзивные функции\n\n"
-        "💰 Цена: 50₽/месяц\n\n"
-        "📩 Для оплаты пиши @flidges"
-    )
+    bot.send_message(message.chat.id, "💎 PREMIUM\n\n✅ Безлимит сообщений\n✅ Приоритетные ответы\n\n💰 50₽/месяц\n📩 @flidges")
 
 def profile_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -791,15 +784,8 @@ def profile_cmd_from_user(message, user_id):
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
-    bot.send_message(
-        message.chat.id,
-        f"📊 Твой профиль\n\n"
-        f"🆔 ID: {user_id}\n"
-        f"👤 Юзер: {user_link}\n"
-        f"📅 Вход: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n"
-        f"💎 Статус: {status}\n"
-        f"✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}"
-    )
+    bot.send_message(message.chat.id,
+        f"📊 Твой профиль\n\n🆔 ID: {user_id}\n👤 Юзер: {user_link}\n💎 Статус: {status}\n✉️ Сообщений сегодня: {messages}/{FREE_LIMIT}")
 
 def stats_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -811,7 +797,6 @@ def stats_cmd_from_user(message, user_id):
         today_messages = c.fetchone()[0] or 0
         c.execute('SELECT SUM(total_messages) FROM total_stats')
         all_time_messages = c.fetchone()[0] or 0
-
         c.execute('SELECT COUNT(*) FROM users')
         total_users = c.fetchone()[0]
         c.execute('SELECT COUNT(*) FROM users WHERE premium = 1')
@@ -821,24 +806,13 @@ def stats_cmd_from_user(message, user_id):
         c.execute('SELECT COUNT(*) FROM muted')
         muted_users = c.fetchone()[0]
         conn.close()
-
-        bot.send_message(
-            message.chat.id,
-            f"🏴 Статистика сервера\n\n"
-            f"👥 Всего пользователей: {total_users}\n"
-            f"💎 Premium: {premium_users}\n"
-            f"🔓 Бесплатных: {total_users - premium_users}\n"
-            f"🚫 Забанено: {banned_users}\n"
-            f"🔇 Замучено: {muted_users}\n\n"
-            f"📨 Сообщений сегодня: {today_messages}\n"
-            f"📨 За всё время: {all_time_messages}"
-        )
+        bot.send_message(message.chat.id,
+            f"🏴 Статистика\n\n👥 Всего: {total_users}\n💎 Premium: {premium_users}\n🚫 Забанено: {banned_users}\n📨 Сообщений сегодня: {today_messages}")
         return
 
     c.execute('SELECT messages_today, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
     result = c.fetchone()
     conn.close()
-
     if result is None:
         user_messages = 0
         user_status = "🔓 Бесплатный"
@@ -859,13 +833,8 @@ def stats_cmd_from_user(message, user_id):
     total_user_messages = res[0] if res else 0
     conn.close()
 
-    bot.send_message(
-        message.chat.id,
-        f"📊 Твоя статистика\n\n"
-        f"👤 Статус: {user_status}\n"
-        f"✉️ Сегодня: {user_messages}\n"
-        f"📨 Всего: {total_user_messages}"
-    )
+    bot.send_message(message.chat.id,
+        f"📊 Твоя статистика\n\n👤 Статус: {user_status}\n✉️ Сегодня: {user_messages}\n📨 Всего: {total_user_messages}")
 
 def clear_cmd_from_user(message, user_id):
     if user_id in user_histories:
@@ -874,35 +843,21 @@ def clear_cmd_from_user(message, user_id):
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — ЖИВОЙ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ*\n\n"
-        "Я не просто бот. Я думаю, учусь и помню.\n\n"
+        "🧠 *AWESOME AI — ЖИВОЙ ИИ*\n\n"
         "📋 *Команды:*\n"
-        "/start — Главное меню\n"
-        "/help — Помощь\n"
-        "/status — Мой статус\n"
-        "/premium — Купить Premium\n"
-        "/profile — Мой профиль\n"
-        "/stats — Статистика\n"
+        "/start — Меню\n/help — Помощь\n"
+        "/status — Статус\n/premium — Premium\n"
+        "/profile — Профиль\n/stats — Статистика\n"
         "/clear — Очистить историю\n"
-        "/feedback — Отправить отзыв\n"
         "/draw [описание] — Сгенерировать картинку\n\n"
-        "🌤 *Примеры запросов:*\n"
+        "🌤 *Примеры:*\n"
         "• погода в Ростове-на-Дону\n"
-        "• сколько градусов в Москве\n"
+        "• когда дождь в Москве\n"
         "• кто такой Илон Маск\n"
-        "• новости сегодня\n"
-        "• расскажи анекдот\n"
-        "• что ты думаешь о жизни?\n\n"
-        "💡 *Я запоминаю всё, что ты говоришь!*"
+        "• расскажи анекдот"
     )
     if user_id == OWNER_ID or is_admin(user_id):
-        text += (
-            "\n\n👑 *Админ-команды:*\n"
-            "/giveadmin [ID]\n/deladmin [ID]\n"
-            "/giveprem [ID] [срок]\n/delprem [ID]\n"
-            "/mute [ID]\n/unmute [ID]\n"
-            "/ban [ID]\n/unban [ID]"
-        )
+        text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
@@ -920,16 +875,9 @@ def start(m):
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
     init_memory_db()
-    bot.send_message(
-        m.chat.id,
-        f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — *живой искусственный интеллект*.\n\n"
-        f"Я думаю, учусь и запоминаю.\n"
-        f"Общайся со мной как с человеком — я понимаю всё.\n\n"
-        f"👇 *Выбери действие:*",
-        reply_markup=main_menu(),
-        parse_mode='Markdown'
-    )
+    bot.send_message(m.chat.id,
+        f"🧠 *Привет, {m.from_user.first_name}!*\n\nЯ AWESOME AI — живой искусственный интеллект.\nЯ думаю, учусь и запоминаю.\n👇 *Выбери действие:*",
+        reply_markup=main_menu(), parse_mode='Markdown')
 
 @bot.message_handler(commands=['help'])
 def help_cmd(m):
@@ -1015,19 +963,12 @@ def admin_panel(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-    text = (
+    bot.send_message(m.chat.id,
         "🛡️ *АДМИН-ПАНЕЛЬ*\n\n"
-        "👤 /giveadmin [ID]\n"
-        "👤 /deladmin [ID]\n"
-        "💎 /giveprem [ID] [срок]\n"
-        "💎 /givetest [ID]\n"
-        "💎 /delprem [ID]\n"
-        "🚫 /mute [ID]\n"
-        "🚫 /unmute [ID]\n"
-        "⛔ /ban [ID]\n"
-        "⛔ /unban [ID]"
-    )
-    bot.send_message(m.chat.id, text, parse_mode='Markdown')
+        "/giveadmin [ID]\n/deladmin [ID]\n"
+        "/giveprem [ID] [срок]\n/delprem [ID]\n"
+        "/mute [ID]\n/unmute [ID]\n"
+        "/ban [ID]\n/unban [ID]", parse_mode='Markdown')
 
 @bot.message_handler(commands=['giveadmin'])
 def giveadmin_cmd(m):
@@ -1085,26 +1026,6 @@ def giveprem_cmd(m):
         bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
     else:
         bot.send_message(m.chat.id, "❌ Неверный формат срока.")
-
-@bot.message_handler(commands=['givetest'])
-def givetest_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /givetest [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    if set_premium(target_id, "1d"):
-        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на 1 день.")
-    else:
-        bot.send_message(m.chat.id, "❌ Ошибка выдачи.")
 
 @bot.message_handler(commands=['delprem'])
 def delprem_cmd(m):
@@ -1197,7 +1118,7 @@ def unban_cmd(m):
     bot.send_message(m.chat.id, f"✅ Пользователь {target_id} разбанен")
 
 # ============================================================
-# ГЕНЕРАЦИЯ И ОТПРАВКА КАРТИНКИ
+# ГЕНЕРАЦИЯ КАРТИНКИ
 # ============================================================
 def generate_and_send_image(m, prompt):
     user_id = m.from_user.id
@@ -1206,7 +1127,7 @@ def generate_and_send_image(m, prompt):
         return
 
     title = fix_title(prompt)
-    bot.send_message(m.chat.id, f"🎨 Генерирую картинку по запросу: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
+    bot.send_message(m.chat.id, f"🎨 Генерирую картинку: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
 
     image_data = generate_image(prompt)
 
@@ -1217,7 +1138,7 @@ def generate_and_send_image(m, prompt):
         except:
             bot.send_message(m.chat.id, "⚠️ Ошибка при отправке")
     else:
-        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку. Попробуй другой запрос.")
+        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку.")
 
 # ============================================================
 # КНОПКИ
@@ -1288,9 +1209,6 @@ def handle_text(m):
     
     if response:
         bot.send_message(m.chat.id, response, parse_mode='Markdown')
-    else:
-        # Если response None (например, генерация картинки уже обработана)
-        pass
 
 # ============================================================
 # ФОТО
@@ -1362,7 +1280,7 @@ def handle_voice(m):
 # ============================================================
 @bot.message_handler(content_types=['video', 'document', 'audio'])
 def other(m):
-    bot.send_message(m.chat.id, "📁 Пока не умею обрабатывать этот тип файлов. Пришли текст, фото или голосовое.")
+    bot.send_message(m.chat.id, "📁 Пока не умею обрабатывать этот тип файлов.")
 
 # ============================================================
 # ЗАПУСК
@@ -1374,17 +1292,13 @@ print("=" * 50)
 print("🧠 AWESOME AI — ЖИВОЙ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ")
 print("=" * 50)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print(f"📊 Бесплатный лимит: {FREE_LIMIT} сообщений в день")
-print("🧠 Режим: ПОЛНОСТЬЮ ЖИВОЙ ИИ, БЕЗ ШАБЛОНОВ")
-print("🌐 Поиск в интернете: ВКЛЮЧЁН")
-print("💾 Память: АКТИВНА")
-print("=" * 50)
-print("Бот запущен и готов к работе!")
+print("🌤 Погода для ЛЮБОГО города")
+print("🧠 Без шаблонов, живой ИИ")
 print("=" * 50)
 
 while True:
     try:
         bot.polling(none_stop=True)
     except Exception as e:
-        print(f"⚠️ Бот упал с ошибкой: {e}. Перезапуск через 5 секунд...")
+        print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
         time.sleep(5)
