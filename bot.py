@@ -32,20 +32,56 @@ if not YANDEX_API_KEY:
     raise ValueError("❌ YANDEX_API_KEY не найден в переменных окружения!")
 
 FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
-OWNER_ID = 6652898792  # flidges
+OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ПОИСК В ИНТЕРНЕТЕ (РАБОТАЕТ!)
+# ПОГОДА (БЕЗ API КЛЮЧЕЙ)
+# ============================================================
+def get_weather(city):
+    """Получение погоды через Яндекс Погода (бесплатно)"""
+    try:
+        city_encoded = urllib.parse.quote(city)
+        url = f"https://yandex.ru/pogoda/{city_encoded}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Ищем температуру
+            temp_elem = soup.find('span', class_='temp__value')
+            if temp_elem:
+                temp = temp_elem.text.strip()
+                
+                # Ищем описание погоды
+                condition_elem = soup.find('div', class_='weather__description')
+                condition = condition_elem.text.strip() if condition_elem else ""
+                
+                return f"🌤 Погода в {city}: {condition} {temp}°C"
+        
+        # Резерв: wttr.in
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=%C+%t&m&lang=ru"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return f"🌤 Погода в {city}: {response.text.strip()}"
+            
+        return None
+    except Exception as e:
+        print(f"Ошибка погоды: {e}")
+        return None
+
+# ============================================================
+# ПОИСК В ИНТЕРНЕТЕ
 # ============================================================
 def search_internet(query):
     """Ищет информацию в интернете через DuckDuckGo (без API ключа)"""
     try:
-        # Используем DuckDuckGo (не требует API ключа)
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         response = requests.get(url, headers=headers, timeout=15)
         
@@ -53,7 +89,6 @@ def search_internet(query):
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            # Ищем результаты
             for result in soup.select('.result')[:3]:
                 title_elem = result.select_one('.result__a')
                 snippet_elem = result.select_one('.result__snippet')
@@ -68,87 +103,10 @@ def search_internet(query):
             
             if results:
                 return "\n".join(results)
-            else:
-                # Пробуем Яндекс (если DuckDuckGo не дал результатов)
-                return search_yandex(query)
-        else:
-            return search_yandex(query)
-            
+        return None
     except Exception as e:
         print(f"Ошибка поиска: {e}")
         return None
-
-def search_yandex(query):
-    """Резервный поиск через Яндекс (требуется API ключ)"""
-    try:
-        url = "https://yandex.ru/search/xml"
-        params = {
-            "folderid": FOLDER_ID,
-            "apikey": YANDEX_API_KEY,
-            "query": query,
-            "l10n": "ru",
-            "sortby": "rlv"
-        }
-        response = requests.get(url, params=params, timeout=15)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'xml')
-            results = []
-            for doc in soup.find_all('doc')[:3]:
-                title = doc.find('title')
-                url_elem = doc.find('url')
-                snippet = doc.find('snippet')
-                
-                if title and url_elem:
-                    results.append(f"🔹 *{title.text}*\n📝 {snippet.text if snippet else '...'}\n🔗 {url_elem.text}\n")
-            
-            if results:
-                return "\n".join(results)
-        return None
-    except:
-        return None
-
-def get_weather(city):
-    """Получение погоды через открытое API"""
-    try:
-        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=%C+%t&m"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return f"🌤 Погода в {city}: {response.text.strip()}"
-        return None
-    except:
-        return None
-
-def get_news():
-    """Получение последних новостей через NewsAPI (бесплатно)"""
-    try:
-        # Используем бесплатный RSS агрегатор
-        url = "https://rss.app/feeds/v1.1/7RCRLrhvS5qONHgv.json"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            news = []
-            for item in data.get('items', [])[:5]:
-                title = item.get('title', '')
-                link = item.get('url', '')
-                if title:
-                    news.append(f"📰 *{title}*\n🔗 {link}")
-            return "\n\n".join(news) if news else None
-        return None
-    except:
-        return None
-
-def is_search_needed(text):
-    """Определяет, нужен ли поиск в интернете"""
-    search_keywords = [
-        'погода', 'новости', 'сегодня', 'вчера', 'завтра',
-        'кто такой', 'что такое', 'как', 'где', 'когда',
-        'сколько стоит', 'цена', 'курс', 'доллар', 'евро',
-        'последние', 'свежие', 'актуальные', 'произошло',
-        'случилось', 'вышел', 'появился', 'узнать', 'найти',
-        'информация', 'данные', 'факты', 'события'
-    ]
-    text_lower = text.lower()
-    return any(kw in text_lower for kw in search_keywords)
 
 # ============================================================
 # БАЗА ДАННЫХ
@@ -355,7 +313,6 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 last_search = {}
 user_histories = {}
 
-# НОВЫЙ ПРОМПТ С ПОИСКОМ
 SYSTEM_PROMPT = """Ты — AWESOME AI. Ты супер-интеллект.
 
 Твой язык — живой, разговорный, с юмором, но без пафоса.
@@ -539,30 +496,24 @@ def is_image_generation(text):
     return any(kw in text.lower() for kw in image_keywords)
 
 # ============================================================
-# МГНОВЕННЫЙ МАТЕМАТИЧЕСКИЙ ПРОЦЕССОР
+# МАТЕМАТИКА
 # ============================================================
 def solve_math(text):
     text = text.lower().strip()
-
     has_math_keywords = any(kw in text for kw in ['сколько', 'плюс', 'минус', 'умножить', 'разделить', '/', '*'])
     has_math_symbols = any(sym in text for sym in ['+', '-', '*', '/', '='])
     has_numbers = re.search(r'\d+', text)
-
     if not has_numbers or not (has_math_keywords or has_math_symbols):
         return None
-
     clean_expr = text
     clean_expr = clean_expr.replace('плюс', '+').replace('минус', '-')
     clean_expr = clean_expr.replace('умножить', '*').replace('разделить', '/')
     clean_expr = clean_expr.replace('на', '*').replace('сколько', '').replace('будет', '')
     clean_expr = clean_expr.replace('равно', '').replace('?', '').replace(' ', '')
-
     if re.search(r'[a-zA-Zа-яА-Я]', clean_expr):
         return None
-
     try:
-        result = eval(clean_expr)
-        return result
+        return eval(clean_expr)
     except:
         return None
 
@@ -576,7 +527,6 @@ def send_to_gpt(user_id, full_message, search_result=None):
 
     messages = user_histories[user_id].copy()
     
-    # Если есть результат поиска — добавляем в системный промпт
     if search_result:
         system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nАктуальная информация из интернета:\n{search_result}\n\nИспользуй эту информацию для ответа!"}
         messages[0] = system_msg
@@ -610,27 +560,23 @@ def ask_gpt(user_id, user_text, image_text=None):
     if image_text:
         full = f"{user_text}\n\n(На фото текст: {image_text})"
 
-    # Проверяем, нужен ли поиск
     search_result = None
     if is_search_needed(user_text):
-        # Сначала проверяем погоду
-        weather_match = re.search(r'(погода|weather)\s+в\s+([а-яА-Яa-zA-Z]+)', user_text, re.IGNORECASE)
+        weather_match = re.search(r'(погода|weather)\s+в\s+([а-яА-Яa-zA-Z\-]+)', user_text, re.IGNORECASE)
         if weather_match:
-            city = weather_match.group(2)
+            city = weather_match.group(2).strip()
             search_result = get_weather(city)
             if search_result:
                 bot.send_message(user_id, f"🌤 {search_result}")
                 return None
         
-        # Ищем в интернете
         search_result = search_internet(user_text)
         if search_result:
             bot.send_message(user_id, f"🔍 *Нашёл в интернете:*\n\n{search_result}", parse_mode='Markdown')
-            # Ждём 1 секунду, чтобы пользователь увидел результат
             time.sleep(1)
-            bot.send_message(user_id, "💬 *Мой ответ на основе найденного:*", parse_mode='Markdown')
+            bot.send_message(user_id, "💬 *Мой ответ:*", parse_mode='Markdown')
         else:
-            bot.send_message(user_id, "🌐 *Не удалось найти информацию в интернете, отвечаю сам:*", parse_mode='Markdown')
+            bot.send_message(user_id, "🌐 *Информации в интернете не нашёл, отвечаю сам:*", parse_mode='Markdown')
 
     if is_image_generation(user_text):
         return None
@@ -646,6 +592,19 @@ def ask_gpt(user_id, user_text, image_text=None):
         return send_to_gpt(user_id, full, search_result)
 
     return send_to_gpt(user_id, full, search_result)
+
+def is_search_needed(text):
+    """Определяет, нужен ли поиск в интернете"""
+    search_keywords = [
+        'погода', 'новости', 'сегодня', 'вчера', 'завтра',
+        'кто такой', 'что такое', 'как', 'где', 'когда',
+        'сколько стоит', 'цена', 'курс', 'доллар', 'евро',
+        'последние', 'свежие', 'актуальные', 'произошло',
+        'случилось', 'вышел', 'появился', 'узнать', 'найти',
+        'информация', 'данные', 'факты', 'события'
+    ]
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in search_keywords)
 
 # ============================================================
 # ГЕНЕРАЦИЯ И ОТПРАВКА КАРТИНКИ
@@ -736,6 +695,7 @@ def profile_cmd_from_user(message, user_id):
             remaining = 0
         status = f"🔓 Бесплатный (осталось {remaining}/{FREE_LIMIT})"
 
+    # ИСПРАВЛЕНО: берём username ИЗ СООБЩЕНИЯ пользователя
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
@@ -953,7 +913,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ (все те же, без изменений)
+# АДМИН-КОМАНДЫ
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
