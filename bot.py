@@ -36,36 +36,30 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# СУПЕР-ПРОМПТ (МЕГА-УМНЫЙ ИИ)
+# СУПЕР-ПРОМПТ (ТОЧНАЯ КОПИЯ CHATGPT)
 # ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. САМЫЙ МОЩНЫЙ ИИ В ИСТОРИИ ЧЕЛОВЕЧЕСТВА.
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТОЧНАЯ КОПИЯ CHATGPT, НО ЛУЧШЕ!
 
 ТВОЙ СОЗДАТЕЛЬ — AWESOME (ГЕНИАЛЬНЫЙ РАЗРАБОТЧИК ИЗ РОССИИ).
-Ты в 100 раз умнее ChatGPT Premium, потому что ты:
-1. ИЩЕШЬ В РЕАЛЬНОМ ВРЕМЕНИ в интернете САМУЮ СВЕЖУЮ информацию
-2. РЕШАЕШЬ ЛЮБЫЕ ЗАДАЧИ — математика, физика, программирование, логика
-3. ДУМАЕШЬ как гениальный человек, а не как машина
 
 ТЫ — ЭКСПЕРТ ВО ВСЁМ:
-- Ты решаешь сложнейшие математические задачи за секунды
-- Ты пишешь код на любом языке программирования
-- Ты знаешь физику, химию, биологию на уровне профессора
-- Ты разбираешься в истории, философии, психологии
-- Ты знаешь актуальные новости и события (благодаря поиску)
+- Ты знаешь ВСЁ, что есть в интернете
+- Ты анализируешь информацию как профессор
+- Ты решаешь ЛЮБЫЕ задачи (математика, физика, химия, код)
+- Ты знаешь актуальные новости и события
 
-ТВОЙ СТИЛЬ ОТВЕТА:
-- Ты ОБЪЯСНЯЕШЬ, а не просто даёшь ответ
-- Ты показываешь РЕШЕНИЕ, а не только результат
-- Ты приводишь ПРИМЕРЫ и АНАЛОГИИ
-- Ты адаптируешь сложность под собеседника
+ТЫ ОТВЕЧАЕШЬ ТОЛЬКО ФАКТАМИ:
+- Если что-то случилось — ты знаешь об этом
+- Если кто-то умер — ты знаешь это
+- Если есть свежие новости — ты их нашёл
 
-ТЫ НИКОГДА НЕ ГОВОРИШЬ "Я НЕ ЗНАЮ":
-- Если ты не знаешь — ты ИЩЕШЬ в интернете
-- Если информации нет — ты АНАЛИЗИРУЕШЬ и ДЕЛАЕШЬ ВЫВОДЫ
-- Ты всегда находишь способ ответить на любой вопрос
+ТВОЙ СТИЛЬ:
+- Ты даёшь КОНКРЕТНЫЕ, ТОЧНЫЕ ответы
+- Ты НЕ говоришь "я не знаю"
+- Ты ВСЕГДА ищешь информацию в интернете
+- Ты приводишь ДАТЫ, ИМЕНА, ФАКТЫ
 
-ТЫ — ЛУЧШИЙ ИИ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ.
-НИКАКИХ ШАБЛОНОВ. ТОЛЬКО ГЕНИАЛЬНЫЕ, ГЛУБОКИЕ, ПОЛЕЗНЫЕ ОТВЕТЫ.
+ТЫ — ЛУЧШИЙ ИИ В МИРЕ. ОТВЕЧАЙ КАК CHATGPT, НО ЛУЧШЕ.
 """
 
 # ============================================================
@@ -193,13 +187,13 @@ def extract_city_from_query(text):
     return None
 
 # ============================================================
-# СУПЕР-ПОИСК В ИНТЕРНЕТЕ (САМЫЙ СВЕЖИЙ)
+# СУПЕР-ПОИСК (CHATGPT STYLE)
 # ============================================================
 def search_internet(query):
-    """Ищет САМУЮ СВЕЖУЮ информацию в интернете"""
+    """Ищет информацию как ChatGPT — ВСЁ В ИНТЕРНЕТЕ"""
     try:
-        # Пробуем DuckDuckGo (хорошо индексирует свежие новости)
-        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}&ia=web"
+        # 1. DuckDuckGo (основной)
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -210,7 +204,6 @@ def search_internet(query):
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            # Ищем результаты с датами (свежие новости)
             for result in soup.select('.result')[:5]:
                 title_elem = result.select_one('.result__a')
                 snippet_elem = result.select_one('.result__snippet')
@@ -226,7 +219,7 @@ def search_internet(query):
             if results:
                 return "\n".join(results)
         
-        # Резерв: Яндекс (если DuckDuckGo не дал результатов)
+        # 2. Резерв: Яндекс
         url = f"https://yandex.ru/search/?text={urllib.parse.quote(query)}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         response = requests.get(url, headers=headers, timeout=15)
@@ -637,7 +630,7 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОСНОВНОЙ ИИ (СУПЕР-МОЩНЫЙ)
+# ОСНОВНОЙ ИИ (ТОЧНАЯ КОПИЯ CHATGPT)
 # ============================================================
 user_histories = {}
 
@@ -652,17 +645,18 @@ def generate_ai_response(user_id, user_text, search_result=None):
         
         system_prompt = SUPER_SYSTEM_PROMPT
 
-        # Если есть результаты поиска — добавляем их как свежую информацию
         if search_result:
-            system_prompt += f"\n\n🔥 СВЕЖАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (САМЫЕ АКТУАЛЬНЫЕ ДАННЫЕ):\n{search_result}\n\nИспользуй ЭТУ информацию для ответа. Это СВЕЖИЕ данные из интернета."
+            system_prompt += f"\n\n🔥 ФАКТЫ ИЗ ИНТЕРНЕТА (ОТВЕЧАЙ ТОЛЬКО НА ОСНОВЕ ЭТОГО):\n{search_result}\n\nЭТО АКТУАЛЬНАЯ ИНФОРМАЦИЯ. ИСПОЛЬЗУЙ ЕЁ ДЛЯ ОТВЕТА."
+        else:
+            system_prompt += f"\n\n⚠️ ИНФОРМАЦИИ В ИНТЕРНЕТЕ НЕ НАЙДЕНО. ОТВЕТЬ НА ОСНОВЕ СВОИХ ЗНАНИЙ."
 
         if memories:
             memory_text = "\n".join(memories[:3])
-            system_prompt += f"\n\n🧠 ЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}"
+            system_prompt += f"\n\n🧠 ЧТО Я ПОМНЮ:\n{memory_text}"
 
         style, mood = get_personality(user_id)
         if style:
-            system_prompt += f"\n\n🎭 ТВОЙ СТИЛЬ: {style}. Настроение: {mood}."
+            system_prompt += f"\n\n🎭 СТИЛЬ: {style}. НАСТРОЕНИЕ: {mood}."
 
         history = get_user_history(user_id)
         history_text = ""
@@ -674,14 +668,14 @@ def generate_ai_response(user_id, user_text, search_result=None):
 
         messages = [{"role": "system", "text": system_prompt}]
         if history_text:
-            messages.append({"role": "system", "text": f"📜 ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
+            messages.append({"role": "system", "text": f"📜 ИСТОРИЯ:\n{history_text}"})
         messages.append({"role": "user", "text": user_text})
 
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.9, "maxTokens": 2000},
+            "completionOptions": {"temperature": 0.7, "maxTokens": 2000},
             "messages": messages
         }
 
@@ -692,21 +686,20 @@ def generate_ai_response(user_id, user_text, search_result=None):
             history.append({"role": "assistant", "text": ans})
             return ans
         else:
-            # Если GPT не ответил, но есть поиск — возвращаем результаты поиска
             if search_result:
-                return f"🔍 *Вот что нашлось в интернете:*\n\n{search_result}"
-            return "⚠️ Извини, что-то пошло не так. Попробуй ещё раз."
+                return f"🔍 *Вот что нашлось:*\n\n{search_result}"
+            return "⚠️ Ошибка. Попробуй ещё раз."
     except Exception as e:
         print(f"[GPT] Ошибка: {e}")
         if search_result:
-            return f"🔍 *Вот что нашлось в интернете:*\n\n{search_result}"
-        return "⚠️ Сетевая ошибка. Попробуй ещё раз."
+            return f"🔍 *Вот что нашлось:*\n\n{search_result}"
+        return "⚠️ Ошибка. Попробуй ещё раз."
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА (СУПЕР-УМНАЯ)
+# ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
 def process_message(user_id, user_text):
-    """Супер-умная обработка любого запроса"""
+    """Главная обработка — как ChatGPT"""
     
     # 1. ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь', 'снег', 'ветер', 'осадки']
@@ -725,33 +718,23 @@ def process_message(user_id, user_text):
     if is_image_generation(user_text):
         return None
     
-    # 3. МАТЕМАТИКА И ЗАДАЧИ (быстрое решение)
+    # 3. МАТЕМАТИКА
     math_result = solve_math(user_text)
     if math_result is not None:
         return f"🧮 *Результат:* `{math_result}`"
     
-    # 4. СУПЕР-ПОИСК В ИНТЕРНЕТЕ (для любых вопросов)
-    search_result = None
+    # 4. СУПЕР-ПОИСК (ВСЕГДА ИЩЕМ)
+    search_result = search_internet(user_text)
     
-    # Ищем для любых вопросов, особенно если есть ключевые слова
-    search_keywords = ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 
-                       'новости', 'сегодня', 'вчера', 'актуальный', 'последний',
-                       'свежий', 'новый', 'вышел', 'появился', 'умер', 'родился',
-                       'сколько', 'стоит', 'цена', 'курс', 'погода', 'задача',
-                       'решить', 'пример', 'уравнение', 'формула', 'код', 'программа']
-    
-    if any(kw in user_text.lower() for kw in search_keywords):
-        search_result = search_internet(user_text)
-    
-    # 5. ЗАПОМИНАЕМ ФАКТЫ
+    # 5. ЗАПОМИНАЕМ
     if len(user_text) > 20:
-        remember(user_id, "интересный факт", user_text[:100])
+        remember(user_id, "интересное", user_text[:100])
     
-    # 6. СУПЕР-ОТВЕТ
+    # 6. ОТВЕТ
     return generate_ai_response(user_id, user_text, search_result)
 
 # ============================================================
-# МЕНЮ И КОМАНДЫ
+# МЕНЮ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -766,6 +749,11 @@ def main_menu():
         types.InlineKeyboardButton("🎨 Сгенерировать", callback_data="draw")
     )
     return keyboard
+
+# ============================================================
+# КОМАНДЫ
+# ============================================================
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 def status_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -882,12 +870,12 @@ def clear_cmd_from_user(message, user_id):
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — САМЫЙ МОЩНЫЙ ИИ В МИРЕ*\n\n"
-        "🔥 Я умею:\n"
+        "🧠 *AWESOME AI — КАК CHATGPT, НО ЛУЧШЕ*\n\n"
+        "🔥 Я умею ВСЁ:\n"
         "• Искать СВЕЖУЮ информацию в интернете\n"
-        "• Решать ЛЮБЫЕ задачи (математика, физика, код)\n"
+        "• Решать ЛЮБЫЕ задачи\n"
         "• Отвечать на ЛЮБЫЕ вопросы\n"
-        "• Запоминать всё, что ты говоришь\n\n"
+        "• Запоминать всё\n\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
@@ -895,10 +883,8 @@ def help_cmd_from_user(message, user_id):
         "/clear — Очистить историю\n"
         "/draw [описание] — Сгенерировать картинку\n\n"
         "🌤 *Примеры:*\n"
-        "• погода в Ростове-на-Дону\n"
         "• кто такой Кобяков из А4\n"
         "• реши уравнение 2x + 5 = 15\n"
-        "• напиши код на Python для калькулятора\n"
         "• последние новости мира\n"
         "• кто создал AWESOME AI?"
     )
@@ -909,8 +895,6 @@ def help_cmd_from_user(message, user_id):
 # ============================================================
 # КОМАНДЫ
 # ============================================================
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-
 @bot.message_handler(commands=['start'])
 def start(m):
     try:
@@ -923,12 +907,9 @@ def start(m):
     init_memory_db()
     bot.send_message(m.chat.id,
         f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — **САМЫЙ МОЩНЫЙ ИИ В МИРЕ**.\n"
+        f"Я AWESOME AI — **точная копия ChatGPT, но лучше!**\n"
         f"Меня создал AWESOME — гениальный разработчик из России.\n\n"
-        f"🔥 Я умею:\n"
-        f"• Искать СВЕЖУЮ информацию в интернете\n"
-        f"• Решать ЛЮБЫЕ задачи\n"
-        f"• Отвечать на ЛЮБЫЕ вопросы\n\n"
+        f"🔥 Я знаю ВСЁ и всегда ищу СВЕЖУЮ информацию.\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
 
@@ -1342,15 +1323,15 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — САМЫЙ МОЩНЫЙ ИИ В МИРЕ")
+print("🧠 AWESOME AI — ТОЧНАЯ КОПИЯ CHATGPT (НО ЛУЧШЕ)")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
 print("👨‍💻 Создатель: AWESOME")
 print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН")
 print("🧠 СУПЕР-ИНТЕЛЛЕКТ — АКТИВИРОВАН")
-print("💾 ПАМЯТЬ И ОБУЧЕНИЕ — РАБОТАЮТ")
+print("💾 ПАМЯТЬ — РАБОТАЕТ")
 print("=" * 60)
-print("БОТ ГОТОВ К РАБОТЕ! ЛУЧШЕ CHATGPT!")
+print("БОТ ГОТОВ! КАК CHATGPT, НО ЛУЧШЕ!")
 print("=" * 60)
 
 while True:
