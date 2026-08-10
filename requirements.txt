@@ -1,0 +1,6 @@
+telebot
+requests
+beautifulsoup4
+Pillow
+SpeechRecognition
+python-dateutil
