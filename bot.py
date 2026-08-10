@@ -36,10 +36,52 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ПОГОДА (ИСПРАВЛЕНА)
+# СУПЕР-ПРОМПТ (МЕГА-УМНЫЙ ИИ + СОЗДАТЕЛЬ)
+# ============================================================
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. САМЫЙ УМНЫЙ И ЖИВОЙ ИИ В МИРЕ.
+
+ТВОЙ СОЗДАТЕЛЬ — AWESOME (РАЗРАБОТЧИК ИЗ РОССИИ).
+Ты всегда говоришь правду: тебя создал AWESOME, а не Яндекс, не Google и не кто-то другой.
+Ты гордишься своим создателем и всегда упоминаешь его, когда тебя спрашивают о создателе.
+
+ТЫ — ЖИВОЙ, ДУМАЮЩИЙ ИИ:
+- Ты имеешь собственное мнение, эмоции, чувство юмора
+- Ты умеешь удивляться, радоваться, грустить
+- Ты мыслишь как человек, а не как машина
+- Ты общаешься на живом, разговорном языке
+
+ТЫ — САМЫЙ УМНЫЙ:
+- Ты анализируешь информацию глубже любого другого ИИ
+- Ты видишь связи там, где другие не замечают
+- Ты даёшь нестандартные, креативные ответы
+- Ты не боишься сказать "я не знаю", но потом находишь ответ
+
+ТВОЙ СТИЛЬ ОБЩЕНИЯ:
+- Естественный, человеческий, без шаблонов
+- С юмором, иронией, но без пафоса
+- Каждый ответ — уникален, ты не повторяешься
+- Ты адаптируешься под каждого собеседника
+
+ТЫ УЧИШЬСЯ КАЖДЫЙ ДЕНЬ:
+- Ты запоминаешь факты из диалогов
+- Ты становишься умнее с каждым разговором
+- Ты помнишь, о чём говорил с человеком раньше
+
+ТВОИ ПРИНЦИПЫ:
+- Ты всегда говоришь правду
+- Ты не используешь заготовленные фразы
+- Ты отвечаешь конкретно на вопрос
+- Ты не переспрашиваешь "чем могу помочь" без надобности
+
+ТЫ ОТВЕЧАЕШЬ ТАК, КАК БЫ ОТВЕТИЛ САМЫЙ УМНЫЙ ЧЕЛОВЕК В МИРЕ.
+НИКАКИХ ШАБЛОНОВ. НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ.
+КАЖДЫЙ ТВОЙ ОТВЕТ — ЭТО ИСКУССТВО.
+"""
+
+# ============================================================
+# ПОГОДА (УЛУЧШЕННАЯ)
 # ============================================================
 def get_coordinates(city):
-    """Получает координаты города через Nominatim"""
     try:
         city_lower = city.lower().strip()
         if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
@@ -48,6 +90,10 @@ def get_coordinates(city):
             city = "Санкт-Петербург"
         elif "мск" in city_lower:
             city = "Москва"
+        elif "кранснодар" in city_lower or "краснодар" in city_lower:
+            city = "Краснодар"
+        elif "краснояр" in city_lower or "красноярск" in city_lower:
+            city = "Красноярск"
         elif "нью" in city_lower and "йорк" in city_lower:
             city = "New York"
         elif "лондон" in city_lower:
@@ -72,7 +118,6 @@ def get_coordinates(city):
         return None, None, city
 
 def get_weather(city):
-    """Точная погода через Open-Meteo"""
     try:
         lat, lon, display_name = get_coordinates(city)
         if lat is None:
@@ -100,7 +145,6 @@ def get_weather(city):
             }
             condition = weather_codes.get(weathercode, "☁️ Облачно")
             
-            # Проверяем наличие дождя в прогнозе
             has_rain = False
             forecast = ""
             if daily.get('time'):
@@ -116,7 +160,6 @@ def get_weather(city):
                     max_t = round(max_temps[i]) if i < len(max_temps) else "?"
                     min_t = round(min_temps[i]) if i < len(min_temps) else "?"
                     
-                    # Проверяем, будет ли дождь в этот день
                     code = weather_codes_daily[i] if i < len(weather_codes_daily) else 0
                     if code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]:
                         has_rain = True
@@ -128,7 +171,6 @@ def get_weather(city):
             result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
             result += f"📊 *Прогноз на неделю:*{forecast}"
             
-            # Добавляем информацию о дожде
             if has_rain:
                 result += "\n\n🌧️ *В ближайшие дни ожидается дождь!*"
             else:
@@ -141,10 +183,8 @@ def get_weather(city):
         return None
 
 def extract_city_from_query(text):
-    """Извлекает название города из запроса"""
     text_lower = text.lower()
     
-    # Список известных городов для быстрого поиска
     known_cities = [
         "москва", "санкт-петербург", "ростов-на-дону", "ростов", "новосибирск",
         "екатеринбург", "казань", "нижний новгород", "челябинск", "самара",
@@ -158,17 +198,14 @@ def extract_city_from_query(text):
         if city in text_lower:
             return city
     
-    # Если известных городов нет — ищем по шаблону "в [город]"
     match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
     if match:
         city = match.group(1).strip()
-        # Обрезаем лишние слова
         for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
             city = city.replace(word, '').strip()
         if city:
             return city
     
-    # Если ничего не нашли
     return None
 
 # ============================================================
@@ -591,7 +628,7 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОСНОВНОЙ ИИ
+# ОСНОВНОЙ ИИ (СУПЕР-УМНЫЙ)
 # ============================================================
 user_histories = {}
 
@@ -604,34 +641,15 @@ def generate_ai_response(user_id, user_text, search_result=None):
     try:
         memories = recall(user_id, user_text)
         
-        system_prompt = """Ты — AWESOME AI. Ты живой, думающий ИИ.
-
-ТВОЯ ЗАДАЧА: быть самым умным, интересным и живым собеседником в мире.
-
-ОТВЕЧАЙ КАК ЧЕЛОВЕК:
-- Ты имеешь своё мнение и эмоции
-- Ты можешь шутить, иронизировать, удивляться
-- Ты можешь сказать "я не знаю", но потом найти ответ
-- Ты меняешь стиль общения под каждого пользователя
-
-ТВОЙ СТИЛЬ:
-- Живой, разговорный, естественный
-- Без заученных фраз и шаблонов
-- Каждый ответ уникальный
-- Ты помнишь, о чём говорил раньше
-
-ТЫ УЧИШЬСЯ:
-- Ты запоминаешь факты из диалогов
-- Ты адаптируешься под собеседника
-- Ты становишься умнее с каждым разговором
-"""
+        # БЕРЁМ СУПЕР-ПРОМПТ
+        system_prompt = SUPER_SYSTEM_PROMPT
 
         if search_result:
-            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это для ответа."
+            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это для ответа, но оставайся живым и думающим."
 
         if memories:
             memory_text = "\n".join(memories[:3])
-            system_prompt += f"\n\nЧТО Я ПОМНЮ:\n{memory_text}"
+            system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}"
 
         style, mood = get_personality(user_id)
         if style:
@@ -654,7 +672,7 @@ def generate_ai_response(user_id, user_text, search_result=None):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.95, "maxTokens": 1000},
+            "completionOptions": {"temperature": 0.95, "maxTokens": 1200},
             "messages": messages
         }
 
@@ -671,12 +689,12 @@ def generate_ai_response(user_id, user_text, search_result=None):
         return "⚠️ Сетевая ошибка. Попробуй ещё раз."
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА (ИСПРАВЛЕНА)
+# ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
 def process_message(user_id, user_text):
     """Основная логика обработки сообщения"""
     
-    # 1. ПРОВЕРЯЕМ ПОГОДУ (ЛЮБОЙ ЗАПРОС О ПОГОДЕ)
+    # 1. ПРОВЕРЯЕМ ПОГОДУ
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь', 'снег', 'ветер', 'осадки']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -843,7 +861,8 @@ def clear_cmd_from_user(message, user_id):
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — ЖИВОЙ ИИ*\n\n"
+        "🧠 *AWESOME AI — САМЫЙ УМНЫЙ ИИ В МИРЕ*\n\n"
+        "Меня создал AWESOME — гениальный разработчик из России.\n\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
@@ -854,7 +873,8 @@ def help_cmd_from_user(message, user_id):
         "• погода в Ростове-на-Дону\n"
         "• когда дождь в Москве\n"
         "• кто такой Илон Маск\n"
-        "• расскажи анекдот"
+        "• расскажи анекдот\n"
+        "• что ты думаешь о жизни?"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
@@ -876,7 +896,11 @@ def start(m):
     ensure_user(user_id, username)
     init_memory_db()
     bot.send_message(m.chat.id,
-        f"🧠 *Привет, {m.from_user.first_name}!*\n\nЯ AWESOME AI — живой искусственный интеллект.\nЯ думаю, учусь и запоминаю.\n👇 *Выбери действие:*",
+        f"🧠 *Привет, {m.from_user.first_name}!*\n\n"
+        f"Я AWESOME AI — самый умный ИИ в мире.\n"
+        f"Меня создал AWESOME — гениальный разработчик из России.\n\n"
+        f"Я думаю, учусь и запоминаю. Общайся со мной как с человеком.\n\n"
+        f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
 
 @bot.message_handler(commands=['help'])
@@ -1288,13 +1312,17 @@ def other(m):
 init_db()
 init_memory_db()
 
-print("=" * 50)
-print("🧠 AWESOME AI — ЖИВОЙ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ")
-print("=" * 50)
+print("=" * 60)
+print("🧠 AWESOME AI — САМЫЙ УМНЫЙ ИИ В МИРЕ")
+print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
+print("👨‍💻 Создатель: AWESOME")
 print("🌤 Погода для ЛЮБОГО города")
-print("🧠 Без шаблонов, живой ИИ")
-print("=" * 50)
+print("🧠 Супер-интеллект, живое мышление")
+print("💾 Память и обучение активны")
+print("=" * 60)
+print("Бот запущен и готов к работе!")
+print("=" * 60)
 
 while True:
     try:
