@@ -36,6 +36,24 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
+# ХРАНИЛИЩЕ ID СООБЩЕНИЙ ДЛЯ УДАЛЕНИЯ
+# ============================================================
+user_message_ids = {}
+
+def delete_previous_messages(chat_id, user_id):
+    """Удаляет предыдущие сообщения пользователя в чате"""
+    try:
+        if user_id in user_message_ids:
+            for msg_id in user_message_ids[user_id]:
+                try:
+                    bot.delete_message(chat_id, msg_id)
+                except:
+                    pass
+            user_message_ids[user_id] = []
+    except:
+        pass
+
+# ============================================================
 # АНТИ-СПАМ (1 СООБЩЕНИЕ В 3 СЕКУНДЫ)
 # ============================================================
 user_last_message = {}
@@ -919,7 +937,607 @@ def main_menu():
 # ============================================================
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
+# ============================================================
+# КОМАНДЫ (С УДАЛЕНИЕМ СТАРЫХ СООБЩЕНИЙ)
+# ============================================================
+
+@bot.message_handler(commands=['start'])
+def start(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    ensure_user(user_id, m.from_user.username or "unknown")
+    init_memory_db()
+    
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🧠 *AWESOME AI — МЕГА-ИИ!*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🔥 *Привет, {m.from_user.first_name}!*\n\n"
+        "🌐 Я умею искать в Google, Wikipedia и новостях\n"
+        "💵 Показываю курс валют и криптовалют\n"
+        "🧮 Решаю задачи и помогаю с программированием\n"
+        "🧠 Анализирую настроение и адаптируюсь\n\n"
+        "🎁 *Попробуй Premium бесплатно!*\n"
+        "Нажми кнопку *«Тест Premium»* 👇\n\n"
+        "💎 Бесплатно — 10 сообщений/день\n"
+        "💎 Премиум — безлимит (/premium)\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "👇 *Выбери действие:*\n"
+        "━━━━━━━━━━━━━━━━━━━━"
+    )
+    
+    msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='Markdown')
+    
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['help'])
+def help_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    help_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['status'])
+def status_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    status_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['premium'])
+def premium_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    premium_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['profile'])
+def profile_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    profile_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['stats'])
+def stats_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    stats_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['clear'])
+def clear_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    clear_cmd_from_user(m, user_id)
+
+@bot.message_handler(commands=['feedback'])
+def feedback_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    text = m.text.replace('/feedback', '').strip()
+    if not text:
+        msg = bot.send_message(chat_id, "❌ Использование: /feedback [текст]")
+        if user_id not in user_message_ids:
+            user_message_ids[user_id] = []
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    bot.send_message(chat_id, "✅ Спасибо за отзыв!")
+    bot.send_message(OWNER_ID, f"📩 Отзыв от @{m.from_user.username or 'anon'}: {text}")
+
+@bot.message_handler(commands=['draw'])
+def draw_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    prompt = m.text.replace('/draw', '').strip()
+    if not prompt:
+        msg = bot.send_message(chat_id, "❌ Использование: /draw [описание]")
+        if user_id not in user_message_ids:
+            user_message_ids[user_id] = []
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    generate_and_send_image(m, prompt)
+
+# ============================================================
+# КОМАНДА /test (ЧЕРЕЗ КНОПКУ, НО ОСТАВЛЯЕМ ДЛЯ СОВМЕСТИМОСТИ)
+# ============================================================
+@bot.message_handler(commands=['test'])
+def test_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    # Вызываем ту же логику, что и при нажатии на кнопку
+    process_test_premium(chat_id, user_id)
+
+# ============================================================
+# АДМИН-КОМАНДЫ
+# ============================================================
+def is_authorized(user_id):
+    return user_id == OWNER_ID or is_admin(user_id)
+
+@bot.message_handler(commands=['admin'])
+def admin_panel(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🛡️ *АДМИН-ПАНЕЛЬ*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "👤 /giveadmin [ID] — выдать админа\n"
+        "👤 /deladmin [ID] — забрать админа\n"
+        "💎 /giveprem [ID] [срок] — выдать премиум\n"
+        "🎁 /givetest [ID] — премиум на 1 день\n"
+        "💎 /delprem [ID] — отключить премиум\n"
+        "📊 /info [ID] — инфо о пользователе\n"
+        "🔇 /mute [ID] — замутить\n"
+        "🔊 /unmute [ID] — размутить\n"
+        "🚫 /ban [ID] — забанить\n"
+        "✅ /unban [ID] — разбанить\n\n"
+        "━━━━━━━━━━━━━━━━━━━━"
+    )
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['info'])
+def info_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /info [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT is_admin, premium, premium_expires, messages_today, test_used FROM users WHERE user_id = ?', (target_id,))
+    result = c.fetchone()
+    conn.close()
+    if result is None:
+        msg = bot.send_message(chat_id, f"❌ Пользователь {target_id} не найден.")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
+    premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
+    test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
+    
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📊 *ИНФО О ПОЛЬЗОВАТЕЛЕ*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🆔 ID: `{target_id}`\n"
+        f"👑 Админ: {admin_status}\n"
+        f"💎 Premium: {premium_status}\n"
+        f"🎁 Тест: {test_status}\n"
+        f"✉️ Сообщений сегодня: {result[3]}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━"
+    )
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['giveadmin'])
+def giveadmin_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /giveadmin [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    set_admin(target_id, True)
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} теперь администратор.")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['deladmin'])
+def deladmin_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /deladmin [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    set_admin(target_id, False)
+    msg = bot.send_message(chat_id, f"❌ У пользователя {target_id} отобраны права администратора.")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['giveprem'])
+def giveprem_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 3:
+        msg = bot.send_message(chat_id, "❌ /giveprem [ID] [срок]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    duration = args[2].lower()
+    if set_premium(target_id, duration):
+        msg = bot.send_message(chat_id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
+        user_message_ids[user_id].append(msg.message_id)
+    else:
+        msg = bot.send_message(chat_id, "❌ Неверный срок. Используй: 1d, 1m, 1h, 1mes, 1y")
+        user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['givetest'])
+def givetest_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /givetest [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    if set_premium(target_id, "1d"):
+        msg = bot.send_message(chat_id, f"✅ Premium на 1 день выдан пользователю {target_id}")
+        user_message_ids[user_id].append(msg.message_id)
+    else:
+        msg = bot.send_message(chat_id, "❌ Ошибка выдачи тестового периода.")
+        user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['delprem'])
+def delprem_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /delprem [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    remove_premium(target_id)
+    msg = bot.send_message(chat_id, f"✅ Premium отключён у пользователя {target_id}")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['mute'])
+def mute_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /mute [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    mute_user(target_id)
+    msg = bot.send_message(chat_id, f"🔇 Пользователь {target_id} замучен")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['unmute'])
+def unmute_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /unmute [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    unmute_user(target_id)
+    msg = bot.send_message(chat_id, f"🔊 Пользователь {target_id} размучен")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['ban'])
+def ban_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /ban [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    ban_user(target_id)
+    msg = bot.send_message(chat_id, f"🚫 Пользователь {target_id} забанен")
+    user_message_ids[user_id].append(msg.message_id)
+
+@bot.message_handler(commands=['unban'])
+def unban_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    if not is_authorized(user_id):
+        msg = bot.send_message(chat_id, "❌ Нет прав!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    args = m.text.split()
+    if len(args) < 2:
+        msg = bot.send_message(chat_id, "❌ /unban [ID]")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = args[1]
+    if not target_id.isdigit():
+        msg = bot.send_message(chat_id, "❌ ID цифры!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    target_id = int(target_id)
+    ensure_user(target_id, "unknown")
+    unban_user(target_id)
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} разбанен")
+    user_message_ids[user_id].append(msg.message_id)
+
+# ============================================================
+# ФУНКЦИИ ДЛЯ КНОПОК (С ВИЗУАЛОМ)
+# ============================================================
+
 def status_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     ensure_user(user_id, "unknown")
     if user_id == OWNER_ID or is_admin(user_id):
         status_text = "👑 АДМИН — безлимит!"
@@ -950,9 +1568,14 @@ def status_cmd_from_user(message, user_id):
         f"{status_text}\n\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 def premium_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     text = (
         "━━━━━━━━━━━━━━━━━━━━\n"
         "💎 *PREMIUM AWESOME AI*\n"
@@ -965,9 +1588,14 @@ def premium_cmd_from_user(message, user_id):
         "Напиши @flidges — оплати и получи Premium!\n\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 def profile_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     ensure_user(user_id, "unknown")
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -1006,9 +1634,14 @@ def profile_cmd_from_user(message, user_id):
         "━━━━━━━━━━━━━━━━━━━━"
     )
     
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 def stats_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     ensure_user(user_id, "unknown")
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -1032,7 +1665,10 @@ def stats_cmd_from_user(message, user_id):
             f"📨 Сообщений сегодня: {today_messages}\n\n"
             "━━━━━━━━━━━━━━━━━━━━"
         )
-        bot.send_message(message.chat.id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        if user_id not in user_message_ids:
+            user_message_ids[user_id] = []
+        user_message_ids[user_id].append(msg.message_id)
         return
 
     c.execute('SELECT messages_today, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
@@ -1067,11 +1703,19 @@ def stats_cmd_from_user(message, user_id):
         f"📨 Всего: {total_user_messages}\n\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 def clear_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     if user_id in user_histories:
         user_histories[user_id] = []
+    if user_id in user_message_ids:
+        user_message_ids[user_id] = []
+    
     text = (
         "━━━━━━━━━━━━━━━━━━━━\n"
         "🧹 *ИСТОРИЯ ОЧИЩЕНА*\n"
@@ -1080,9 +1724,14 @@ def clear_cmd_from_user(message, user_id):
         "Начинаем с чистого листа! 📝\n\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 def help_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    
     text = (
         "━━━━━━━━━━━━━━━━━━━━\n"
         "🧠 *AWESOME AI — МЕГА-ИИ!*\n"
@@ -1132,120 +1781,16 @@ def help_cmd_from_user(message, user_id):
             "/unban [ID] — разбанить"
         )
     
-    bot.send_message(message.chat.id, text, parse_mode='Markdown')
-
-@bot.message_handler(commands=['start'])
-def start(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    init_memory_db()
-    
-    text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🧠 *AWESOME AI — МЕГА-ИИ!*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🔥 *Привет, {m.from_user.first_name}!*\n\n"
-        "🌐 Я умею искать в Google, Wikipedia и новостях\n"
-        "💵 Показываю курс валют и криптовалют\n"
-        "🧮 Решаю задачи и помогаю с программированием\n"
-        "🧠 Анализирую настроение и адаптируюсь\n\n"
-        "🎁 *Попробуй Premium бесплатно!*\n"
-        "Напиши `/test` — получи 1 день безлимита!\n\n"
-        "💎 Бесплатно — 10 сообщений/день\n"
-        "💎 Премиум — безлимит (/premium)\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "👇 *Выбери действие:*\n"
-        "━━━━━━━━━━━━━━━━━━━━"
-    )
-    
-    bot.send_message(m.chat.id, text, reply_markup=main_menu(), parse_mode='Markdown')
-
-@bot.message_handler(commands=['help'])
-def help_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    help_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['status'])
-def status_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    status_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['premium'])
-def premium_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    premium_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['profile'])
-def profile_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    profile_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['stats'])
-def stats_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    stats_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['clear'])
-def clear_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    clear_cmd_from_user(m, m.from_user.id)
-
-@bot.message_handler(commands=['feedback'])
-def feedback_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    text = m.text.replace('/feedback', '').strip()
-    if not text:
-        bot.send_message(m.chat.id, "❌ /feedback [текст]")
-        return
-    bot.send_message(m.chat.id, "✅ Спасибо за отзыв!")
-    bot.send_message(OWNER_ID, f"📩 Отзыв: {text}")
-
-@bot.message_handler(commands=['draw'])
-def draw_cmd(m):
-    try:
-        bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
-    prompt = m.text.replace('/draw', '').strip()
-    if not prompt:
-        bot.send_message(m.chat.id, "❌ /draw [описание]")
-        return
-    generate_and_send_image(m, prompt)
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# КОМАНДА /test
+# ЛОГИКА ТЕСТ PREMIUM (ДЛЯ КНОПКИ)
 # ============================================================
-@bot.message_handler(commands=['test'])
-def test_cmd(m):
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
+def process_test_premium(chat_id, user_id):
+    """Обрабатывает выдачу тестового Premium (для кнопки и команды /test)"""
     
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -1254,7 +1799,10 @@ def test_cmd(m):
     conn.close()
     
     if result is None:
-        bot.send_message(m.chat.id, "❌ Сначала напиши /start")
+        msg = bot.send_message(chat_id, "❌ Сначала напиши /start")
+        if user_id not in user_message_ids:
+            user_message_ids[user_id] = []
+        user_message_ids[user_id].append(msg.message_id)
         return
     
     test_used, premium = result
@@ -1267,7 +1815,8 @@ def test_cmd(m):
             "Ты уже в топе! Наслаждайся безлимитом! 🚀\n\n"
             "━━━━━━━━━━━━━━━━━━━━"
         )
-        bot.send_message(m.chat.id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
         return
     
     if test_used == 1:
@@ -1281,7 +1830,8 @@ def test_cmd(m):
             "💰 50₽/месяц — пиши @flidges\n\n"
             "━━━━━━━━━━━━━━━━━━━━"
         )
-        bot.send_message(m.chat.id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
         return
     
     if set_premium(user_id, "1d"):
@@ -1302,288 +1852,129 @@ def test_cmd(m):
             "Купить полноценный Premium: `/premium`\n\n"
             "━━━━━━━━━━━━━━━━━━━━"
         )
-        bot.send_message(m.chat.id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
     else:
-        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода. Попробуй позже.")
+        msg = bot.send_message(chat_id, "❌ Ошибка выдачи тестового периода.")
+        user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# АДМИН-КОМАНДЫ
+# КНОПКИ
 # ============================================================
-def is_authorized(user_id):
-    return user_id == OWNER_ID or is_admin(user_id)
-
-@bot.message_handler(commands=['admin'])
-def admin_panel(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    
-    text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🛡️ *АДМИН-ПАНЕЛЬ*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "👤 /giveadmin [ID] — выдать админа\n"
-        "👤 /deladmin [ID] — забрать админа\n"
-        "💎 /giveprem [ID] [срок] — выдать премиум\n"
-        "🎁 /givetest [ID] — премиум на 1 день\n"
-        "💎 /delprem [ID] — отключить премиум\n"
-        "📊 /info [ID] — инфо о пользователе\n"
-        "🔇 /mute [ID] — замутить\n"
-        "🔊 /unmute [ID] — размутить\n"
-        "🚫 /ban [ID] — забанить\n"
-        "✅ /unban [ID] — разбанить\n\n"
-        "━━━━━━━━━━━━━━━━━━━━"
-    )
-    bot.send_message(m.chat.id, text, parse_mode='Markdown')
-
-@bot.message_handler(commands=['info'])
-def info_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /info [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT is_admin, premium, premium_expires, messages_today, test_used FROM users WHERE user_id = ?', (target_id,))
-    result = c.fetchone()
-    conn.close()
-    if result is None:
-        bot.send_message(m.chat.id, f"❌ Пользователь {target_id} не найден.")
-        return
-    admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
-    premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
-    test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
-    
-    text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *ИНФО О ПОЛЬЗОВАТЕЛЕ*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🆔 ID: `{target_id}`\n"
-        f"👑 Админ: {admin_status}\n"
-        f"💎 Premium: {premium_status}\n"
-        f"🎁 Тест: {test_status}\n"
-        f"✉️ Сообщений сегодня: {result[3]}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━"
-    )
-    bot.send_message(m.chat.id, text, parse_mode='Markdown')
-
-@bot.message_handler(commands=['giveadmin'])
-def giveadmin_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /giveadmin [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    set_admin(target_id, True)
-    bot.send_message(m.chat.id, f"✅ Пользователь {target_id} теперь администратор.")
-
-@bot.message_handler(commands=['deladmin'])
-def deladmin_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /deladmin [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    set_admin(target_id, False)
-    bot.send_message(m.chat.id, f"❌ У пользователя {target_id} отобраны права администратора.")
-
-@bot.message_handler(commands=['giveprem'])
-def giveprem_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 3:
-        bot.send_message(m.chat.id, "❌ /giveprem [ID] [срок]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    duration = args[2].lower()
-    if set_premium(target_id, duration):
-        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
-    else:
-        bot.send_message(m.chat.id, "❌ Неверный срок. Используй: 1d, 1m, 1h, 1mes, 1y")
-
-@bot.message_handler(commands=['givetest'])
-def givetest_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /givetest [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    if set_premium(target_id, "1d"):
-        bot.send_message(m.chat.id, f"✅ Premium на 1 день выдан пользователю {target_id}")
-    else:
-        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода.")
-
-@bot.message_handler(commands=['delprem'])
-def delprem_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /delprem [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    remove_premium(target_id)
-    bot.send_message(m.chat.id, f"✅ Premium отключён у пользователя {target_id}")
-
-@bot.message_handler(commands=['mute'])
-def mute_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /mute [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    mute_user(target_id)
-    bot.send_message(m.chat.id, f"🔇 Пользователь {target_id} замучен")
-
-@bot.message_handler(commands=['unmute'])
-def unmute_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /unmute [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    unmute_user(target_id)
-    bot.send_message(m.chat.id, f"🔊 Пользователь {target_id} размучен")
-
-@bot.message_handler(commands=['ban'])
-def ban_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /ban [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    ban_user(target_id)
-    bot.send_message(m.chat.id, f"🚫 Пользователь {target_id} забанен")
-
-@bot.message_handler(commands=['unban'])
-def unban_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ /unban [ID]")
-        return
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID цифры!")
-        return
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-    unban_user(target_id)
-    bot.send_message(m.chat.id, f"✅ Пользователь {target_id} разбанен")
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    try:
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+        ensure_user(user_id, call.from_user.username or "unknown")
+        
+        # Удаляем старые сообщения
+        delete_previous_messages(chat_id, user_id)
+        
+        # Удаляем сообщение с кнопками
+        try:
+            bot.delete_message(chat_id, call.message.message_id)
+        except:
+            pass
+        
+        # === ТЕСТ PREMIUM (ВЫДАЁТ СРАЗУ!) ===
+        if call.data == "test":
+            bot.answer_callback_query(call.id, "🎁 Активирую тест Premium...")
+            process_test_premium(chat_id, user_id)
+            return
+        
+        # === ОСТАЛЬНЫЕ КНОПКИ ===
+        if call.data == "status":
+            bot.answer_callback_query(call.id)
+            status_cmd_from_user(call.message, user_id)
+        elif call.data == "premium":
+            bot.answer_callback_query(call.id)
+            premium_cmd_from_user(call.message, user_id)
+        elif call.data == "profile":
+            bot.answer_callback_query(call.id)
+            profile_cmd_from_user(call.message, user_id)
+        elif call.data == "stats":
+            bot.answer_callback_query(call.id)
+            stats_cmd_from_user(call.message, user_id)
+        elif call.data == "clear":
+            bot.answer_callback_query(call.id)
+            clear_cmd_from_user(call.message, user_id)
+        elif call.data == "help":
+            bot.answer_callback_query(call.id)
+            help_cmd_from_user(call.message, user_id)
+        elif call.data == "feedback":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📩 Напиши: /feedback [текст]")
+            if user_id not in user_message_ids:
+                user_message_ids[user_id] = []
+            user_message_ids[user_id].append(msg.message_id)
+        elif call.data == "draw":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]")
+            if user_id not in user_message_ids:
+                user_message_ids[user_id] = []
+            user_message_ids[user_id].append(msg.message_id)
+            
+    except Exception as e:
+        bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
 # КАРТИНКИ
 # ============================================================
 def generate_and_send_image(m, prompt):
+    chat_id = m.chat.id
     user_id = m.from_user.id
+    
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        msg = bot.send_message(chat_id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
         return
 
     title = fix_title(prompt)
-    bot.send_message(m.chat.id, f"🎨 Генерирую картинку: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, f"🎨 Генерирую картинку: *{title}*...\n⏳ 10-20 секунд.", parse_mode='Markdown')
+    user_message_ids[user_id].append(msg.message_id)
 
     image_data = generate_image(prompt)
 
     if image_data:
         increment_messages(user_id)
         try:
-            bot.send_photo(m.chat.id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ Сгенерировано AWESOME AI", parse_mode='Markdown')
+            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 *{title}*\n\n✨ Сгенерировано AWESOME AI", parse_mode='Markdown')
         except:
-            bot.send_message(m.chat.id, "⚠️ Ошибка при отправке")
+            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
+            user_message_ids[user_id].append(msg.message_id)
     else:
-        bot.send_message(m.chat.id, "⚠️ Не удалось сгенерировать картинку. Попробуй другой запрос.")
+        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать картинку. Попробуй другой запрос.")
+        user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
 # ФОТО
 # ============================================================
 @bot.message_handler(content_types=['photo'])
 def handle_photo(m):
+    chat_id = m.chat.id
     user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
     
     if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
         return
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        msg = bot.send_message(chat_id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
         return
     
-    bot.send_chat_action(m.chat.id, 'typing')
+    bot.send_chat_action(chat_id, 'typing')
     
     try:
         file_info = bot.get_file(m.photo[-1].file_id)
@@ -1591,44 +1982,62 @@ def handle_photo(m):
         analysis = analyze_image_from_file(downloaded)
         increment_messages(user_id)
         caption = m.caption or "Опиши, что на этом изображении"
-        bot.send_message(m.chat.id, analysis, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, analysis, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
         if m.caption and len(m.caption) > 3:
             response = process_message(user_id, m.caption, analysis)
             if response:
-                bot.send_message(m.chat.id, response, parse_mode='Markdown')
+                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+                user_message_ids[user_id].append(msg.message_id)
     except Exception as e:
-        bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
+        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+        user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
 # ГОЛОС
 # ============================================================
 @bot.message_handler(content_types=['voice'])
 def handle_voice(m):
+    chat_id = m.chat.id
     user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
     username = m.from_user.username or "unknown"
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
     if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
         return
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        msg = bot.send_message(chat_id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
         return
-    bot.send_chat_action(m.chat.id, 'typing')
+    
+    bot.send_chat_action(chat_id, 'typing')
     try:
         file_info = bot.get_file(m.voice.file_id)
         downloaded = bot.download_file(file_info.file_path)
         recognized = stt(downloaded)
         increment_messages(user_id)
         if recognized:
-            bot.send_message(m.chat.id, f"🎤 *Распознано:*\n{recognized}", parse_mode='Markdown')
+            msg = bot.send_message(chat_id, f"🎤 *Распознано:*\n{recognized}", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
             response = process_message(user_id, recognized)
             if response:
-                bot.send_message(m.chat.id, response, parse_mode='Markdown')
+                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+                user_message_ids[user_id].append(msg.message_id)
         else:
-            bot.send_message(m.chat.id, "🎤 Не разобрал.")
+            msg = bot.send_message(chat_id, "🎤 Не разобрал.")
+            user_message_ids[user_id].append(msg.message_id)
     except Exception as e:
-        bot.send_message(m.chat.id, f"⚠️ Ошибка: {e}")
+        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+        user_message_ids[user_id].append(msg.message_id)
 
 def stt(audio_data):
     try:
@@ -1657,29 +2066,35 @@ def stt(audio_data):
 # ============================================================
 @bot.message_handler(content_types=['text'])
 def handle_text(m):
+    chat_id = m.chat.id
     user_id = m.from_user.id
     username = m.from_user.username or "unknown"
+    
+    # Если это команда — она уже обработана выше
+    if m.text.startswith('/'):
+        return
+    
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
     
+    # Удаляем старые сообщения пользователя
+    delete_previous_messages(chat_id, user_id)
+    
     if check_spam(user_id):
-        bot.send_message(m.chat.id, "⏳ Не спамь! Подожди 3 секунды!")
+        msg = bot.send_message(chat_id, "⏳ Не спамь! Подожди 3 секунды!")
+        user_message_ids[user_id].append(msg.message_id)
         return
     
     if is_banned(user_id):
-        bot.send_message(m.chat.id, "🚫 Ты забанен!")
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
         return
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
+        msg = bot.send_message(chat_id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
         return
 
-    text_clean = m.text.strip()
-    if text_clean.startswith('/'):
-        m.text = text_clean
-        bot.process_new_messages([m])
-        return
-
-    bot.send_chat_action(m.chat.id, 'typing')
+    bot.send_chat_action(chat_id, 'typing')
 
     if is_image_generation(m.text):
         generate_and_send_image(m, m.text)
@@ -1689,59 +2104,31 @@ def handle_text(m):
     response = process_message(user_id, m.text)
     
     if response:
-        bot.send_message(m.chat.id, response, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
     else:
-        bot.send_message(m.chat.id, random.choice([
+        msg = bot.send_message(chat_id, random.choice([
             "🤔 Хм, я задумался... Что ты имеешь в виду?",
             "🧐 Слушай, я не совсем понял. Давай ещё раз?",
             "😮 А вот это интересно! Расскажи подробнее.",
             "💡 Понял! Ты спрашиваешь про это. Я сейчас подумаю..."
         ]))
-
-# ============================================================
-# КНОПКИ
-# ============================================================
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback(call):
-    try:
-        user_id = call.from_user.id
-        ensure_user(user_id, call.from_user.username or "unknown")
-        
-        if call.data == "status":
-            bot.answer_callback_query(call.id)
-            status_cmd_from_user(call.message, user_id)
-        elif call.data == "premium":
-            bot.answer_callback_query(call.id)
-            premium_cmd_from_user(call.message, user_id)
-        elif call.data == "test":
-            bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, "🎁 Напиши команду: `/test`", parse_mode='Markdown')
-        elif call.data == "profile":
-            bot.answer_callback_query(call.id)
-            profile_cmd_from_user(call.message, user_id)
-        elif call.data == "stats":
-            bot.answer_callback_query(call.id)
-            stats_cmd_from_user(call.message, user_id)
-        elif call.data == "clear":
-            bot.answer_callback_query(call.id)
-            clear_cmd_from_user(call.message, user_id)
-        elif call.data == "help":
-            bot.answer_callback_query(call.id)
-            help_cmd_from_user(call.message, user_id)
-        elif call.data == "feedback":
-            bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, "📩 Напиши: /feedback [текст]")
-        elif call.data == "draw":
-            bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, "🎨 Напиши: /draw [описание]")
-    except Exception as e:
-        bot.send_message(call.message.chat.id, f"⚠️ Ошибка: {e}")
+        user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
 # ОСТАЛЬНОЕ
 # ============================================================
 @bot.message_handler(content_types=['video', 'document', 'audio'])
 def other(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
     text = (
         "━━━━━━━━━━━━━━━━━━━━\n"
         "📁 *ПОКА НЕ УМЕЮ*\n"
@@ -1750,7 +2137,10 @@ def other(m):
         "Пришли текст, фото или голосовое сообщение.\n\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(m.chat.id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    if user_id not in user_message_ids:
+        user_message_ids[user_id] = []
+    user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
 # ЗАПУСК
@@ -1771,6 +2161,7 @@ print("💎 Бесплатно: 10 сообщений/день")
 print("🎁 Пробный Premium: /test (1 раз)")
 print("👑 Админ-команды скрыты от обычных юзеров")
 print("🎨 МЕГА-КРАСИВЫЙ ВИЗУАЛ — ВКЛЮЧЁН!")
+print("🧹 АВТО-УДАЛЕНИЕ СТАРЫХ СООБЩЕНИЙ — ВКЛЮЧЁНО!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
