@@ -2,5 +2,5 @@ telebot
 requests
 beautifulsoup4
 Pillow
-SpeechRecognition
+speechrecognition
 python-dateutil
