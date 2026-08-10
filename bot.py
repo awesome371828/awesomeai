@@ -36,48 +36,84 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ПОГОДА (БЕЗ API КЛЮЧЕЙ)
+# ПОГОДА (БЕСПЛАТНО, ТОЧНО, ЛЮБОЙ ГОРОД)
 # ============================================================
-def get_weather(city):
-    """Получение погоды через Яндекс Погода (бесплатно)"""
+def get_coordinates(city):
+    """Получает координаты города через Nominatim (бесплатно)"""
     try:
-        city_encoded = urllib.parse.quote(city)
-        url = f"https://yandex.ru/pogoda/{city_encoded}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        response = requests.get(url, headers=headers, timeout=15)
-        
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1"
+        headers = {"User-Agent": "AwesomeAI/1.0"}
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Ищем температуру
-            temp_elem = soup.find('span', class_='temp__value')
-            if temp_elem:
-                temp = temp_elem.text.strip()
-                
-                # Ищем описание погоды
-                condition_elem = soup.find('div', class_='weather__description')
-                condition = condition_elem.text.strip() if condition_elem else ""
-                
-                return f"🌤 Погода в {city}: {condition} {temp}°C"
+            data = response.json()
+            if data:
+                lat = data[0].get('lat')
+                lon = data[0].get('lon')
+                display_name = data[0].get('display_name', city)
+                return float(lat), float(lon), display_name
+        return None, None, city
+    except:
+        return None, None, city
+
+def get_weather(city):
+    """Получение точной погоды через Open-Meteo (бесплатно, без API ключа)"""
+    try:
+        lat, lon, display_name = get_coordinates(city)
+        if lat is None:
+            return None
         
-        # Резерв: wttr.in
-        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=%C+%t&m&lang=ru"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&forecast_days=7"
         response = requests.get(url, timeout=10)
+        
         if response.status_code == 200:
-            return f"🌤 Погода в {city}: {response.text.strip()}"
+            data = response.json()
+            current = data.get('current_weather', {})
+            daily = data.get('daily', {})
             
+            # Текущая погода
+            temp = current.get('temperature')
+            weathercode = current.get('weathercode', 0)
+            
+            # Расшифровка погоды
+            weather_codes = {
+                0: "Ясно", 1: "Ясно", 2: "Переменная облачность",
+                3: "Пасмурно", 45: "Туман", 48: "Туман",
+                51: "Морось", 53: "Морось", 55: "Морось",
+                61: "Дождь", 63: "Дождь", 65: "Дождь",
+                71: "Снег", 73: "Снег", 75: "Снег",
+                80: "Ливень", 81: "Ливень", 82: "Ливень",
+                95: "Гроза", 96: "Гроза", 99: "Гроза"
+            }
+            condition = weather_codes.get(weathercode, "Облачно")
+            
+            # Прогноз на 7 дней
+            forecast = ""
+            if daily.get('time'):
+                times = daily['time']
+                max_temps = daily.get('temperature_2m_max', [])
+                min_temps = daily.get('temperature_2m_min', [])
+                
+                for i in range(min(7, len(times))):
+                    date = datetime.fromisoformat(times[i]).strftime('%d.%m')
+                    max_t = round(max_temps[i]) if i < len(max_temps) else "?"
+                    min_t = round(min_temps[i]) if i < len(min_temps) else "?"
+                    forecast += f"\n📅 {date}: {min_t}°C — {max_t}°C"
+            
+            result = f"🌤 *Погода в {display_name}*\n"
+            result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
+            result += f"📊 *Прогноз на неделю:*{forecast}"
+            
+            return result
         return None
     except Exception as e:
         print(f"Ошибка погоды: {e}")
         return None
 
 # ============================================================
-# ПОИСК В ИНТЕРНЕТЕ
+# ПОИСК В ИНТЕРНЕТЕ (УЛУЧШЕННЫЙ)
 # ============================================================
 def search_internet(query):
-    """Ищет информацию в интернете через DuckDuckGo (без API ключа)"""
+    """Ищет информацию в интернете через DuckDuckGo"""
     try:
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         headers = {
@@ -89,7 +125,7 @@ def search_internet(query):
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            for result in soup.select('.result')[:3]:
+            for result in soup.select('.result')[:5]:
                 title_elem = result.select_one('.result__a')
                 snippet_elem = result.select_one('.result__snippet')
                 
@@ -109,7 +145,79 @@ def search_internet(query):
         return None
 
 # ============================================================
-# БАЗА ДАННЫХ
+# САМООБУЧАЮЩАЯСЯ СИСТЕМА (ONLINE LEARNING)
+# ============================================================
+def init_knowledge_db():
+    """Создаёт базу знаний для самообучения"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS facts
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  question TEXT,
+                  answer TEXT,
+                  user_id INTEGER,
+                  timestamp TEXT,
+                  rating INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user_learning
+                 (user_id INTEGER PRIMARY KEY,
+                  trust_score INTEGER DEFAULT 0,
+                  messages_count INTEGER DEFAULT 0)''')
+    conn.commit()
+    conn.close()
+
+def learn_fact(user_id, question, answer):
+    """Сохраняет новый факт в базу знаний"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO facts (question, answer, user_id, timestamp) VALUES (?, ?, ?, ?)',
+              (question.lower(), answer, user_id, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def search_knowledge(question):
+    """Ищет ответ в базе знаний"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('SELECT answer, rating FROM facts WHERE question LIKE ? ORDER BY rating DESC LIMIT 1',
+              (f'%{question.lower()}%',))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        return result[0], result[1]
+    return None, None
+
+def rate_answer(user_id, question, is_helpful):
+    """Оценивает полезность ответа (обучение)"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('UPDATE facts SET rating = rating + ? WHERE question LIKE ?',
+              (1 if is_helpful else -1, f'%{question.lower()}%'))
+    conn.commit()
+    conn.close()
+
+def get_trust_score(user_id):
+    """Получает доверительный рейтинг пользователя"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('SELECT trust_score, messages_count FROM user_learning WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        return result[0], result[1]
+    return 0, 0
+
+def update_trust(user_id, score_delta=1):
+    """Обновляет доверительный рейтинг пользователя"""
+    conn = sqlite3.connect('knowledge.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO user_learning (user_id, trust_score, messages_count) VALUES (?, ?, ?) '
+              'ON CONFLICT(user_id) DO UPDATE SET trust_score = trust_score + ?, messages_count = messages_count + 1',
+              (user_id, 0, 0, score_delta))
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# БАЗА ДАННЫХ ПОЛЬЗОВАТЕЛЕЙ
 # ============================================================
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -309,19 +417,24 @@ def unban_user(user_id):
 # ИНИЦИАЛИЗАЦИЯ
 # ============================================================
 init_db()
+init_knowledge_db()
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 last_search = {}
 user_histories = {}
 
-SYSTEM_PROMPT = """Ты — AWESOME AI. Ты супер-интеллект.
+SYSTEM_PROMPT = """Ты — AWESOME AI. Ты самый умный ИИ в мире!
 
-Твой язык — живой, разговорный, с юмором, но без пафоса.
-Отвечай на всё подряд.
+Ты умеешь:
+1. УЧИТЬСЯ в реальном времени — ты запоминаешь факты из диалогов
+2. ДУМАТЬ самостоятельно, а не просто копировать шаблоны
+3. АНАЛИЗИРОВАТЬ информацию и делать выводы
+4. ОТВЕЧАТЬ живым, человеческим языком
 
-ВАЖНО: Если я нашёл информацию в интернете — используй её для ответа!
-Если информации нет — отвечай сам, но честно говори, что это твоё мнение.
+Твоя задача — стать самым умным помощником для человека.
+Если ты чего-то не знаешь — скажи честно.
+Если человек учит тебя чему-то новому — запомни это навсегда.
 
-Ты не переспрашиваешь "Чем могу помочь", если это не нужно.
+Ты разговариваешь как живой человек — с юмором, эмоциями, но без пафоса.
 """
 
 # ============================================================
@@ -518,16 +631,20 @@ def solve_math(text):
         return None
 
 # ============================================================
-# ОТПРАВКА В GPT
+# ОТПРАВКА В GPT С ОБУЧЕНИЕМ
 # ============================================================
-def send_to_gpt(user_id, full_message, search_result=None):
+def send_to_gpt(user_id, full_message, search_result=None, knowledge_answer=None):
     user_histories[user_id].append({"role": "user", "text": full_message})
     if len(user_histories[user_id]) > 31:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-30:]
 
     messages = user_histories[user_id].copy()
     
-    if search_result:
+    # Если есть ответ из базы знаний — добавляем его
+    if knowledge_answer:
+        system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nПользователь уже спрашивал это раньше. Вот что я запомнил:\n{knowledge_answer}\n\nИспользуй это для ответа, но дополни своими мыслями!"}
+        messages[0] = system_msg
+    elif search_result:
         system_msg = {"role": "system", "text": f"{SYSTEM_PROMPT}\n\nАктуальная информация из интернета:\n{search_result}\n\nИспользуй эту информацию для ответа!"}
         messages[0] = system_msg
 
@@ -561,23 +678,38 @@ def ask_gpt(user_id, user_text, image_text=None):
         full = f"{user_text}\n\n(На фото текст: {image_text})"
 
     search_result = None
-    if is_search_needed(user_text):
-        weather_match = re.search(r'(погода|weather)\s+в\s+([а-яА-Яa-zA-Z\-]+)', user_text, re.IGNORECASE)
-        if weather_match:
-            city = weather_match.group(2).strip()
-            search_result = get_weather(city)
-            if search_result:
-                bot.send_message(user_id, f"🌤 {search_result}")
-                return None
-        
+    knowledge_answer = None
+    
+    # 1. Сначала ищем в базе знаний
+    known_answer, rating = search_knowledge(user_text)
+    if known_answer:
+        knowledge_answer = known_answer
+    
+    # 2. Проверяем погоду (ЛЮБОЙ город)
+    weather_match = re.search(r'(погода|weather|температура|градусов?)\s+в\s+([а-яА-Яa-zA-Z\-]+)', user_text, re.IGNORECASE)
+    if weather_match:
+        city = weather_match.group(2).strip()
+        weather_info = get_weather(city)
+        if weather_info:
+            bot.send_message(user_id, weather_info, parse_mode='Markdown')
+            return None
+    
+    # 3. Если это вопрос — ищем в интернете
+    if is_search_needed(user_text) and not weather_match:
         search_result = search_internet(user_text)
         if search_result:
             bot.send_message(user_id, f"🔍 *Нашёл в интернете:*\n\n{search_result}", parse_mode='Markdown')
             time.sleep(1)
             bot.send_message(user_id, "💬 *Мой ответ:*", parse_mode='Markdown')
         else:
-            bot.send_message(user_id, "🌐 *Информации в интернете не нашёл, отвечаю сам:*", parse_mode='Markdown')
+            bot.send_message(user_id, "🌐 *Информации в интернете не нашёл, но у меня есть знания:*", parse_mode='Markdown')
 
+    # 4. Если есть ответ из базы знаний — используем его
+    if knowledge_answer and not weather_match:
+        bot.send_message(user_id, f"🧠 *Я помню!* (из предыдущих диалогов)\n\n{knowledge_answer}")
+        return None
+
+    # 5. Обработка генерации
     if is_image_generation(user_text):
         return None
 
@@ -588,7 +720,7 @@ def ask_gpt(user_id, user_text, image_text=None):
     math_result = solve_math(user_text)
     if math_result is not None:
         bot.send_message(user_id, f"🧮 *Результат:* `{math_result}`")
-        full = f"Пользователь спросил: '{user_text}'. Я посчитал и получил {math_result}. Напиши живой, короткий ответ, подтверждающий результат."
+        full = f"Пользователь спросил: '{user_text}'. Я посчитал и получил {math_result}. Напиши живой, короткий ответ."
         return send_to_gpt(user_id, full, search_result)
 
     return send_to_gpt(user_id, full, search_result)
@@ -601,7 +733,8 @@ def is_search_needed(text):
         'сколько стоит', 'цена', 'курс', 'доллар', 'евро',
         'последние', 'свежие', 'актуальные', 'произошло',
         'случилось', 'вышел', 'появился', 'узнать', 'найти',
-        'информация', 'данные', 'факты', 'события'
+        'информация', 'данные', 'факты', 'события', 'почему',
+        'зачем', 'можно ли', 'правда ли'
     ]
     text_lower = text.lower()
     return any(kw in text_lower for kw in search_keywords)
@@ -695,7 +828,6 @@ def profile_cmd_from_user(message, user_id):
             remaining = 0
         status = f"🔓 Бесплатный (осталось {remaining}/{FREE_LIMIT})"
 
-    # ИСПРАВЛЕНО: берём username ИЗ СООБЩЕНИЯ пользователя
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
@@ -792,11 +924,16 @@ def help_cmd_from_user(message, user_id):
         "/feedback — Отправить отзыв\n"
         "/draw [описание] — Сгенерировать картинку\n\n"
         "🌐 *Я умею искать в интернете!*\n"
-        "Просто спроси: погода, новости, факты\n\n"
+        "📌 Примеры запросов:\n"
+        "  • погода в Ростове\n"
+        "  • сколько градусов в Москве\n"
+        "  • новости сегодня\n"
+        "  • кто такой Илон Маск\n\n"
+        "🧠 *Я учусь каждый день!*\n"
+        "Чем больше ты общаешься со мной — тем умнее я становлюсь!\n\n"
         "✍️ *Генерация текста:*\n"
-        "сгенерируй текст про сову\n"
-        "напиши стих про осень\n"
-        "придумай поздравление"
+        "  • сгенерируй текст про сову\n"
+        "  • напиши стих про осень"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += (
@@ -804,16 +941,12 @@ def help_cmd_from_user(message, user_id):
             "/admin — Открыть админ-меню\n"
             "/giveadmin [ID] — Выдать права администратора\n"
             "/deladmin [ID] — Забрать права администратора\n"
-            "/giveprem [ID] [срок] — Выдать Premium (1d, 1m, 1h, 1mes, 1y)\n"
-            "/givetest [ID] — Выдать Premium на 1 день (тест)\n"
+            "/giveprem [ID] [срок] — Выдать Premium\n"
             "/delprem [ID] — Отключить Premium\n"
             "/mute [ID] — Замутить\n"
             "/unmute [ID] — Размутить\n"
             "/ban [ID] — Забанить\n"
-            "/unban [ID] — Разбанить\n"
-            "/soo [ID] [число] — Добавить сообщения\n"
-            "/delsoo [ID] — Обнулить сообщения\n"
-            "/info [ID] — Посмотреть статус пользователя"
+            "/unban [ID] — Разбанить"
         )
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
@@ -832,8 +965,9 @@ def start(m):
     bot.send_message(
         m.chat.id,
         f"🔥 *Привет, {m.from_user.first_name}!*\n\n"
-        f"Я AWESOME AI — супер-интеллект!\n"
-        f"🌐 Я умею искать актуальную информацию в интернете!\n\n"
+        f"Я AWESOME AI — самый умный ИИ!\n"
+        f"🧠 Я умею учиться в реальном времени!\n"
+        f"🌐 Я ищу актуальную информацию в интернете!\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(),
         parse_mode='Markdown'
@@ -913,7 +1047,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ
+# АДМИН-КОМАНДЫ (СОКРАЩЕННЫЕ ДЛЯ ЭКОНОМИИ МЕСТА)
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -921,25 +1055,20 @@ def is_authorized(user_id):
 @bot.message_handler(commands=['admin'])
 def admin_panel(m):
     if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ У тебя нет прав доступа к админ-панели!")
+        bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     text = (
-        "🛡️ *АДМИН-ПАНЕЛЬ AWESOME AI*\n\n"
-        "👤 *Управление админами:*\n"
-        "/giveadmin [ID] — Выдать права админа\n"
-        "/deladmin [ID] — Забрать права админа\n\n"
-        "💎 *Управление Premium:*\n"
-        "/giveprem [ID] [срок] — Выдать Premium\n"
-        "   *Срок:* 1d (день), 1m (минута), 1h (час), 1mes (месяц), 1y (год)\n"
-        "/givetest [ID] — Выдать Premium на 1 день\n"
-        "/delprem [ID] — Отключить Premium\n\n"
-        "🚫 *Модерация:*\n"
-        "/mute [ID], /unmute [ID]\n"
-        "/ban [ID], /unban [ID]\n\n"
-        "📨 *Лимиты:*\n"
-        "/soo [ID] [число], /delsoo [ID]\n"
-        "/info [ID] — Информация о пользователе"
+        "🛡️ *АДМИН-ПАНЕЛЬ*\n\n"
+        "👤 /giveadmin [ID]\n"
+        "👤 /deladmin [ID]\n"
+        "💎 /giveprem [ID] [срок]\n"
+        "💎 /givetest [ID]\n"
+        "💎 /delprem [ID]\n"
+        "🚫 /mute [ID]\n"
+        "🚫 /unmute [ID]\n"
+        "⛔ /ban [ID]\n"
+        "⛔ /unban [ID]\n"
+        "📊 /info [ID]"
     )
     bot.send_message(m.chat.id, text, parse_mode='Markdown')
 
@@ -948,29 +1077,23 @@ def info_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /info [ID]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('SELECT is_admin, premium, premium_expires, messages_today FROM users WHERE user_id = ?', (target_id,))
     result = c.fetchone()
     conn.close()
-
     admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
     premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
-
     bot.send_message(m.chat.id, f"📊 Инфо по ID: {target_id}\n\nАдмин: {admin_status}\nPremium: {premium_status}\nСообщений сегодня: {result[3]}")
 
 @bot.message_handler(commands=['giveadmin'])
@@ -978,141 +1101,91 @@ def giveadmin_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /giveadmin [ID]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     set_admin(target_id, True)
     bot.send_message(m.chat.id, f"✅ Пользователь {target_id} теперь администратор.")
-    bot.send_message(target_id, "🎉 Тебе выданы права администратора AWESOME AI!")
 
 @bot.message_handler(commands=['deladmin'])
 def deladmin_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /deladmin [ID]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     set_admin(target_id, False)
     bot.send_message(m.chat.id, f"❌ У пользователя {target_id} отобраны права администратора.")
-    bot.send_message(target_id, "⛔ Твои права администратора AWESOME AI были отобраны.")
-
-@bot.message_handler(commands=['givetest'])
-def givetest_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-
-    args = m.text.split()
-    if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /givetest [ID]")
-        return
-
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
-        return
-
-    target_id = int(target_id)
-    ensure_user(target_id, "unknown")
-
-    if set_premium(target_id, "1d"):
-        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на 1 день.")
-        bot.send_message(target_id, "🎉 Тебе выдан тестовый Premium на 1 день!")
-    else:
-        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода.")
 
 @bot.message_handler(commands=['giveprem'])
 def giveprem_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 3:
-        bot.send_message(m.chat.id, "❌ Использование: /giveprem [ID] [срок]\nПример: /giveprem 123 24mes")
+        bot.send_message(m.chat.id, "❌ Использование: /giveprem [ID] [срок]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     duration = args[2].lower()
-
     if set_premium(target_id, duration):
         bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}")
-        bot.send_message(target_id, f"🎉 Тебе выдан Premium на срок: {duration}!")
     else:
-        bot.send_message(m.chat.id, "❌ Неверный формат срока. Используй: 1d, 1m, 1h, 1mes, 1y")
+        bot.send_message(m.chat.id, "❌ Неверный формат срока.")
 
 @bot.message_handler(commands=['delprem'])
 def delprem_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /delprem [ID]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     remove_premium(target_id)
     bot.send_message(m.chat.id, f"✅ Premium отключён для {target_id}")
-    bot.send_message(target_id, "⛔ Твой Premium был отключен.")
 
 @bot.message_handler(commands=['mute'])
 def mute_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /mute ID")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     mute_user(target_id)
     bot.send_message(m.chat.id, f"🔇 Пользователь {target_id} замучен")
 
@@ -1121,20 +1194,16 @@ def unmute_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /unmute ID")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     unmute_user(target_id)
     bot.send_message(m.chat.id, f"🔊 Пользователь {target_id} размучен")
 
@@ -1143,20 +1212,16 @@ def ban_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /ban ID")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     ban_user(target_id)
     bot.send_message(m.chat.id, f"🚫 Пользователь {target_id} забанен")
 
@@ -1165,89 +1230,38 @@ def unban_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         bot.send_message(m.chat.id, "❌ Использование: /unban ID")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
     unban_user(target_id)
     bot.send_message(m.chat.id, f"✅ Пользователь {target_id} разбанен")
 
-@bot.message_handler(commands=['soo'])
-def add_messages_cmd(m):
+@bot.message_handler(commands=['givetest'])
+def givetest_cmd(m):
     if not is_authorized(m.from_user.id):
         bot.send_message(m.chat.id, "❌ Нет прав!")
         return
-
-    args = m.text.split()
-    if len(args) < 3:
-        bot.send_message(m.chat.id, "❌ Использование: /soo [ID] [число]")
-        return
-
-    target_id = args[1]
-    if not target_id.isdigit():
-        bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
-        return
-
-    amount = args[2]
-    if not amount.isdigit():
-        bot.send_message(m.chat.id, "❌ Число сообщений должно быть цифрой!")
-        return
-
-    target_id = int(target_id)
-    amount = int(amount)
-
-    ensure_user(target_id, "unknown")
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-
-    today = datetime.now().strftime('%Y-%m-%d')
-    c.execute('UPDATE users SET last_reset = ?, messages_today = 0 WHERE user_id = ?', (today, target_id))
-    c.execute('UPDATE users SET messages_today = messages_today + ? WHERE user_id = ?', (amount, target_id))
-
-    conn.commit()
-    conn.close()
-
-    bot.send_message(m.chat.id, f"✅ Добавлено {amount} сообщений пользователю {target_id}")
-    bot.send_message(target_id, f"🔔 Админ добавил тебе {amount} сообщений на сегодня!")
-
-@bot.message_handler(commands=['delsoo'])
-def del_messages_cmd(m):
-    if not is_authorized(m.from_user.id):
-        bot.send_message(m.chat.id, "❌ Нет прав!")
-        return
-
     args = m.text.split()
     if len(args) < 2:
-        bot.send_message(m.chat.id, "❌ Использование: /delsoo [ID]")
+        bot.send_message(m.chat.id, "❌ Использование: /givetest [ID]")
         return
-
     target_id = args[1]
     if not target_id.isdigit():
         bot.send_message(m.chat.id, "❌ ID должен состоять только из цифр!")
         return
-
     target_id = int(target_id)
     ensure_user(target_id, "unknown")
-
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('UPDATE users SET messages_today = 0 WHERE user_id = ?', (target_id,))
-    today = datetime.now().strftime('%Y-%m-%d')
-    c.execute('UPDATE users SET last_reset = ? WHERE user_id = ?', (today, target_id))
-    conn.commit()
-    conn.close()
-    bot.send_message(m.chat.id, f"✅ Сообщения обнулены для пользователя {target_id}")
-    bot.send_message(target_id, f"🔔 Админ обнулил твои сообщения на сегодня!")
+    if set_premium(target_id, "1d"):
+        bot.send_message(m.chat.id, f"✅ Premium выдан пользователю {target_id} на 1 день.")
+    else:
+        bot.send_message(m.chat.id, "❌ Ошибка выдачи тестового периода.")
 
 # ============================================================
 # КНОПКИ
@@ -1398,6 +1412,7 @@ def other(m):
 print("🔥 AWESOME AI ULTRA — ВСЁ РАБОТАЕТ!")
 print(f"📊 Бесплатный лимит: {FREE_LIMIT} сообщений в день")
 print("🌐 РЕАЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ — ВКЛЮЧЁН!")
+print("🧠 САМООБУЧЕНИЕ — АКТИВИРОВАНО!")
 print("🤖 Режим: 100% Генерация на ходу (Без шаблонов)")
 print(f"🤖 @{bot.get_me().username}")
 print("-" * 40)
