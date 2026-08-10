@@ -28,7 +28,7 @@ from bs4 import BeautifulSoup
 # ============================================================
 TELEGRAM_TOKEN = "8336209662:AAHOZeKwoncRM7NVtqlyWq_DlJRUIyz3O8w"
 FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
-YANDEX_API_KEY = "AQVN1rPml9-6Yb_CrUmydBjzCxvN9IWXRm0rl2Bk"
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 OWNER_ID = 6652898792  # flidges
 
 # ЛИМИТ СООБЩЕНИЙ ДЛЯ БЕСПЛАТНОГО ТАРИФА (СНИЖЕН ДО 10)
