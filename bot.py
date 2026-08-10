@@ -36,7 +36,7 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
-# ХРАНИЛИЩЕ ID СООБЩЕНИЙ ДЛЯ УДАЛЕНИЯ
+# ХРАНИЛИЩЕ ID СООБЩЕНИЙ
 # ============================================================
 user_message_ids = {}
 
@@ -529,7 +529,7 @@ def recall(user_id, topic):
     return []
 
 # ============================================================
-# БАЗА ПОЛЬЗОВАТЕЛЕЙ (С ПРАВИЛЬНЫМ ЮЗЕРНЕЙМОМ)
+# БАЗА ПОЛЬЗОВАТЕЛЕЙ
 # ============================================================
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -579,7 +579,6 @@ def ensure_user(user_id, username):
         conn.commit()
         conn.close()
         
-        # Уведомление о новом пользователе (С ПРАВИЛЬНЫМ ЮЗЕРНЕЙМОМ)
         user_link = f"@{username}" if username and username != "unknown" else "Не указан"
         text = (
             "✦ ──────── ✦\n"
@@ -859,7 +858,6 @@ def process_message(user_id, user_text, image_description=None):
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
     
-    # ПОГОДА
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -872,7 +870,6 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
     
-    # КУРС ВАЛЮТ
     if any(kw in user_text.lower() for kw in ['курс', 'доллар', 'евро', 'валюта']):
         rates = get_exchange_rates()
         if rates:
@@ -880,7 +877,6 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "💵 Не удалось получить курс валют."
     
-    # КРИПТОВАЛЮТЫ
     if any(kw in user_text.lower() for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
         crypto = get_crypto_rates()
         if crypto:
@@ -888,35 +884,29 @@ def process_message(user_id, user_text, image_description=None):
         else:
             return "🪙 Не удалось получить курс криптовалют."
     
-    # ПОМОЩЬ С ПРОГРАММИРОВАНИЕМ
     if any(kw in user_text.lower() for kw in ['python', 'javascript', 'html', 'код', 'программа']):
         coding_help = get_coding_help(user_text)
         if coding_help:
             return coding_help
     
-    # КАРТИНКИ
     if is_image_generation(user_text):
         return None
     
-    # МАТЕМАТИКА
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
     
-    # ПОИСК В ИНТЕРНЕТЕ
     search_result = None
     if len(user_text) > 5:
         search_result = search_internet(user_text)
     
-    # ЗАПОМИНАЕМ
     if len(user_text) > 20:
         remember(user_id, "интересное", user_text[:100])
     
-    # ЧИСТЫЙ ОТВЕТ ИИ
     return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
-# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ — МЕНЮ
+# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -933,30 +923,25 @@ def main_menu():
     )
     return keyboard
 
-# ============================================================
-# АДМИН-МЕНЮ (С КНОПКАМИ!)
-# ============================================================
-def admin_menu():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
+def back_to_menu():
+    keyboard = types.InlineKeyboardMarkup()
     keyboard.add(
-        types.InlineKeyboardButton("📊 Статистика сервера", callback_data="admin_stats"),
-        types.InlineKeyboardButton("👥 Список админов", callback_data="admin_list"),
-        types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"),
-        types.InlineKeyboardButton("💎 Выдать Premium", callback_data="admin_giveprem"),
-        types.InlineKeyboardButton("🎁 Тест Premium (принуд)", callback_data="admin_givetest"),
-        types.InlineKeyboardButton("🚫 Забанить", callback_data="admin_ban"),
-        types.InlineKeyboardButton("✅ Разбанить", callback_data="admin_unban"),
-        types.InlineKeyboardButton("🔇 Замутить", callback_data="admin_mute"),
-        types.InlineKeyboardButton("🔊 Размутить", callback_data="admin_unmute"),
-        types.InlineKeyboardButton("👑 Выдать админа", callback_data="admin_giveadmin"),
-        types.InlineKeyboardButton("👑 Забрать админа", callback_data="admin_deladmin"),
-        types.InlineKeyboardButton("📊 Инфо о пользователе", callback_data="admin_info"),
-        types.InlineKeyboardButton("❌ Закрыть", callback_data="admin_close")
+        types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
+    )
+    return keyboard
+
+def premium_menu():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton("📩 Написать владельцу", callback_data="contact_owner")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
     )
     return keyboard
 
 # ============================================================
-# КОМАНДЫ (С УДАЛЕНИЕМ СТАРЫХ СООБЩЕНИЙ)
+# КОМАНДЫ
 # ============================================================
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -975,9 +960,7 @@ def start(m):
     init_memory_db()
     
     text = (
-        "✦ ──────── ✦\n"
-        "🧠 AWESOME AI — МЕГА-ИИ!\n"
-        "✦ ──────── ✦\n\n"
+        "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
         f"🌸 Привет, {m.from_user.first_name}!\n\n"
         "🌐 Я умею искать в Google, Wikipedia и новостях\n"
         "💵 Показываю курс валют и криптовалют\n"
@@ -986,10 +969,7 @@ def start(m):
         "🎁 Попробуй Premium бесплатно!\n"
         "Нажми кнопку «Тест Premium» 👇\n\n"
         "💎 Бесплатно — 10 сообщений/день\n"
-        "💎 Премиум — безлимит (/premium)\n\n"
-        "✦ ──────── ✦\n"
-        "👇 Выбери действие:\n"
-        "✦ ──────── ✦"
+        "💎 Премиум — безлимит (/premium)"
     )
     
     msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='Markdown')
@@ -1128,12 +1108,6 @@ def test_cmd(m):
     
     process_test_premium(chat_id, user_id)
 
-# ============================================================
-# АДМИН-КОМАНДЫ
-# ============================================================
-def is_authorized(user_id):
-    return user_id == OWNER_ID or is_admin(user_id)
-
 @bot.message_handler(commands=['admin'])
 def admin_panel(m):
     chat_id = m.chat.id
@@ -1151,12 +1125,9 @@ def admin_panel(m):
         return
     
     text = (
-        "✦ ──────── ✦\n"
-        "🛡️ АДМИН-ПАНЕЛЬ\n"
-        "✦ ──────── ✦\n\n"
+        "🛡️ АДМИН-ПАНЕЛЬ\n\n"
         "👋 Привет, админ!\n"
-        "Выбери действие ниже 👇\n\n"
-        "✦ ──────── ✦"
+        "Выбери действие ниже 👇"
     )
     
     msg = bot.send_message(chat_id, text, reply_markup=admin_menu(), parse_mode='Markdown')
@@ -1166,7 +1137,7 @@ def admin_panel(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ФУНКЦИИ ДЛЯ ВИЗУАЛА (С ПРАВИЛЬНЫМ ЮЗЕРНЕЙМОМ)
+# ФУНКЦИИ ДЛЯ КОМАНД
 # ============================================================
 def status_cmd_from_user(message, user_id):
     chat_id = message.chat.id
@@ -1195,31 +1166,26 @@ def status_cmd_from_user(message, user_id):
             status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
     
     text = (
-        "✦ ──────── ✦\n"
-        "📊 ТВОЙ СТАТУС\n"
-        "✦ ──────── ✦\n\n"
-        f"{status_text}\n\n"
-        "✦ ──────── ✦"
+        "📊 ТВОЙ СТАТУС\n\n"
+        f"{status_text}"
     )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
     text = (
-        "✦ ──────── ✦\n"
-        "💎 PREMIUM AWESOME AI\n"
-        "✦ ──────── ✦\n\n"
+        "💎 PREMIUM AWESOME AI\n\n"
         "✅ Безлимит сообщений\n"
         "✅ Приоритетные ответы\n"
         "✅ Эксклюзивные функции\n\n"
         "💰 Цена: 50₽/месяц\n\n"
-        "📩 Как купить:\n"
-        "Напиши @flidges\n\n"
-        "✦ ──────── ✦"
+        "📩 Для покупки напиши владельцу:"
     )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    
+    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 def profile_cmd_from_user(message, user_id):
@@ -1250,23 +1216,19 @@ def profile_cmd_from_user(message, user_id):
             remaining = 0
         status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
 
-    # БЕРЁМ ЮЗЕРНЕЙМ ИЗ СООБЩЕНИЯ (ЭТО ПОЛЬЗОВАТЕЛЬ!)
     username = message.from_user.username
     user_link = f"@{username}" if username else "Не указан"
 
     text = (
-        "✦ ──────── ✦\n"
-        "📊 ТВОЙ ПРОФИЛЬ\n"
-        "✦ ──────── ✦\n\n"
+        "📊 ТВОЙ ПРОФИЛЬ\n\n"
         f"🆔 ID: {user_id}\n"
         f"👤 Юзер: {user_link}\n"
         f"💎 Статус: {status}\n"
         f"✉️ Сегодня: {messages}/{FREE_LIMIT}\n"
-        f"📅 Вход: {joined_at or 'Неизвестно'}\n\n"
-        "✦ ──────── ✦"
+        f"📅 Вход: {joined_at or 'Неизвестно'}"
     )
     
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 def stats_cmd_from_user(message, user_id):
@@ -1286,16 +1248,13 @@ def stats_cmd_from_user(message, user_id):
         conn.close()
         
         text = (
-            "✦ ──────── ✦\n"
-            "📊 СТАТИСТИКА СЕРВЕРА\n"
-            "✦ ──────── ✦\n\n"
+            "📊 СТАТИСТИКА СЕРВЕРА\n\n"
             f"👥 Всего: {total_users}\n"
             f"💎 Premium: {premium_users}\n"
             f"🔓 Бесплатных: {total_users - premium_users}\n"
-            f"📨 Сообщений сегодня: {today_messages}\n\n"
-            "✦ ──────── ✦"
+            f"📨 Сообщений сегодня: {today_messages}"
         )
-        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
         user_message_ids[user_id].append(msg.message_id)
         return
 
@@ -1323,15 +1282,13 @@ def stats_cmd_from_user(message, user_id):
     conn.close()
 
     text = (
-        "✦ ──────── ✦\n"
-        "📊 ТВОЯ СТАТИСТИКА\n"
-        "✦ ──────── ✦\n\n"
+        "📊 ТВОЯ СТАТИСТИКА\n\n"
         f"👤 Статус: {user_status}\n"
         f"✉️ Сегодня: {user_messages}\n"
-        f"📨 Всего: {total_user_messages}\n\n"
-        "✦ ──────── ✦"
+        f"📨 Всего: {total_user_messages}"
     )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 def clear_cmd_from_user(message, user_id):
@@ -1343,23 +1300,19 @@ def clear_cmd_from_user(message, user_id):
         user_message_ids[user_id] = []
     
     text = (
-        "✦ ──────── ✦\n"
-        "🧹 ИСТОРИЯ ОЧИЩЕНА\n"
-        "✦ ──────── ✦\n\n"
+        "🧹 ИСТОРИЯ ОЧИЩЕНА\n\n"
         "🌸 Теперь я ничего не помню.\n"
-        "Начинаем с чистого листа! 📝\n\n"
-        "✦ ──────── ✦"
+        "Начинаем с чистого листа! 📝"
     )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 def help_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
     text = (
-        "✦ ──────── ✦\n"
-        "🧠 AWESOME AI — МЕГА-ИИ!\n"
-        "✦ ──────── ✦\n\n"
+        "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
         "🌐 Что я умею:\n"
         "🔍 Ищу в Google, Wikipedia и новостях\n"
         "🌤 Погода с прогнозом на неделю\n"
@@ -1370,7 +1323,6 @@ def help_cmd_from_user(message, user_id):
         "🧠 Анализирую настроение\n"
         "🧹 Запоминаю факты из диалогов\n"
         "🎨 Генерирую картинки\n\n"
-        "✦ ──────── ✦\n"
         "📋 Команды:\n"
         "/start — Меню\n"
         "/help — Помощь\n"
@@ -1381,23 +1333,18 @@ def help_cmd_from_user(message, user_id):
         "/stats — Статистика\n"
         "/clear — Очистить\n"
         "/draw [описание] — Картинка\n\n"
-        "✦ ──────── ✦\n"
         "💎 Лимиты:\n"
         "🔓 Бесплатно — 10 сообщений/день\n"
         "💎 Premium — безлимит\n"
-        "Купить Premium: /premium\n"
-        "✦ ──────── ✦"
+        "Купить Premium: /premium"
     )
     
     if user_id == OWNER_ID or is_admin(user_id):
         text += (
-            "\n\n✦ ──────── ✦\n"
-            "👑 Админ-панель:\n"
-            "/admin — открыть панель\n"
-            "✦ ──────── ✦"
+            "\n\n👑 Админ-панель: /admin"
         )
     
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
@@ -1419,27 +1366,21 @@ def process_test_premium(chat_id, user_id):
     
     if premium == 1:
         text = (
-            "✦ ──────── ✦\n"
-            "💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n"
-            "✦ ──────── ✦\n\n"
-            "Ты уже в топе! 🚀\n\n"
-            "✦ ──────── ✦"
+            "💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n"
+            "Ты уже в топе! 🚀"
         )
-        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
         user_message_ids[user_id].append(msg.message_id)
         return
     
     if test_used == 1:
         text = (
-            "✦ ──────── ✦\n"
-            "⛔ ТЫ УЖЕ ИСПОЛЬЗОВАЛ ТЕСТ!\n"
-            "✦ ──────── ✦\n\n"
+            "⛔ ТЫ УЖЕ ИСПОЛЬЗОВАЛ ТЕСТ!\n\n"
             "Пробный период закончился.\n"
             "Купи Premium: /premium\n\n"
-            "💰 50₽/месяц — @flidges\n\n"
-            "✦ ──────── ✦"
+            "💰 50₽/месяц — @flidges"
         )
-        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
         user_message_ids[user_id].append(msg.message_id)
         return
     
@@ -1451,17 +1392,14 @@ def process_test_premium(chat_id, user_id):
         conn.close()
         
         text = (
-            "✦ ──────── ✦\n"
-            "🎉 ПРОБНЫЙ PREMIUM АКТИВИРОВАН!\n"
-            "✦ ──────── ✦\n\n"
+            "🎉 ПРОБНЫЙ PREMIUM АКТИВИРОВАН!\n\n"
             "✅ Безлимит сообщений\n"
             "✅ Приоритетные ответы\n"
             "✅ Все функции ИИ\n\n"
             "⏳ Доступ активен 24 часа.\n"
-            "Купить Premium: /premium\n\n"
-            "✦ ──────── ✦"
+            "Купить Premium: /premium"
         )
-        msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
         user_message_ids[user_id].append(msg.message_id)
     else:
         msg = bot.send_message(chat_id, "❌ Ошибка. Попробуй позже.")
@@ -1515,473 +1453,11 @@ def broadcast_cmd(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК
+# АДМИН-КОМАНДЫ
 # ============================================================
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback(call):
-    try:
-        chat_id = call.message.chat.id
-        user_id = call.from_user.id
-        ensure_user(user_id, call.from_user.username or "unknown")
-        
-        delete_previous_messages(chat_id, user_id)
-        try:
-            bot.delete_message(chat_id, call.message.message_id)
-        except:
-            pass
-        
-        # === ПОДТВЕРЖДЕНИЕ РАССЫЛКИ ===
-        if call.data.startswith("confirm_broadcast:"):
-            if not is_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Нет прав!")
-                return
-            
-            bot.answer_callback_query(call.id, "📢 Начинаю...")
-            
-            text = call.data.replace("confirm_broadcast:", "")
-            
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT user_id FROM users')
-            users = c.fetchall()
-            conn.close()
-            
-            if not users:
-                msg = bot.send_message(chat_id, "❌ Нет пользователей.")
-                user_message_ids[user_id].append(msg.message_id)
-                return
-            
-            status_msg = bot.send_message(
-                chat_id,
-                f"📢 Рассылка\n👥 {len(users)} пользователей\n\n⏳ Отправка...",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(status_msg.message_id)
-            
-            sent = 0
-            failed = 0
-            
-            for user in users:
-                try:
-                    bot.send_message(
-                        user[0],
-                        f"📢 Объявление AWESOME AI\n\n{text}\n\n✦ ──────── ✦\n"
-                        f"Отписаться: /unsubscribe",
-                        parse_mode='Markdown'
-                    )
-                    sent += 1
-                    time.sleep(0.05)
-                except:
-                    failed += 1
-            
-            bot.edit_message_text(
-                f"✅ Рассылка завершена!\n\n"
-                f"📤 Отправлено: {sent}\n"
-                f"❌ Ошибок: {failed}\n"
-                f"👥 Всего: {len(users)}",
-                chat_id=chat_id,
-                message_id=status_msg.message_id,
-                parse_mode='Markdown'
-            )
-            return
-        
-        elif call.data == "cancel_broadcast":
-            bot.answer_callback_query(call.id, "❌ Отменено")
-            bot.edit_message_text("❌ Отменено.", chat_id=chat_id, message_id=call.message.message_id)
-            return
-        
-        # === АДМИН-КНОПКИ ===
-        if call.data == "admin_stats":
-            bot.answer_callback_query(call.id)
-            stats_cmd_from_user(call.message, user_id)
-            return
-        
-        elif call.data == "admin_list":
-            bot.answer_callback_query(call.id)
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
-            admins = c.fetchall()
-            conn.close()
-            
-            if not admins:
-                text = "✦ ──────── ✦\n👑 АДМИНЫ\n✦ ──────── ✦\n\nНет админов."
-            else:
-                text = "✦ ──────── ✦\n👑 АДМИНЫ\n✦ ──────── ✦\n\n"
-                for admin in admins:
-                    user_link = f"@{admin[1]}" if admin[1] else f"`{admin[0]}`"
-                    text += f"• {user_link}\n"
-                text += "\n✦ ──────── ✦"
-            
-            msg = bot.send_message(chat_id, text, parse_mode='Markdown')
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_broadcast":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "📢 Напиши текст рассылки:\n/broadcast [текст]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_giveprem":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "💎 Выдать Premium:\n/giveprem [ID] [срок]\n\n"
-                "Срок: 1d, 1m, 1h, 1mes, 1y",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_givetest":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "🎁 Выдать тест Premium:\n/givetest [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_ban":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "🚫 Забанить:\n/ban [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_unban":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "✅ Разбанить:\n/unban [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_mute":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "🔇 Замутить:\n/mute [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_unmute":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "🔊 Размутить:\n/unmute [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_giveadmin":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "👑 Выдать админа:\n/giveadmin [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_deladmin":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "👑 Забрать админа:\n/deladmin [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_info":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(
-                chat_id,
-                "📊 Инфо о пользователе:\n/info [ID]",
-                parse_mode='Markdown'
-            )
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        elif call.data == "admin_close":
-            bot.answer_callback_query(call.id, "❌ Закрыто")
-            msg = bot.send_message(chat_id, "✦ ──────── ✦\n❌ Панель закрыта\n✦ ──────── ✦", parse_mode='Markdown')
-            user_message_ids[user_id].append(msg.message_id)
-            return
-        
-        # === ОСНОВНЫЕ КНОПКИ ===
-        if call.data == "test":
-            bot.answer_callback_query(call.id, "🎁 Активирую...")
-            process_test_premium(chat_id, user_id)
-            return
-        
-        elif call.data == "status":
-            bot.answer_callback_query(call.id)
-            status_cmd_from_user(call.message, user_id)
-        elif call.data == "premium":
-            bot.answer_callback_query(call.id)
-            premium_cmd_from_user(call.message, user_id)
-        elif call.data == "profile":
-            bot.answer_callback_query(call.id)
-            profile_cmd_from_user(call.message, user_id)
-        elif call.data == "stats":
-            bot.answer_callback_query(call.id)
-            stats_cmd_from_user(call.message, user_id)
-        elif call.data == "clear":
-            bot.answer_callback_query(call.id)
-            clear_cmd_from_user(call.message, user_id)
-        elif call.data == "help":
-            bot.answer_callback_query(call.id)
-            help_cmd_from_user(call.message, user_id)
-        elif call.data == "feedback":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(chat_id, "📩 Напиши: /feedback [текст]")
-            user_message_ids[user_id].append(msg.message_id)
-        elif call.data == "draw":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]")
-            user_message_ids[user_id].append(msg.message_id)
-            
-    except Exception as e:
-        bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+def is_authorized(user_id):
+    return user_id == OWNER_ID or is_admin(user_id)
 
-# ============================================================
-# КАРТИНКИ
-# ============================================================
-def generate_and_send_image(m, prompt):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    
-    if not can_send_message(user_id):
-        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-
-    title = fix_title(prompt)
-    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='Markdown')
-    user_message_ids[user_id].append(msg.message_id)
-
-    image_data = generate_image(prompt)
-
-    if image_data:
-        increment_messages(user_id)
-        try:
-            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='Markdown')
-        except:
-            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
-            user_message_ids[user_id].append(msg.message_id)
-    else:
-        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
-        user_message_ids[user_id].append(msg.message_id)
-
-# ============================================================
-# ФОТО
-# ============================================================
-@bot.message_handler(content_types=['photo'])
-def handle_photo(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    
-    delete_previous_messages(chat_id, user_id)
-    try:
-        bot.delete_message(chat_id, m.message_id)
-    except:
-        pass
-    
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    
-    if is_banned(user_id):
-        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    if not can_send_message(user_id):
-        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    
-    bot.send_chat_action(chat_id, 'typing')
-    
-    try:
-        file_info = bot.get_file(m.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        analysis = analyze_image_from_file(downloaded)
-        increment_messages(user_id)
-        caption = m.caption or "Опиши, что на этом изображении"
-        msg = bot.send_message(chat_id, analysis, parse_mode='Markdown')
-        user_message_ids[user_id].append(msg.message_id)
-        if m.caption and len(m.caption) > 3:
-            response = process_message(user_id, m.caption, analysis)
-            if response:
-                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
-                user_message_ids[user_id].append(msg.message_id)
-    except Exception as e:
-        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
-        user_message_ids[user_id].append(msg.message_id)
-
-# ============================================================
-# ГОЛОС
-# ============================================================
-@bot.message_handler(content_types=['voice'])
-def handle_voice(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    
-    delete_previous_messages(chat_id, user_id)
-    try:
-        bot.delete_message(chat_id, m.message_id)
-    except:
-        pass
-    
-    username = m.from_user.username or "unknown"
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    if is_banned(user_id):
-        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    if not can_send_message(user_id):
-        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    
-    bot.send_chat_action(chat_id, 'typing')
-    try:
-        file_info = bot.get_file(m.voice.file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        recognized = stt(downloaded)
-        increment_messages(user_id)
-        if recognized:
-            msg = bot.send_message(chat_id, f"🎤 Распознано:\n{recognized}", parse_mode='Markdown')
-            user_message_ids[user_id].append(msg.message_id)
-            response = process_message(user_id, recognized)
-            if response:
-                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
-                user_message_ids[user_id].append(msg.message_id)
-        else:
-            msg = bot.send_message(chat_id, "🎤 Не разобрал.")
-            user_message_ids[user_id].append(msg.message_id)
-    except Exception as e:
-        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
-        user_message_ids[user_id].append(msg.message_id)
-
-def stt(audio_data):
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
-            tmp.write(audio_data)
-            tmp_path = tmp.name
-        recognizer = sr.Recognizer()
-        wav_path = tmp_path + '.wav'
-        subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
-                      capture_output=True, check=False)
-        if os.path.exists(wav_path):
-            with sr.AudioFile(wav_path) as source:
-                audio = recognizer.record(source)
-            os.unlink(wav_path)
-        else:
-            with sr.AudioFile(tmp_path) as source:
-                audio = recognizer.record(source)
-        os.unlink(tmp_path)
-        text = recognizer.recognize_google(audio, language='ru-RU')
-        return text
-    except:
-        return None
-
-# ============================================================
-# ТЕКСТ
-# ============================================================
-@bot.message_handler(content_types=['text'])
-def handle_text(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    username = m.from_user.username or "unknown"
-    
-    if m.text.startswith('/'):
-        return
-    
-    ensure_user(user_id, username)
-    reset_messages_if_needed(user_id)
-    
-    delete_previous_messages(chat_id, user_id)
-    
-    if check_spam(user_id):
-        msg = bot.send_message(chat_id, "⏳ Подожди 3 секунды!")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    
-    if is_banned(user_id):
-        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    if not can_send_message(user_id):
-        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-
-    bot.send_chat_action(chat_id, 'typing')
-
-    if is_image_generation(m.text):
-        generate_and_send_image(m, m.text)
-        return
-
-    increment_messages(user_id)
-    response = process_message(user_id, m.text)
-    
-    if response:
-        msg = bot.send_message(chat_id, response, parse_mode='Markdown')
-        user_message_ids[user_id].append(msg.message_id)
-    else:
-        msg = bot.send_message(chat_id, random.choice([
-            "🤔 Хм... Что ты имеешь в виду?",
-            "🧐 Слушай, я не совсем понял.",
-            "😮 Ого! Расскажи подробнее!",
-            "💡 Понял! Я сейчас подумаю..."
-        ]))
-        user_message_ids[user_id].append(msg.message_id)
-
-# ============================================================
-# ОСТАЛЬНОЕ
-# ============================================================
-@bot.message_handler(content_types=['video', 'document', 'audio'])
-def other(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    
-    delete_previous_messages(chat_id, user_id)
-    try:
-        bot.delete_message(chat_id, m.message_id)
-    except:
-        pass
-    
-    text = (
-        "✦ ──────── ✦\n"
-        "📁 ПОКА НЕ УМЕЮ\n"
-        "✦ ──────── ✦\n\n"
-        "Пришли текст, фото или голосовое.\n\n"
-        "✦ ──────── ✦"
-    )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
-    user_message_ids[user_id].append(msg.message_id)
-
-# ============================================================
-# АДМИН-КОМАНДЫ (ДЛЯ ВВОДА ВРУЧНУЮ)
-# ============================================================
 @bot.message_handler(commands=['giveadmin'])
 def giveadmin_cmd(m):
     chat_id = m.chat.id
@@ -2204,17 +1680,15 @@ def info_cmd(m):
     test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
     
     text = (
-        "✦ ──────── ✦\n"
-        "📊 ИНФО О ПОЛЬЗОВАТЕЛЕ\n"
-        "✦ ──────── ✦\n\n"
+        "📊 ИНФО О ПОЛЬЗОВАТЕЛЕ\n\n"
         f"🆔 ID: {target_id}\n"
         f"👑 Админ: {admin_status}\n"
         f"💎 Premium: {premium_status}\n"
         f"🎁 Тест: {test_status}\n"
-        f"✉️ Сообщений сегодня: {result[3]}\n\n"
-        "✦ ──────── ✦"
+        f"✉️ Сообщений сегодня: {result[3]}"
     )
-    msg = bot.send_message(chat_id, text, parse_mode='Markdown')
+    
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     user_message_ids[user_id].append(msg.message_id)
 
 @bot.message_handler(commands=['mute'])
@@ -2354,6 +1828,477 @@ def unban_cmd(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
+# КАРТИНКИ
+# ============================================================
+def generate_and_send_image(m, prompt):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    if not can_send_message(user_id):
+        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+
+    title = fix_title(prompt)
+    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='Markdown')
+    user_message_ids[user_id].append(msg.message_id)
+
+    image_data = generate_image(prompt)
+
+    if image_data:
+        increment_messages(user_id)
+        try:
+            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='Markdown')
+        except:
+            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
+            user_message_ids[user_id].append(msg.message_id)
+    else:
+        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
+        user_message_ids[user_id].append(msg.message_id)
+
+# ============================================================
+# ФОТО
+# ============================================================
+@bot.message_handler(content_types=['photo'])
+def handle_photo(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    
+    if is_banned(user_id):
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    if not can_send_message(user_id):
+        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    bot.send_chat_action(chat_id, 'typing')
+    
+    try:
+        file_info = bot.get_file(m.photo[-1].file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        analysis = analyze_image_from_file(downloaded)
+        increment_messages(user_id)
+        caption = m.caption or "Опиши, что на этом изображении"
+        msg = bot.send_message(chat_id, analysis, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
+        if m.caption and len(m.caption) > 3:
+            response = process_message(user_id, m.caption, analysis)
+            if response:
+                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+                user_message_ids[user_id].append(msg.message_id)
+    except Exception as e:
+        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+        user_message_ids[user_id].append(msg.message_id)
+
+# ============================================================
+# ГОЛОС
+# ============================================================
+@bot.message_handler(content_types=['voice'])
+def handle_voice(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    username = m.from_user.username or "unknown"
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    if is_banned(user_id):
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    if not can_send_message(user_id):
+        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    bot.send_chat_action(chat_id, 'typing')
+    try:
+        file_info = bot.get_file(m.voice.file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        recognized = stt(downloaded)
+        increment_messages(user_id)
+        if recognized:
+            msg = bot.send_message(chat_id, f"🎤 Распознано:\n{recognized}", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            response = process_message(user_id, recognized)
+            if response:
+                msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+                user_message_ids[user_id].append(msg.message_id)
+        else:
+            msg = bot.send_message(chat_id, "🎤 Не разобрал.")
+            user_message_ids[user_id].append(msg.message_id)
+    except Exception as e:
+        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+        user_message_ids[user_id].append(msg.message_id)
+
+def stt(audio_data):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
+            tmp.write(audio_data)
+            tmp_path = tmp.name
+        recognizer = sr.Recognizer()
+        wav_path = tmp_path + '.wav'
+        subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
+                      capture_output=True, check=False)
+        if os.path.exists(wav_path):
+            with sr.AudioFile(wav_path) as source:
+                audio = recognizer.record(source)
+            os.unlink(wav_path)
+        else:
+            with sr.AudioFile(tmp_path) as source:
+                audio = recognizer.record(source)
+        os.unlink(tmp_path)
+        text = recognizer.recognize_google(audio, language='ru-RU')
+        return text
+    except:
+        return None
+
+# ============================================================
+# ТЕКСТ
+# ============================================================
+@bot.message_handler(content_types=['text'])
+def handle_text(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    username = m.from_user.username or "unknown"
+    
+    if m.text.startswith('/'):
+        return
+    
+    ensure_user(user_id, username)
+    reset_messages_if_needed(user_id)
+    
+    delete_previous_messages(chat_id, user_id)
+    
+    if check_spam(user_id):
+        msg = bot.send_message(chat_id, "⏳ Подожди 3 секунды!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    if is_banned(user_id):
+        msg = bot.send_message(chat_id, "🚫 Ты забанен!")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    if not can_send_message(user_id):
+        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+
+    bot.send_chat_action(chat_id, 'typing')
+
+    if is_image_generation(m.text):
+        generate_and_send_image(m, m.text)
+        return
+
+    increment_messages(user_id)
+    response = process_message(user_id, m.text)
+    
+    if response:
+        msg = bot.send_message(chat_id, response, parse_mode='Markdown')
+        user_message_ids[user_id].append(msg.message_id)
+    else:
+        msg = bot.send_message(chat_id, random.choice([
+            "🤔 Хм... Что ты имеешь в виду?",
+            "🧐 Слушай, я не совсем понял.",
+            "😮 Ого! Расскажи подробнее!",
+            "💡 Понял! Я сейчас подумаю..."
+        ]))
+        user_message_ids[user_id].append(msg.message_id)
+
+# ============================================================
+# АДМИН-МЕНЮ (ДЛЯ КНОПОК)
+# ============================================================
+def admin_menu():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("📊 Статистика сервера", callback_data="admin_stats"),
+        types.InlineKeyboardButton("👥 Список админов", callback_data="admin_list"),
+        types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"),
+        types.InlineKeyboardButton("💎 Выдать Premium", callback_data="admin_giveprem"),
+        types.InlineKeyboardButton("🎁 Тест Premium", callback_data="admin_givetest"),
+        types.InlineKeyboardButton("🚫 Забанить", callback_data="admin_ban"),
+        types.InlineKeyboardButton("✅ Разбанить", callback_data="admin_unban"),
+        types.InlineKeyboardButton("🔇 Замутить", callback_data="admin_mute"),
+        types.InlineKeyboardButton("🔊 Размутить", callback_data="admin_unmute"),
+        types.InlineKeyboardButton("👑 Выдать админа", callback_data="admin_giveadmin"),
+        types.InlineKeyboardButton("👑 Забрать админа", callback_data="admin_deladmin"),
+        types.InlineKeyboardButton("📊 Инфо о пользователе", callback_data="admin_info"),
+        types.InlineKeyboardButton("❌ Закрыть", callback_data="admin_close")
+    )
+    return keyboard
+
+# ============================================================
+# ОБРАБОТЧИК КНОПОК
+# ============================================================
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    try:
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+        ensure_user(user_id, call.from_user.username or "unknown")
+        
+        delete_previous_messages(chat_id, user_id)
+        try:
+            bot.delete_message(chat_id, call.message.message_id)
+        except:
+            pass
+        
+        # === КНОПКА "НАЗАД" ===
+        if call.data == "back_to_menu":
+            bot.answer_callback_query(call.id)
+            text = (
+                "🧠 AWESOME AI — МЕГА-ИИ!\n\n"
+                f"🌸 Привет, {call.from_user.first_name}!\n\n"
+                "🌐 Я умею искать в Google, Wikipedia и новостях\n"
+                "💵 Показываю курс валют и криптовалют\n"
+                "🧮 Решаю задачи и помогаю с программированием\n"
+                "🧠 Анализирую настроение и адаптируюсь\n\n"
+                "🎁 Попробуй Premium бесплатно!\n"
+                "Нажми кнопку «Тест Premium» 👇\n\n"
+                "💎 Бесплатно — 10 сообщений/день\n"
+                "💎 Премиум — безлимит (/premium)"
+            )
+            msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        # === КНОПКА "НАПИСАТЬ ВЛАДЕЛЬЦУ" ===
+        if call.data == "contact_owner":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(
+                chat_id,
+                "📩 Напиши владельцу @flidges для покупки Premium!\n\n"
+                "Он ответит на все вопросы и оформит доступ."
+            )
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        # === ПОДТВЕРЖДЕНИЕ РАССЫЛКИ ===
+        if call.data.startswith("confirm_broadcast:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            
+            bot.answer_callback_query(call.id, "📢 Начинаю...")
+            
+            text = call.data.replace("confirm_broadcast:", "")
+            
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT user_id FROM users')
+            users = c.fetchall()
+            conn.close()
+            
+            if not users:
+                msg = bot.send_message(chat_id, "❌ Нет пользователей.")
+                user_message_ids[user_id].append(msg.message_id)
+                return
+            
+            status_msg = bot.send_message(
+                chat_id,
+                f"📢 Рассылка\n👥 {len(users)} пользователей\n\n⏳ Отправка...",
+                parse_mode='Markdown'
+            )
+            user_message_ids[user_id].append(status_msg.message_id)
+            
+            sent = 0
+            failed = 0
+            
+            for user in users:
+                try:
+                    bot.send_message(
+                        user[0],
+                        f"📢 Объявление AWESOME AI\n\n{text}\n\n---\nОтписаться: /unsubscribe",
+                        parse_mode='Markdown'
+                    )
+                    sent += 1
+                    time.sleep(0.05)
+                except:
+                    failed += 1
+            
+            bot.edit_message_text(
+                f"✅ Рассылка завершена!\n\n"
+                f"📤 Отправлено: {sent}\n"
+                f"❌ Ошибок: {failed}\n"
+                f"👥 Всего: {len(users)}",
+                chat_id=chat_id,
+                message_id=status_msg.message_id,
+                parse_mode='Markdown'
+            )
+            return
+        
+        elif call.data == "cancel_broadcast":
+            bot.answer_callback_query(call.id, "❌ Отменено")
+            bot.edit_message_text("❌ Отменено.", chat_id=chat_id, message_id=call.message.message_id)
+            return
+        
+        # === АДМИН-КНОПКИ ===
+        if call.data == "admin_stats":
+            bot.answer_callback_query(call.id)
+            stats_cmd_from_user(call.message, user_id)
+            return
+        
+        elif call.data == "admin_list":
+            bot.answer_callback_query(call.id)
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
+            admins = c.fetchall()
+            conn.close()
+            
+            if not admins:
+                text = "👑 АДМИНЫ\n\nНет админов."
+            else:
+                text = "👑 АДМИНЫ\n\n"
+                for admin in admins:
+                    user_link = f"@{admin[1]}" if admin[1] else f"`{admin[0]}`"
+                    text += f"• {user_link}\n"
+            
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_broadcast":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📢 Напиши текст рассылки:\n/broadcast [текст]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_giveprem":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "💎 Выдать Premium:\n/giveprem [ID] [срок]\n\nСрок: 1d, 1m, 1h, 1mes, 1y", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_givetest":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎁 Выдать тест Premium:\n/givetest [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_ban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🚫 Забанить:\n/ban [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_unban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "✅ Разбанить:\n/unban [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_mute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔇 Замутить:\n/mute [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_unmute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔊 Размутить:\n/unmute [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_giveadmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 Выдать админа:\n/giveadmin [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_deladmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 Забрать админа:\n/deladmin [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_info":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📊 Инфо о пользователе:\n/info [ID]", parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        elif call.data == "admin_close":
+            bot.answer_callback_query(call.id, "❌ Закрыто")
+            msg = bot.send_message(chat_id, "❌ Панель закрыта", reply_markup=back_to_menu(), parse_mode='Markdown')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        # === ОСНОВНЫЕ КНОПКИ ===
+        if call.data == "test":
+            bot.answer_callback_query(call.id, "🎁 Активирую...")
+            process_test_premium(chat_id, user_id)
+            return
+        
+        elif call.data == "status":
+            bot.answer_callback_query(call.id)
+            status_cmd_from_user(call.message, user_id)
+        elif call.data == "premium":
+            bot.answer_callback_query(call.id)
+            premium_cmd_from_user(call.message, user_id)
+        elif call.data == "profile":
+            bot.answer_callback_query(call.id)
+            profile_cmd_from_user(call.message, user_id)
+        elif call.data == "stats":
+            bot.answer_callback_query(call.id)
+            stats_cmd_from_user(call.message, user_id)
+        elif call.data == "clear":
+            bot.answer_callback_query(call.id)
+            clear_cmd_from_user(call.message, user_id)
+        elif call.data == "help":
+            bot.answer_callback_query(call.id)
+            help_cmd_from_user(call.message, user_id)
+        elif call.data == "feedback":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📩 Напиши: /feedback [текст]")
+            user_message_ids[user_id].append(msg.message_id)
+        elif call.data == "draw":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]")
+            user_message_ids[user_id].append(msg.message_id)
+            
+    except Exception as e:
+        bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+
+# ============================================================
+# ОСТАЛЬНОЕ
+# ============================================================
+@bot.message_handler(content_types=['video', 'document', 'audio'])
+def other(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    text = (
+        "📁 ПОКА НЕ УМЕЮ\n\n"
+        "Пришли текст, фото или голосовое."
+    )
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
+    user_message_ids[user_id].append(msg.message_id)
+
+# ============================================================
 # ЗАПУСК
 # ============================================================
 init_db()
@@ -2363,11 +2308,10 @@ print("=" * 60)
 print("🧠 AWESOME AI — МЕГА-ИИ 2026!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print("📢 РАССЫЛКА — ВКЛЮЧЕНА!")
-print("🆕 УВЕДОМЛЕНИЯ О НОВЫХ ЮЗЕРАХ — ВКЛЮЧЕНЫ!")
-print("🛡️ АДМИН-ПАНЕЛЬ С КНОПКАМИ — ВКЛЮЧЕНА!")
-print("👤 ПРАВИЛЬНЫЙ ЮЗЕРНЕЙМ ПОЛЬЗОВАТЕЛЯ — ВКЛЮЧЁН!")
-print("🎨 МЕГА-КРАСИВЫЙ ВИЗУАЛ — ВКЛЮЧЁН!")
+print("👤 ПРАВИЛЬНЫЙ ЮЗЕРНЕЙМ — ВКЛЮЧЁН!")
+print("🔙 КНОПКА НАЗАД — ВКЛЮЧЕНА!")
+print("📩 КНОПКА СВЯЗИ С ВЛАДЕЛЬЦЕМ — ВКЛЮЧЕНА!")
+print("🎨 МИНИМАЛИСТИЧНЫЙ ДИЗАЙН — ВКЛЮЧЁН!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
