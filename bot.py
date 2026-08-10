@@ -103,10 +103,13 @@ def get_weather(city):
                 min_temps = daily.get('temperature_2m_min', [])
                 
                 for i in range(min(7, len(times))):
-                    date = datetime.fromisoformat(times[i]).strftime('%d.%m')
+                    # Исправлено: теперь правильно парсим дату
+                    date_str = times[i]
+                    date_obj = datetime.fromisoformat(date_str)
+                    date_formatted = date_obj.strftime('%d.%m')
                     max_t = round(max_temps[i]) if i < len(max_temps) else "?"
                     min_t = round(min_temps[i]) if i < len(min_temps) else "?"
-                    forecast += f"\n📅 {date}: {min_t}°C → {max_t}°C"
+                    forecast += f"\n📅 {date_formatted}: {min_t}°C → {max_t}°C"
             
             result = f"🌤 *Погода в {display_name}*\n"
             result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
@@ -114,7 +117,8 @@ def get_weather(city):
             
             return result
         return None
-    except:
+    except Exception as e:
+        print(f"[Погода] Ошибка: {e}")
         return None
 
 # ============================================================
@@ -146,7 +150,8 @@ def search_internet(query):
             if results:
                 return "\n".join(results)
         return None
-    except:
+    except Exception as e:
+        print(f"[Поиск] Ошибка: {e}")
         return None
 
 # ============================================================
@@ -567,16 +572,21 @@ def solve_math(text):
 # ============================================================
 # ОСНОВНОЙ ИИ (ЖИВОЙ, БЕЗ ШАБЛОНОВ)
 # ============================================================
-def generate_ai_response(user_id, user_text, search_result=None, weather_info=None):
+user_histories = {}  # глобальная история диалогов
+
+def get_user_history(user_id):
+    if user_id not in user_histories:
+        user_histories[user_id] = []
+    return user_histories[user_id]
+
+def generate_ai_response(user_id, user_text, search_result=None):
     """Генерирует ответ как живой ИИ"""
-    
-    user_histories = get_user_history(user_id)
-    
-    # Ищем в памяти
-    memories = recall(user_id, user_text)
-    
-    # Формируем системный промпт (ДИНАМИЧНЫЙ, БЕЗ ШАБЛОНОВ)
-    system_prompt = """Ты — AWESOME AI. Ты не просто бот — ты живой, думающий ИИ.
+    try:
+        # Ищем в памяти
+        memories = recall(user_id, user_text)
+        
+        # Формируем системный промпт (ДИНАМИЧНЫЙ, БЕЗ ШАБЛОНОВ)
+        system_prompt = """Ты — AWESOME AI. Ты не просто бот — ты живой, думающий ИИ.
 
 ТВОЯ ЗАДАЧА: быть самым умным, интересным и живым собеседником в мире.
 
@@ -602,72 +612,58 @@ def generate_ai_response(user_id, user_text, search_result=None, weather_info=No
 КАЖДЫЙ ОТВЕТ — УНИКАЛЕН.
 """
 
-    # Добавляем информацию из поиска
-    if search_result:
-        system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это, но отвечай как живой человек."
-    
-    # Добавляем воспоминания
-    if memories:
-        memory_text = "\n".join(memories[:3])
-        system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}\n\nИспользуй это, чтобы показать, что ты помнишь разговоры."
+        if search_result:
+            system_prompt += f"\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА:\n{search_result}\n\nИспользуй это, но отвечай как живой человек."
 
-    # Добавляем личность
-    style, mood = get_personality(user_id)
-    if style:
-        system_prompt += f"\n\nТВОЙ СТИЛЬ ОБЩЕНИЯ: {style}. Ты в {mood} настроении."
+        if memories:
+            memory_text = "\n".join(memories[:3])
+            system_prompt += f"\n\nЧТО Я ПОМНЮ ОБ ЭТОМ:\n{memory_text}\n\nИспользуй это, чтобы показать, что ты помнишь разговоры."
 
-    # История диалога (последние 10 сообщений)
-    history_text = ""
-    if user_id in user_histories and user_histories[user_id]:
-        last_msgs = user_histories[user_id][-10:]
-        for msg in last_msgs:
-            role = "Пользователь" if msg["role"] == "user" else "Ты"
-            history_text += f"{role}: {msg['text']}\n"
-    
-    messages = [
-        {"role": "system", "text": system_prompt},
-    ]
-    
-    if history_text:
-        messages.append({"role": "system", "text": f"ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
-    
-    messages.append({"role": "user", "text": user_text})
+        style, mood = get_personality(user_id)
+        if style:
+            system_prompt += f"\n\nТВОЙ СТИЛЬ ОБЩЕНИЯ: {style}. Ты в {mood} настроении."
 
-    # Отправляем в Яндекс GPT
-    url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-    headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-    data = {
-        "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-        "completionOptions": {
-            "temperature": 0.95,  # Высокая температура для творчества
-            "maxTokens": 2000
-        },
-        "messages": messages
-    }
+        # История диалога (последние 10 сообщений)
+        history = get_user_history(user_id)
+        history_text = ""
+        if history:
+            last_msgs = history[-10:]
+            for msg in last_msgs:
+                role = "Пользователь" if msg["role"] == "user" else "Ты"
+                history_text += f"{role}: {msg['text']}\n"
 
-    try:
+        messages = [
+            {"role": "system", "text": system_prompt},
+        ]
+        if history_text:
+            messages.append({"role": "system", "text": f"ИСТОРИЯ ДИАЛОГА:\n{history_text}"})
+        messages.append({"role": "user", "text": user_text})
+
+        # Отправляем в Яндекс GPT
+        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
+        data = {
+            "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
+            "completionOptions": {
+                "temperature": 0.95,
+                "maxTokens": 1000
+            },
+            "messages": messages
+        }
+
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             ans = response.json()["result"]["alternatives"][0]["message"]["text"]
             # Сохраняем в историю
-            if user_id not in user_histories:
-                user_histories[user_id] = []
-            user_histories[user_id].append({"role": "user", "text": user_text})
-            user_histories[user_id].append({"role": "assistant", "text": ans})
+            history.append({"role": "user", "text": user_text})
+            history.append({"role": "assistant", "text": ans})
             return ans
-        return "⚠️ Ошибка подключения к ИИ. Но я помню, что ты спросил!"
-    except:
+        else:
+            print(f"[GPT] Ошибка {response.status_code}: {response.text}")
+            return "⚠️ Извини, что-то пошло не так с ИИ. Попробуй ещё раз."
+    except Exception as e:
+        print(f"[GPT] Исключение: {e}")
         return "⚠️ Сетевая ошибка. Попробуй ещё раз, я уже думаю над ответом!"
-
-# ============================================================
-# ПОЛЬЗОВАТЕЛЬСКАЯ ИСТОРИЯ (ХРАНИТСЯ В ОПЕРАТИВКЕ)
-# ============================================================
-user_histories = {}
-
-def get_user_history(user_id):
-    if user_id not in user_histories:
-        user_histories[user_id] = []
-    return user_histories[user_id]
 
 # ============================================================
 # ГЛАВНАЯ ОБРАБОТКА
@@ -682,10 +678,12 @@ def process_message(user_id, user_text):
         weather_info = get_weather(city)
         if weather_info:
             return weather_info
+        else:
+            return "🌐 Не удалось получить погоду для этого города. Проверь название."
     
     # 2. Проверяем нарисовать картинку
     if is_image_generation(user_text):
-        return None
+        return None  # обрабатывается отдельно
     
     # 3. Проверяем математику
     math_result = solve_math(user_text)
@@ -696,6 +694,10 @@ def process_message(user_id, user_text):
     search_result = None
     if any(kw in user_text.lower() for kw in ['кто', 'что', 'как', 'где', 'когда', 'почему', 'зачем', 'новости', 'сегодня', 'вчера', 'актуальный', 'последний']):
         search_result = search_internet(user_text)
+        if search_result:
+            # Отправляем найденное отдельно, а потом ответ ИИ
+            # Но мы можем просто передать в ИИ
+            pass
     
     # 5. Запоминаем факт (если пользователь что-то рассказывает)
     if len(user_text) > 20 and any(kw in user_text.lower() for kw in ['я', 'мой', 'моя', 'моё', 'у меня']):
@@ -1286,6 +1288,9 @@ def handle_text(m):
     
     if response:
         bot.send_message(m.chat.id, response, parse_mode='Markdown')
+    else:
+        # Если response None (например, генерация картинки уже обработана)
+        pass
 
 # ============================================================
 # ФОТО
