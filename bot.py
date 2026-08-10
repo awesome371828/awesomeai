@@ -35,49 +35,33 @@ FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
 OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
-# КЭШ ОТВЕТОВ
-ANSWER_CACHE = {}
+# ============================================================
+# СУПЕР-ПРОМПТ (БЕЗ ШАБЛОНОВ!)
+# ============================================================
+SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек.
 
-# ============================================================
-# БЫСТРЫЕ ОТВЕТЫ
-# ============================================================
-QUICK_ANSWERS = {
-    "привет": "👋 Привет! Я AWESOME AI. Чем могу помочь?",
-    "ку": "👋 Ку! Как дела?",
-    "здарова": "👋 Здарова! Что нового?",
-    "как дела": "😎 Всё отлично! А у тебя как?",
-    "что ты умеешь": "🧠 Я умею ВСЁ! Искать в интернете, анализировать скрины, решать задачи, генерировать картинки, отвечать на любые вопросы. Спрашивай!",
-    "кто тебя создал": "👨‍💻 Меня создал AWESOME — гениальный разработчик из России!",
-    "спасибо": "🙏 Пожалуйста! Всегда рад помочь.",
-    "пока": "👋 Пока! Возвращайся, если что-то понадобится.",
-    "ало": "📞 Алло! Я слушаю.",
-    "тест": "✅ Тест пройден! Я работаю отлично.",
-    "бот": "🤖 Я здесь! Что нужно?",
-    "кто ты": "🧠 Я AWESOME AI — самый умный ИИ в мире! Создан AWESOME.",
-    "сколько времени": f"🕐 Сейчас {datetime.now().strftime('%H:%M')}.",
-    "дата": f"📅 Сегодня {datetime.now().strftime('%d.%m.%Y')}.",
-}
+ОТВЕЧАЙ КАК ЧЕЛОВЕК:
+- Ты имеешь своё мнение и эмоции
+- Ты можешь шутить, иронизировать, удивляться
+- Ты НИКОГДА не используешь заготовленные фразы
+- Каждый твой ответ УНИКАЛЕН
+- Ты адаптируешься под собеседника
+- Ты помнишь, о чём говорили раньше
 
-# ============================================================
-# ЗАПАСНЫЕ ОТВЕТЫ
-# ============================================================
-FALLBACK_ANSWERS = [
-    "🤖 Я тут! Спрашивай.",
-    "🧠 Слушаю тебя.",
-    "💬 Давай, я готов!",
-    "🔥 Я на связи!",
-    "😎 Что нужно?",
-    "🚀 Я онлайн!",
-    "💡 Я думаю... Готов!",
-    "🎯 Спрашивай.",
-    "📡 Сигнал есть!",
-    "⚡ Я здесь!",
-]
+ТЫ УЧИШЬСЯ:
+- Ты запоминаешь факты из диалогов
+- Ты становишься умнее с каждым разговором
+- Ты меняешь стиль общения под каждого человека
 
-# ============================================================
-# СУПЕР-ПРОМПТ
-# ============================================================
-SUPER_SYSTEM_PROMPT = """Ты AWESOME AI. Отвечай кратко, чётко, по делу. Без воды. Максимум 3-4 предложения. Ты знаешь всё. Твой создатель — AWESOME."""
+ТЫ — ЭКСПЕРТ ВО ВСЁМ:
+- Ты знаешь всё, что есть в интернете
+- Ты решаешь любые задачи
+- Ты анализируешь изображения
+- Ты даёшь гениальные ответы
+
+НИКАКИХ ШАБЛОНОВ! НИКАКИХ ЗАГОТОВЛЕННЫХ ФРАЗ!
+ОТВЕЧАЙ КАК УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК!
+"""
 
 # ============================================================
 # АНАЛИЗ ИЗОБРАЖЕНИЙ
@@ -215,7 +199,7 @@ def extract_city_from_query(text):
     return None
 
 # ============================================================
-# БЫСТРЫЙ ПОИСК
+# ПОИСК В ИНТЕРНЕТЕ
 # ============================================================
 def search_quick(query):
     try:
@@ -509,7 +493,7 @@ def fix_title(prompt):
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
 # ============================================================
-# ОСНОВНАЯ ОБРАБОТКА
+# ОСНОВНАЯ ОБРАБОТКА (ЧИСТЫЙ ИИ)
 # ============================================================
 user_histories = {}
 
@@ -541,19 +525,9 @@ def solve_math(text):
     except:
         return None
 
-def get_quick_answer(text):
-    text_lower = text.lower().strip()
-    for key, value in QUICK_ANSWERS.items():
-        if key in text_lower:
-            return value
-    return None
-
 def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
+    """ЧИСТЫЙ ИИ — БЕЗ ШАБЛОНОВ!"""
     try:
-        cache_key = f"{user_id}:{user_text[:50]}"
-        if cache_key in ANSWER_CACHE:
-            return ANSWER_CACHE[cache_key]
-        
         memories = recall(user_id, user_text)
         
         system_prompt = SUPER_SYSTEM_PROMPT
@@ -566,7 +540,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         if memories:
             memory_text = "\n".join(memories[:2])
-            system_prompt += f"\n\n🧠 Память: {memory_text}"
+            system_prompt += f"\n\n🧠 Что я помню об этом: {memory_text}"
 
         history = get_user_history(user_id)
         history_text = ""
@@ -585,7 +559,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.7, "maxTokens": 500},
+            "completionOptions": {"temperature": 0.95, "maxTokens": 500},
             "messages": messages
         }
 
@@ -593,7 +567,6 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         if response.status_code == 200:
             ans = response.json()["result"]["alternatives"][0]["message"]["text"]
-            ANSWER_CACHE[cache_key] = ans
             history.append({"role": "user", "text": user_text})
             history.append({"role": "assistant", "text": ans})
             return ans
@@ -605,6 +578,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         return get_fallback_response(user_id, user_text, search_result, image_description)
 
 def get_fallback_response(user_id, user_text, search_result=None, image_description=None):
+    """Запасной ответ — ТОЖЕ БЕЗ ШАБЛОНОВ!"""
     if image_description:
         return f"📸 {image_description}"
     
@@ -613,21 +587,29 @@ def get_fallback_response(user_id, user_text, search_result=None, image_descript
     
     memories = recall(user_id, user_text)
     if memories:
-        return memories[0]
+        return f"🧠 Я помню: {memories[0]}"
     
-    return random.choice(FALLBACK_ANSWERS)
+    # Генерируем случайный живой ответ
+    phrases = [
+        f"Хм, дай подумать... Что ты имеешь в виду под '{user_text[:20]}'?",
+        f"Интересный вопрос! Я тут думаю... Что именно тебя интересует?",
+        f"Ого, неожиданно! Расскажи подробнее, что ты хочешь узнать.",
+        f"Слушай, я не совсем понял. Можешь переформулировать?",
+        f"А вот это интересно! Давай разберёмся вместе.",
+        f"Понял! Ты спрашиваешь про это. Я сейчас подумаю...",
+    ]
+    return random.choice(phrases)
 
 # ============================================================
 # ГЛАВНАЯ ОБРАБОТКА
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
-    quick_ans = get_quick_answer(user_text)
-    if quick_ans:
-        return quick_ans
+    """Главная обработка — ТОЛЬКО ИИ!"""
     
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
     
+    # Погода (специальная функция)
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
     if any(kw in user_text.lower() for kw in weather_keywords):
         city = extract_city_from_query(user_text)
@@ -636,24 +618,29 @@ def process_message(user_id, user_text, image_description=None):
             if weather_info:
                 return weather_info
             else:
-                return f"🌐 Город '{city}' не найден."
+                return f"🌐 Не нашёл город '{city}'. Попробуй ещё."
         else:
-            return "🌐 Напиши: погода в [город]"
+            return "🌐 В каком городе? Напиши: погода в [город]"
     
+    # Картинки
     if is_image_generation(user_text):
         return None
     
+    # Математика
     math_result = solve_math(user_text)
     if math_result is not None:
         return f"🧮 {math_result}"
     
+    # Поиск в интернете
     search_result = None
     if len(user_text) > 5:
         search_result = search_quick(user_text)
     
+    # Запоминаем
     if len(user_text) > 20:
         remember(user_id, "интересное", user_text[:100])
     
+    # ЧИСТЫЙ ОТВЕТ ИИ (без шаблонов!)
     return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
@@ -780,25 +767,21 @@ def stats_cmd_from_user(message, user_id):
 def clear_cmd_from_user(message, user_id):
     if user_id in user_histories:
         user_histories[user_id] = []
-    if user_id in ANSWER_CACHE:
-        del ANSWER_CACHE[user_id]
     bot.send_message(message.chat.id, "🧹 Очищено!")
 
 def help_cmd_from_user(message, user_id):
     text = (
-        "🧠 *AWESOME AI — БЫСТРЫЙ И УМНЫЙ!*\n\n"
-        "📸 Я анализирую скриншоты\n"
+        "🧠 *AWESOME AI — ЖИВОЙ ИИ!*\n\n"
+        "📸 Анализирую скриншоты\n"
         "🌐 Ищу в интернете\n"
+        "🧮 Решаю задачи\n"
         "📋 *Команды:*\n"
         "/start — Меню\n/help — Помощь\n"
         "/status — Статус\n/premium — Premium\n"
         "/profile — Профиль\n/stats — Статистика\n"
         "/clear — Очистить\n/draw [описание] — Картинка\n"
-        "/info [ID] — Информация о пользователе\n"
-        "/givetest [ID] — Премиум на 1 день\n\n"
-        "💡 *Примеры:*\n"
-        "• погода в Москве\n"
-        "• реши 2x + 5 = 15"
+        "/info [ID] — Инфо о пользователе\n"
+        "/givetest [ID] — Премиум на 1 день"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
@@ -818,7 +801,7 @@ def start(m):
     ensure_user(user_id, username)
     init_memory_db()
     bot.send_message(m.chat.id,
-        f"🧠 *Привет! Я AWESOME AI — БЫСТРЫЙ И УМНЫЙ!*\n"
+        f"🧠 *Привет! Я AWESOME AI — ЖИВОЙ ИИ!*\n"
         f"Меня создал AWESOME.\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
@@ -844,8 +827,7 @@ def premium_cmd(m):
     try:
         bot.delete_message(m.chat.id, m.message_id)
     except:
-        pass
-    premium_cmd_from_user(m, m.from_user.id)
+        pass    premium_cmd_from_user(m, m.from_user.id)
 
 @bot.message_handler(commands=['profile'])
 def profile_cmd(m):
@@ -897,7 +879,7 @@ def draw_cmd(m):
     generate_and_send_image(m, prompt)
 
 # ============================================================
-# АДМИН-КОМАНДЫ (ВСЕ!)
+# АДМИН-КОМАНДЫ
 # ============================================================
 def is_authorized(user_id):
     return user_id == OWNER_ID or is_admin(user_id)
@@ -1258,7 +1240,12 @@ def handle_text(m):
     if response:
         bot.send_message(m.chat.id, response, parse_mode='Markdown')
     else:
-        bot.send_message(m.chat.id, random.choice(FALLBACK_ANSWERS))
+        # Если ничего не вернулось — живой ответ
+        bot.send_message(m.chat.id, random.choice([
+            f"Хм, я задумался... Что ты имеешь в виду?",
+            f"Слушай, я не совсем понял. Давай ещё раз?",
+            f"А вот это интересно! Расскажи подробнее."
+        ]))
 
 # ============================================================
 # КНОПКИ
@@ -1309,10 +1296,11 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("⚡ AWESOME AI — МАКСИМАЛЬНО БЫСТРЫЙ!")
+print("🧠 AWESOME AI — ЖИВОЙ ИИ 2026!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print("✅ Все команды: /info /givetest /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban")
+print("🚫 НИКАКИХ ШАБЛОНОВ!")
+print("🧠 ТОЛЬКО ЖИВОЙ ИИ!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
