@@ -36,6 +36,20 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 10
 
 # ============================================================
+# АНТИ-СПАМ (1 СООБЩЕНИЕ В 5 СЕКУНД)
+# ============================================================
+user_last_message = {}  # user_id -> timestamp
+
+def check_spam(user_id):
+    """Проверяет, не спамит ли пользователь"""
+    now = time.time()
+    if user_id in user_last_message:
+        if now - user_last_message[user_id] < 5:
+            return True  # Спам!
+    user_last_message[user_id] = now
+    return False  # Не спам
+
+# ============================================================
 # СУПЕР-ПРОМПТ (БЕЗ ШАБЛОНОВ!)
 # ============================================================
 SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI. Ты живой, думающий человек.
@@ -691,7 +705,19 @@ def status_cmd_from_user(message, user_id):
     bot.send_message(message.chat.id, f"📊 {status_text}")
 
 def premium_cmd_from_user(message, user_id):
-    bot.send_message(message.chat.id, "💎 PREMIUM\n✅ Безлимит\n💰 50₽/месяц\n📩 @flidges")
+    bot.send_message(
+        message.chat.id,
+        "💎 *PREMIUM AWESOME AI*\n\n"
+        "Что даёт Premium:\n"
+        "✅ Безлимит сообщений\n"
+        "✅ Приоритетные ответы\n"
+        "✅ Эксклюзивные функции\n\n"
+        "💰 Цена: 50₽/месяц\n\n"
+        "📩 *Как купить:*\n"
+        "Напиши @flidges — оплати и получи Premium!\n\n"
+        "После оплаты я выдам тебе доступ командой:\n"
+        "/giveprem [твой ID] 1mes"
+    )
 
 def profile_cmd_from_user(message, user_id):
     ensure_user(user_id, "unknown")
@@ -709,7 +735,7 @@ def profile_cmd_from_user(message, user_id):
         premium = premium == 1
 
     if user_id == OWNER_ID or is_admin(user_id):
-        status = "👑 АДМИН"
+        status = "👑 АДМИН (безлимит)"
     elif premium:
         status = f"💎 PREMIUM (до {expires})"
     else:
@@ -781,14 +807,18 @@ def help_cmd_from_user(message, user_id):
         "/profile — Профиль\n/stats — Статистика\n"
         "/clear — Очистить\n/draw [описание] — Картинка\n"
         "/info [ID] — Инфо о пользователе\n"
-        "/givetest [ID] — Премиум на 1 день"
+        "/givetest [ID] — Премиум на 1 день\n\n"
+        "💎 *Лимиты:*\n"
+        "Бесплатно — 10 сообщений/день\n"
+        "Premium — безлимит\n"
+        "Купить Premium: /premium"
     )
     if user_id == OWNER_ID or is_admin(user_id):
         text += "\n\n👑 *Админ:* /giveadmin /deladmin /giveprem /delprem /mute /unmute /ban /unban"
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# КОМАНДЫ BOT (ИСПРАВЛЕНЫ!)
+# КОМАНДЫ BOT
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -803,6 +833,8 @@ def start(m):
     bot.send_message(m.chat.id,
         f"🧠 *Привет! Я AWESOME AI — ЖИВОЙ ИИ!*\n"
         f"Меня создал AWESOME.\n\n"
+        f"💎 Бесплатно — 10 сообщений/день\n"
+        f"Премиум — безлимит (/premium)\n\n"
         f"👇 *Выбери действие:*",
         reply_markup=main_menu(), parse_mode='Markdown')
 
@@ -1207,7 +1239,7 @@ def stt(audio_data):
         return None
 
 # ============================================================
-# ТЕКСТ
+# ТЕКСТ (С АНТИ-СПАМОМ)
 # ============================================================
 @bot.message_handler(content_types=['text'])
 def handle_text(m):
@@ -1216,11 +1248,16 @@ def handle_text(m):
     ensure_user(user_id, username)
     reset_messages_if_needed(user_id)
     
+    # АНТИ-СПАМ: 1 сообщение в 5 секунд
+    if check_spam(user_id):
+        bot.send_message(m.chat.id, "⏳ Не спамь! Подожди 5 секунд.")
+        return
+    
     if is_banned(user_id):
         bot.send_message(m.chat.id, "🚫 Ты забанен!")
         return
     if not can_send_message(user_id):
-        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день!\nКупи Premium: /premium")
+        bot.send_message(m.chat.id, f"🔴 Лимит {FREE_LIMIT} сообщений в день исчерпан!\nКупи Premium: /premium")
         return
 
     text_clean = m.text.strip()
@@ -1241,7 +1278,6 @@ def handle_text(m):
     if response:
         bot.send_message(m.chat.id, response, parse_mode='Markdown')
     else:
-        # Если ничего не вернулось — живой ответ
         bot.send_message(m.chat.id, random.choice([
             f"Хм, я задумался... Что ты имеешь в виду?",
             f"Слушай, я не совсем понял. Давай ещё раз?",
@@ -1300,8 +1336,9 @@ print("=" * 60)
 print("🧠 AWESOME AI — ЖИВОЙ ИИ 2026!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
+print("⏳ Анти-спам: 5 секунд на сообщение")
+print("💎 Бесплатно: 10 сообщений/день")
 print("🚫 НИКАКИХ ШАБЛОНОВ!")
-print("🧠 ТОЛЬКО ЖИВОЙ ИИ!")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
