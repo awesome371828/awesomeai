@@ -788,7 +788,7 @@ def help_cmd_from_user(message, user_id):
     bot.send_message(message.chat.id, text, parse_mode='Markdown')
 
 # ============================================================
-# КОМАНДЫ BOT
+# КОМАНДЫ BOT (ИСПРАВЛЕНЫ!)
 # ============================================================
 @bot.message_handler(commands=['start'])
 def start(m):
@@ -835,7 +835,8 @@ def profile_cmd(m):
     try:
         bot.delete_message(m.chat.id, m.message_id)
     except:
-        pass    profile_cmd_from_user(m, m.from_user.id)
+        pass
+    profile_cmd_from_user(m, m.from_user.id)
 
 @bot.message_handler(commands=['stats'])
 def stats_cmd(m):
