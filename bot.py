@@ -53,22 +53,29 @@ def delete_previous_messages(chat_id, user_id):
         pass
 
 # ============================================================
-# АНТИ-СПАМ С ALERT
+# АНТИ-СПАМ (ИСПРАВЛЕННЫЙ)
 # ============================================================
 user_last_message = {}
 
-async def check_spam(user_id, bot=None, chat_id=None, call=None):
+def check_spam(user_id):
+    """Проверяет спам. Возвращает True если спам, False если можно отправить"""
     now = time.time()
+    
+    # Если пользователь уже есть в словаре
     if user_id in user_last_message:
-        if now - user_last_message[user_id] < 2:  # 2 секунда
-            if call:
-                try:
-                    await bot.answer_callback_query(call.id, "⏳ Подождите 2 секунды!", show_alert=True)
-                except:
-                    pass
+        time_diff = now - user_last_message[user_id]
+        # Если прошло меньше 3 секунд - спам
+        if time_diff < 3:
             return True
-    user_last_message[user_id] = now
-    return False
+        # Если прошло больше 3 секунд - обновляем время и разрешаем
+        else:
+            user_last_message[user_id] = now
+            return False
+    else:
+        # Если пользователя нет - добавляем и разрешаем
+        user_last_message[user_id] = now
+        return False
+
 # ============================================================
 # ПРОВЕРКА ПРАВ
 # ============================================================
@@ -2161,6 +2168,7 @@ def handle_text(m):
     
     delete_previous_messages(chat_id, user_id)
     
+    # Проверка анти-спама
     if check_spam(user_id):
         msg = bot.send_message(chat_id, "⏳ Подожди 3 секунды!")
         user_message_ids[user_id].append(msg.message_id)
