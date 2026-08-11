@@ -53,28 +53,17 @@ def delete_previous_messages(chat_id, user_id):
         pass
 
 # ============================================================
-# АНТИ-СПАМ (ИСПРАВЛЕННЫЙ)
+# АНТИ-СПАМ (3 секунды)
 # ============================================================
 user_last_message = {}
 
 def check_spam(user_id):
-    """Проверяет спам. Возвращает True если спам, False если можно отправить"""
     now = time.time()
-    
-    # Если пользователь уже есть в словаре
     if user_id in user_last_message:
-        time_diff = now - user_last_message[user_id]
-        # Если прошло меньше 3 секунд - спам
-        if time_diff < 3:
+        if now - user_last_message[user_id] < 3:
             return True
-        # Если прошло больше 3 секунд - обновляем время и разрешаем
-        else:
-            user_last_message[user_id] = now
-            return False
-    else:
-        # Если пользователя нет - добавляем и разрешаем
-        user_last_message[user_id] = now
-        return False
+    user_last_message[user_id] = now
+    return False
 
 # ============================================================
 # ПРОВЕРКА ПРАВ
@@ -351,12 +340,19 @@ def get_crypto_rates():
         return None
 
 # ============================================================
-# МАТЕМАТИКА И ПРОГРАММИРОВАНИЕ
+# МАТЕМАТИКА И ПРОГРАММИРОВАНИЕ (ИСПРАВЛЕННАЯ)
 # ============================================================
 def solve_math(text):
-    text = text.lower().strip()
+    """Решает математические выражения, но только если это явно математика"""
+    text_lower = text.lower().strip()
     
-    equation_match = re.search(r'(\d+)x\s*\+\s*(\d+)\s*=\s*(\d+)', text)
+    # Если это игра GTA или другие игры с цифрами - пропускаем
+    game_keywords = ['гта', 'gta', 'играю', 'игра', 'rp', 'роль', 'сервер']
+    if any(kw in text_lower for kw in game_keywords):
+        return None
+    
+    # Проверяем, что это похоже на уравнение с переменной
+    equation_match = re.search(r'(\d+)x\s*\+\s*(\d+)\s*=\s*(\d+)', text_lower)
     if equation_match:
         a = int(equation_match.group(1))
         b = int(equation_match.group(2))
@@ -365,13 +361,28 @@ def solve_math(text):
             x = (c - b) / a
             return f"🧮 *Решение:* {a}x + {b} = {c}\n➜ x = {x}"
     
+    # Проверяем, что это чисто математическое выражение
+    # Убираем все пробелы и смотрим, есть ли только цифры и операторы
+    clean_text = text_lower.replace(' ', '').replace('плюс', '+').replace('минус', '-')
+    clean_text = clean_text.replace('умножить', '*').replace('разделить', '/')
+    
+    # Если в тексте есть буквы (не математические) - пропускаем
+    # Но разрешаем x как переменную в уравнениях
+    if re.search(r'[a-za-я][^x]', clean_text):
+        return None
+    
+    # Проверяем наличие арифметических операторов
+    if not re.search(r'[+\-*/]', clean_text):
+        return None
+    
+    # Если это просто число без операций - пропускаем
+    if re.match(r'^\d+$', clean_text):
+        return None
+    
     try:
-        expr = text
-        expr = expr.replace('плюс', '+').replace('минус', '-')
-        expr = expr.replace('умножить', '*').replace('разделить', '/')
-        expr = re.sub(r'[^0-9+\-*/()=.]', '', expr)
-        
-        if expr and not re.search(r'[a-zA-Zа-яА-Я]', expr):
+        # Убираем всё кроме цифр, операторов, скобок и точки
+        expr = re.sub(r'[^0-9+\-*/()=.]', '', text_lower)
+        if expr and len(expr) > 1:
             result = eval(expr)
             return f"🧮 *Результат:* {expr} = {result}"
     except:
@@ -908,6 +919,7 @@ def process_message(user_id, user_text, image_description=None):
     if is_image_generation(user_text):
         return None
     
+    # МАТЕМАТИКА - теперь проверяет перед поиском, но с защитой от ложных срабатываний
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
@@ -2168,7 +2180,6 @@ def handle_text(m):
     
     delete_previous_messages(chat_id, user_id)
     
-    # Проверка анти-спама
     if check_spam(user_id):
         msg = bot.send_message(chat_id, "⏳ Подожди 3 секунды!")
         user_message_ids[user_id].append(msg.message_id)
