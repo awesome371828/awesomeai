@@ -340,10 +340,10 @@ def get_crypto_rates():
         return None
 
 # ============================================================
-# МАТЕМАТИКА И ПРОГРАММИРОВАНИЕ (ИСПРАВЛЕННАЯ)
+# МАТЕМАТИКА И ПРОГРАММИРОВАНИЕ (ЦИФРЫ)
 # ============================================================
 def solve_math(text):
-    """Решает математические выражения, но только если это явно математика"""
+    """Решает математические выражения, возвращает результат цифрами"""
     text_lower = text.lower().strip()
     
     # Если это игра GTA или другие игры с цифрами - пропускаем
@@ -361,14 +361,21 @@ def solve_math(text):
             x = (c - b) / a
             return f"🧮 *Решение:* {a}x + {b} = {c}\n➜ x = {x}"
     
+    # Проверяем на "сколько будет" или просто "1+4"
+    clean_for_math = text_lower
+    for word in ['сколько', 'будет', 'сколько будет', 'посчитай', 'реши', 'пример']:
+        clean_for_math = clean_for_math.replace(word, '').strip()
+    
+    # Проверяем наличие чисел и операторов
+    if not re.search(r'\d', clean_for_math):
+        return None
+    
     # Проверяем, что это чисто математическое выражение
-    # Убираем все пробелы и смотрим, есть ли только цифры и операторы
-    clean_text = text_lower.replace(' ', '').replace('плюс', '+').replace('минус', '-')
+    clean_text = clean_for_math.replace(' ', '').replace('плюс', '+').replace('минус', '-')
     clean_text = clean_text.replace('умножить', '*').replace('разделить', '/')
     
     # Если в тексте есть буквы (не математические) - пропускаем
-    # Но разрешаем x как переменную в уравнениях
-    if re.search(r'[a-za-я][^x]', clean_text):
+    if re.search(r'[a-zа-я][^x]', clean_text):
         return None
     
     # Проверяем наличие арифметических операторов
@@ -380,11 +387,14 @@ def solve_math(text):
         return None
     
     try:
-        # Убираем всё кроме цифр, операторов, скобок и точки
-        expr = re.sub(r'[^0-9+\-*/()=.]', '', text_lower)
+        expr = re.sub(r'[^0-9+\-*/()=.]', '', clean_text)
         if expr and len(expr) > 1:
             result = eval(expr)
-            return f"🧮 *Результат:* {expr} = {result}"
+            # ОТВЕТ ЦИФРАМИ!
+            if result == int(result):
+                return f"🧮 *Результат:* {expr} = **{int(result)}**"
+            else:
+                return f"🧮 *Результат:* {expr} = **{result}**"
     except:
         pass
     
@@ -919,7 +929,7 @@ def process_message(user_id, user_text, image_description=None):
     if is_image_generation(user_text):
         return None
     
-    # МАТЕМАТИКА - теперь проверяет перед поиском, но с защитой от ложных срабатываний
+    # МАТЕМАТИКА - теперь отвечает ЦИФРАМИ
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
@@ -1648,7 +1658,7 @@ def broadcast_cmd(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# АДМИН-КОМАНДЫ (giveadmin, deladmin, giveprem, givetest, delprem, info, mute, unmute, ban, unban)
+# АДМИН-КОМАНДЫ
 # ============================================================
 
 @bot.message_handler(commands=['giveadmin'])
