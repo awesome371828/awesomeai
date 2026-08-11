@@ -340,18 +340,15 @@ def get_crypto_rates():
         return None
 
 # ============================================================
-# МАТЕМАТИКА И ПРОГРАММИРОВАНИЕ (ЦИФРЫ)
+# МАТЕМАТИКА (ЦИФРЫ)
 # ============================================================
 def solve_math(text):
-    """Решает математические выражения, возвращает результат цифрами"""
     text_lower = text.lower().strip()
     
-    # Если это игра GTA или другие игры с цифрами - пропускаем
     game_keywords = ['гта', 'gta', 'играю', 'игра', 'rp', 'роль', 'сервер']
     if any(kw in text_lower for kw in game_keywords):
         return None
     
-    # Проверяем, что это похоже на уравнение с переменной
     equation_match = re.search(r'(\d+)x\s*\+\s*(\d+)\s*=\s*(\d+)', text_lower)
     if equation_match:
         a = int(equation_match.group(1))
@@ -361,28 +358,22 @@ def solve_math(text):
             x = (c - b) / a
             return f"🧮 *Решение:* {a}x + {b} = {c}\n➜ x = {x}"
     
-    # Проверяем на "сколько будет" или просто "1+4"
     clean_for_math = text_lower
     for word in ['сколько', 'будет', 'сколько будет', 'посчитай', 'реши', 'пример']:
         clean_for_math = clean_for_math.replace(word, '').strip()
     
-    # Проверяем наличие чисел и операторов
     if not re.search(r'\d', clean_for_math):
         return None
     
-    # Проверяем, что это чисто математическое выражение
     clean_text = clean_for_math.replace(' ', '').replace('плюс', '+').replace('минус', '-')
     clean_text = clean_text.replace('умножить', '*').replace('разделить', '/')
     
-    # Если в тексте есть буквы (не математические) - пропускаем
     if re.search(r'[a-zа-я][^x]', clean_text):
         return None
     
-    # Проверяем наличие арифметических операторов
     if not re.search(r'[+\-*/]', clean_text):
         return None
     
-    # Если это просто число без операций - пропускаем
     if re.match(r'^\d+$', clean_text):
         return None
     
@@ -390,7 +381,6 @@ def solve_math(text):
         expr = re.sub(r'[^0-9+\-*/()=.]', '', clean_text)
         if expr and len(expr) > 1:
             result = eval(expr)
-            # ОТВЕТ ЦИФРАМИ!
             if result == int(result):
                 return f"🧮 *Результат:* {expr} = **{int(result)}**"
             else:
@@ -593,6 +583,22 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS total_stats
                  (user_id INTEGER PRIMARY KEY,
                   total_messages INTEGER DEFAULT 0)''')
+    
+    # Таблица для заказов Premium
+    c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
+                 (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
+    
+    # Таблица для обращений в поддержку
+    c.execute('''CREATE TABLE IF NOT EXISTS support_requests
+                 (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  username TEXT,
+                  text TEXT,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
     
     try:
         c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
@@ -929,7 +935,6 @@ def process_message(user_id, user_text, image_description=None):
     if is_image_generation(user_text):
         return None
     
-    # МАТЕМАТИКА - теперь отвечает ЦИФРАМИ
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
@@ -956,7 +961,7 @@ def main_menu():
         types.InlineKeyboardButton("📊 Статистика", callback_data="stats"),
         types.InlineKeyboardButton("🧹 Очистить", callback_data="clear"),
         types.InlineKeyboardButton("❓ Помощь", callback_data="help"),
-        types.InlineKeyboardButton("📩 Отзыв", callback_data="feedback"),
+        types.InlineKeyboardButton("📩 Поддержка", callback_data="support"),
         types.InlineKeyboardButton("🎨 Сгенерировать", callback_data="draw")
     )
     return keyboard
@@ -969,9 +974,10 @@ def back_to_menu():
     return keyboard
 
 def premium_menu():
-    keyboard = types.InlineKeyboardMarkup()
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(
-        types.InlineKeyboardButton("📩 Написать владельцу", url="https://t.me/flidges"),
+        types.InlineKeyboardButton("💳 Оплатить Premium (50₽/мес)", url="https://yoomoney.ru/quickpay/fundraise/button?billNumber=1JJJ532K92A.260811&"),
+        types.InlineKeyboardButton("✅ Я оплатил", callback_data="i_paid"),
         types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")
     )
     return keyboard
@@ -983,6 +989,8 @@ def admin_menu():
         types.InlineKeyboardButton("👥 Список админов", callback_data="admin_list"),
         types.InlineKeyboardButton("👥 Все пользователи", callback_data="admin_list_users"),
         types.InlineKeyboardButton("📢 Рассылка", callback_data="admin_broadcast"),
+        types.InlineKeyboardButton("💎 Заказы Premium", callback_data="admin_orders"),
+        types.InlineKeyboardButton("📩 Обращения", callback_data="admin_support"),
         types.InlineKeyboardButton("💎 Выдать Premium", callback_data="admin_giveprem"),
         types.InlineKeyboardButton("🎁 Тест Premium", callback_data="admin_givetest"),
         types.InlineKeyboardButton("🚫 Забанить", callback_data="admin_ban"),
@@ -1114,6 +1122,67 @@ def clear_cmd(m):
     
     clear_cmd_from_user(m, user_id)
 
+@bot.message_handler(commands=['support'])
+def support_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
+    text = m.text.replace('/support', '').strip()
+    if not text:
+        msg = bot.send_message(
+            chat_id,
+            "📩 <b>Написать в поддержку</b>\n\n"
+            "Напиши свой вопрос или предложение:\n"
+            "<code>/support [текст]</code>\n\n"
+            "Пример: <code>/support У меня проблема с ботом</code>",
+            parse_mode='HTML'
+        )
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    
+    # Сохраняем обращение
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO support_requests (user_id, username, text, created_at) VALUES (?, ?, ?, ?)',
+              (user_id, m.from_user.username or "unknown", text, datetime.now().strftime('%d.%m.%Y %H:%M')))
+    request_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    
+    # Отправляем пользователю
+    msg = bot.send_message(
+        chat_id,
+        "✅ <b>Обращение отправлено!</b>\n\n"
+        f"📝 Текст: {text}\n\n"
+        "⏳ Ожидай ответа администратора.",
+        parse_mode='HTML'
+    )
+    user_message_ids[user_id].append(msg.message_id)
+    
+    # Отправляем админу
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("✏️ Ответить", callback_data=f"support_reply:{request_id}"),
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"support_delete:{request_id}")
+    )
+    
+    bot.send_message(
+        OWNER_ID,
+        f"📩 <b>НОВОЕ ОБРАЩЕНИЕ!</b>\n\n"
+        f"🆔 ID: {request_id}\n"
+        f"👤 Пользователь: @{m.from_user.username or 'Не указан'} (ID: {user_id})\n"
+        f"📝 Текст: {text}\n"
+        f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        reply_markup=keyboard,
+        parse_mode='HTML'
+    )
+
 @bot.message_handler(commands=['feedback'])
 def feedback_cmd(m):
     chat_id = m.chat.id
@@ -1127,12 +1196,34 @@ def feedback_cmd(m):
     
     text = m.text.replace('/feedback', '').strip()
     if not text:
-        msg = bot.send_message(chat_id, "❌ /feedback [текст]")
+        msg = bot.send_message(
+            chat_id,
+            "📝 <b>Оставить отзыв</b>\n\n"
+            "Напиши свой отзыв:\n"
+            "<code>/feedback [текст]</code>",
+            parse_mode='HTML'
+        )
         user_message_ids[user_id].append(msg.message_id)
         return
     
-    bot.send_message(chat_id, "✅ Спасибо за отзыв! ❤️")
-    bot.send_message(OWNER_ID, f"📩 Отзыв от @{m.from_user.username or 'anon'}: {text}")
+    msg = bot.send_message(chat_id, "✅ Спасибо за отзыв! ❤️")
+    user_message_ids[user_id].append(msg.message_id)
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("✏️ Ответить на отзыв", callback_data=f"feedback_reply:{user_id}"),
+        types.InlineKeyboardButton("🗑 Удалить", callback_data=f"feedback_delete:{user_id}")
+    )
+    
+    bot.send_message(
+        OWNER_ID,
+        f"📝 <b>НОВЫЙ ОТЗЫВ!</b>\n\n"
+        f"👤 Пользователь: @{m.from_user.username or 'Не указан'} (ID: {user_id})\n"
+        f"📝 Текст: {text}\n"
+        f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        reply_markup=keyboard,
+        parse_mode='HTML'
+    )
 
 @bot.message_handler(commands=['draw'])
 def draw_cmd(m):
@@ -1235,14 +1326,32 @@ def status_cmd_from_user(message, user_id):
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
-    text = (
-        "💎 <b>PREMIUM AWESOME AI</b>\n\n"
-        "✅ Безлимит сообщений\n"
-        "✅ Приоритетные ответы\n"
-        "✅ Эксклюзивные функции\n\n"
-        "💰 Цена: 50₽/месяц\n\n"
-        "📩 Нажми кнопку ниже, чтобы связаться с владельцем:"
-    )
+    # Проверяем, есть ли уже премиум
+    if get_premium_status(user_id):
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT premium_expires FROM users WHERE user_id = ?', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        expires = result[0] if result else "неизвестно"
+        
+        text = (
+            "💎 <b>У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!</b>\n\n"
+            f"⏳ Действует до: {expires}\n\n"
+            "Можешь продлить подписку:"
+        )
+    else:
+        text = (
+            "💎 <b>PREMIUM AWESOME AI</b>\n\n"
+            "✅ Безлимит сообщений\n"
+            "✅ Приоритетные ответы\n"
+            "✅ Эксклюзивные функции\n\n"
+            "💰 Цена: 50₽/месяц\n\n"
+            "📌 1. Нажми кнопку «Оплатить»\n"
+            "📌 2. Оплати 50₽\n"
+            "📌 3. Нажми «Я оплатил»\n\n"
+            "⏳ После оплаты админ подтвердит заказ в течение 24 часов."
+        )
     
     msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
@@ -1279,7 +1388,7 @@ def profile_cmd_from_user(message, user_id):
     user_link = f"@{username}" if username else "Не указан"
 
     text = (
-        "📊 <b>ТВОЙ ПРОФИЛЬ</b>\n\n"
+        "👤 <b>ТВОЙ ПРОФИЛЬ</b>\n\n"
         f"🆔 ID: <code>{user_id}</code>\n"
         f"👤 Юзер: {user_link}\n"
         f"💎 Статус: {status}\n"
@@ -1304,6 +1413,10 @@ def stats_cmd_from_user(message, user_id):
         total_users = c.fetchone()[0]
         c.execute('SELECT COUNT(*) FROM users WHERE premium = 1')
         premium_users = c.fetchone()[0]
+        c.execute('SELECT COUNT(*) FROM premium_orders WHERE status = "pending"')
+        pending_orders = c.fetchone()[0]
+        c.execute('SELECT COUNT(*) FROM support_requests WHERE status = "pending"')
+        pending_support = c.fetchone()[0]
         conn.close()
         
         text = (
@@ -1311,7 +1424,9 @@ def stats_cmd_from_user(message, user_id):
             f"👥 Всего: {total_users}\n"
             f"💎 Premium: {premium_users}\n"
             f"🔓 Бесплатных: {total_users - premium_users}\n"
-            f"📨 Сообщений сегодня: {today_messages}"
+            f"📨 Сообщений сегодня: {today_messages}\n"
+            f"💳 Заказов: {pending_orders}\n"
+            f"📩 Обращений: {pending_support}"
         )
         msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
@@ -1391,6 +1506,8 @@ def help_cmd_from_user(message, user_id):
         "/profile — Профиль\n"
         "/stats — Статистика\n"
         "/clear — Очистить\n"
+        "/support [текст] — Поддержка\n"
+        "/feedback [текст] — Отзыв\n"
         "/draw [описание] — Картинка\n\n"
         "💎 <b>Лимиты:</b>\n"
         "🔓 Бесплатно — 10 сообщений/день\n"
@@ -1451,9 +1568,9 @@ def process_test_premium(chat_id, user_id):
             "⛔ <b>ТЫ УЖЕ ИСПОЛЬЗОВАЛ ТЕСТ!</b>\n\n"
             "Пробный период закончился.\n"
             "Купи Premium: /premium\n\n"
-            "💰 50₽/месяц — @flidges"
+            "💰 50₽/месяц"
         )
-        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
         return
     
@@ -1472,7 +1589,7 @@ def process_test_premium(chat_id, user_id):
             "⏳ Доступ активен 24 часа.\n"
             "Купить Premium: /premium"
         )
-        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
     else:
         msg = bot.send_message(chat_id, "❌ Ошибка. Попробуй позже.")
@@ -2258,71 +2375,269 @@ def handle_callback(call):
             user_message_ids[user_id].append(msg.message_id)
             return
         
-        # === КНОПКА "НАПИСАТЬ ВЛАДЕЛЬЦУ" ===
-        if call.data == "contact_owner":
-            bot.answer_callback_query(call.id)
+        # === КНОПКА "Я ОПЛАТИЛ" ===
+        if call.data == "i_paid":
+            # Проверяем, есть ли уже премиум
+            if get_premium_status(user_id):
+                bot.answer_callback_query(call.id, "❌ У тебя уже есть Premium!")
+                return
+            
+            # Создаем заказ
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('INSERT INTO premium_orders (user_id, created_at) VALUES (?, ?)',
+                      (user_id, datetime.now().strftime('%d.%m.%Y %H:%M')))
+            order_id = c.lastrowid
+            conn.commit()
+            conn.close()
+            
+            bot.answer_callback_query(call.id, "✅ Заказ создан! Ожидай подтверждения.")
+            
+            # Уведомляем пользователя
+            msg = bot.send_message(
+                chat_id,
+                "✅ <b>ЗАКАЗ ОТПРАВЛЕН!</b>\n\n"
+                f"🆔 Номер заказа: #{order_id}\n"
+                "⏳ Админ проверит оплату и подтвердит заказ.\n\n"
+                "📌 Обычно это занимает до 24 часов.",
+                parse_mode='HTML'
+            )
+            user_message_ids[user_id].append(msg.message_id)
+            
+            # Уведомляем админа
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(
+                types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_order:{order_id}"),
+                types.InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_order:{order_id}")
+            )
+            
+            bot.send_message(
+                OWNER_ID,
+                f"💳 <b>НОВЫЙ ЗАКАЗ PREMIUM!</b>\n\n"
+                f"🆔 Заказ: #{order_id}\n"
+                f"👤 Пользователь: @{call.from_user.username or 'Не указан'}\n"
+                f"🆔 ID: {user_id}\n"
+                f"💰 Сумма: 50₽\n"
+                f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+                "Проверь оплату и подтверди заказ:",
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
             return
         
-        # === ПОДТВЕРЖДЕНИЕ РАССЫЛКИ ===
-        if call.data.startswith("confirm_broadcast:"):
+        # === ПОДТВЕРЖДЕНИЕ ЗАКАЗА ===
+        if call.data.startswith("confirm_order:"):
             if not is_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Нет прав!")
                 return
             
-            bot.answer_callback_query(call.id, "📢 Начинаю...")
-            
-            text = call.data.replace("confirm_broadcast:", "")
+            order_id = int(call.data.replace("confirm_order:", ""))
             
             conn = sqlite3.connect('users.db')
             c = conn.cursor()
-            c.execute('SELECT user_id FROM users')
-            users = c.fetchall()
-            conn.close()
-            
-            if not users:
-                msg = bot.send_message(chat_id, "❌ Нет пользователей.")
-                user_message_ids[user_id].append(msg.message_id)
-                return
-            
-            status_msg = bot.send_message(
-                chat_id,
-                f"📢 Рассылка\n👥 {len(users)} пользователей\n\n⏳ Отправка...",
-                parse_mode='HTML'
-            )
-            user_message_ids[user_id].append(status_msg.message_id)
-            
-            sent = 0
-            failed = 0
-            
-            for user in users:
-                try:
+            c.execute('SELECT user_id FROM premium_orders WHERE order_id = ? AND status = "pending"', (order_id,))
+            result = c.fetchone()
+            if result:
+                target_user = result[0]
+                # Обновляем статус заказа
+                c.execute('UPDATE premium_orders SET status = "confirmed" WHERE order_id = ?', (order_id,))
+                conn.commit()
+                conn.close()
+                
+                # Выдаём Premium
+                if set_premium(target_user, "1mes"):
+                    bot.answer_callback_query(call.id, "✅ Premium выдан!")
+                    
+                    # Уведомляем пользователя
                     bot.send_message(
-                        user[0],
-                        f"📢 Объявление AWESOME AI\n\n{text}\n\n---\nОтписаться: /unsubscribe",
+                        target_user,
+                        f"🎉 <b>PREMIUM АКТИВИРОВАН!</b>\n\n"
+                        f"✅ Твой заказ #{order_id} подтверждён!\n"
+                        f"💎 Premium активен на 1 месяц!\n\n"
+                        "Спасибо за покупку! ❤️",
                         parse_mode='HTML'
                     )
-                    sent += 1
-                    time.sleep(0.05)
-                except:
-                    failed += 1
+                    
+                    bot.edit_message_text(
+                        f"✅ Заказ #{order_id} подтверждён!\n"
+                        f"👤 Пользователю выдан Premium на 1 месяц.",
+                        chat_id=chat_id,
+                        message_id=call.message.message_id,
+                        parse_mode='HTML'
+                    )
+                else:
+                    bot.answer_callback_query(call.id, "❌ Ошибка выдачи Premium")
+            else:
+                conn.close()
+                bot.answer_callback_query(call.id, "❌ Заказ не найден или уже обработан")
+            return
+        
+        # === ОТКЛОНЕНИЕ ЗАКАЗА ===
+        if call.data.startswith("reject_order:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
             
+            order_id = int(call.data.replace("reject_order:", ""))
+            
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT user_id FROM premium_orders WHERE order_id = ? AND status = "pending"', (order_id,))
+            result = c.fetchone()
+            if result:
+                target_user = result[0]
+                c.execute('UPDATE premium_orders SET status = "rejected" WHERE order_id = ?', (order_id,))
+                conn.commit()
+                conn.close()
+                
+                bot.answer_callback_query(call.id, "❌ Заказ отклонён")
+                
+                # Уведомляем пользователя
+                bot.send_message(
+                    target_user,
+                    f"❌ <b>ЗАКАЗ ОТКЛОНЁН</b>\n\n"
+                    f"🆔 Заказ: #{order_id}\n\n"
+                    "Администратор отклонил твой заказ.\n"
+                    "Возможно, оплата не поступила.\n\n"
+                    "Попробуй ещё раз: /premium",
+                    parse_mode='HTML'
+                )
+                
+                bot.edit_message_text(
+                    f"❌ Заказ #{order_id} отклонён!",
+                    chat_id=chat_id,
+                    message_id=call.message.message_id,
+                    parse_mode='HTML'
+                )
+            else:
+                conn.close()
+                bot.answer_callback_query(call.id, "❌ Заказ не найден или уже обработан")
+            return
+        
+        # === ОБРАБОТКА ОТВЕТА НА ОБРАЩЕНИЕ ===
+        if call.data.startswith("support_reply:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            
+            request_id = int(call.data.replace("support_reply:", ""))
+            
+            bot.answer_callback_query(call.id, "✏️ Введи текст ответа")
+            
+            # Сохраняем состояние - ожидаем ответ
+            bot.send_message(
+                chat_id,
+                f"✏️ <b>Ответ на обращение #{request_id}</b>\n\n"
+                "Напиши текст ответа пользователю:",
+                parse_mode='HTML'
+            )
+            
+            # Сохраняем в ожидании
+            bot.register_next_step_handler(call.message, process_support_reply, request_id)
+            return
+        
+        # === УДАЛЕНИЕ ОБРАЩЕНИЯ ===
+        if call.data.startswith("support_delete:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            
+            request_id = int(call.data.replace("support_delete:", ""))
+            
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('UPDATE support_requests SET status = "deleted" WHERE request_id = ?', (request_id,))
+            conn.commit()
+            conn.close()
+            
+            bot.answer_callback_query(call.id, "🗑 Обращение удалено")
             bot.edit_message_text(
-                f"✅ Рассылка завершена!\n\n"
-                f"📤 Отправлено: {sent}\n"
-                f"❌ Ошибок: {failed}\n"
-                f"👥 Всего: {len(users)}",
+                f"🗑 Обращение #{request_id} удалено.",
                 chat_id=chat_id,
-                message_id=status_msg.message_id,
+                message_id=call.message.message_id,
                 parse_mode='HTML'
             )
             return
         
-        elif call.data == "cancel_broadcast":
-            bot.answer_callback_query(call.id, "❌ Отменено")
-            bot.edit_message_text("❌ Отменено.", chat_id=chat_id, message_id=call.message.message_id)
+        # === ОТВЕТ НА ОТЗЫВ ===
+        if call.data.startswith("feedback_reply:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            
+            target_user = int(call.data.replace("feedback_reply:", ""))
+            
+            bot.answer_callback_query(call.id, "✏️ Введи текст ответа")
+            
+            bot.send_message(
+                chat_id,
+                f"✏️ <b>Ответ на отзыв</b>\n\n"
+                f"👤 Пользователь: {target_user}\n"
+                "Напиши текст ответа:",
+                parse_mode='HTML'
+            )
+            
+            bot.register_next_step_handler(call.message, process_feedback_reply, target_user)
             return
         
-        # === АДМИН-КНОПКИ ===
+        # === УДАЛЕНИЕ ОТЗЫВА ===
+        if call.data.startswith("feedback_delete:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            
+            bot.answer_callback_query(call.id, "🗑 Отзыв удалён")
+            bot.edit_message_text(
+                f"🗑 Отзыв удалён.",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                parse_mode='HTML'
+            )
+            return
+        
+        # === АДМИН: ЗАКАЗЫ ===
+        if call.data == "admin_orders":
+            bot.answer_callback_query(call.id)
+            
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT order_id, user_id, created_at FROM premium_orders WHERE status = "pending" ORDER BY order_id DESC')
+            orders = c.fetchall()
+            conn.close()
+            
+            if not orders:
+                text = "💳 <b>ЗАКАЗЫ PREMIUM</b>\n\nНет активных заказов."
+            else:
+                text = f"💳 <b>ЗАКАЗЫ PREMIUM</b>\n\nВсего: {len(orders)}\n\n"
+                for order in orders:
+                    text += f"🆔 #{order[0]} | 👤 {order[1]} | 📅 {order[2]}\n"
+            
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        # === АДМИН: ОБРАЩЕНИЯ ===
+        if call.data == "admin_support":
+            bot.answer_callback_query(call.id)
+            
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT request_id, user_id, username, text, created_at FROM support_requests WHERE status = "pending" ORDER BY request_id DESC')
+            requests = c.fetchall()
+            conn.close()
+            
+            if not requests:
+                text = "📩 <b>ОБРАЩЕНИЯ</b>\n\nНет активных обращений."
+            else:
+                text = f"📩 <b>ОБРАЩЕНИЯ</b>\n\nВсего: {len(requests)}\n\n"
+                for req in requests:
+                    text += f"🆔 #{req[0]} | @{req[2] or 'Не указан'} | {req[4]}\n📝 {req[3][:50]}...\n\n"
+            
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
+        # === ОСТАЛЬНЫЕ АДМИН-КНОПКИ ===
         if call.data == "admin_stats":
             bot.answer_callback_query(call.id)
             stats_cmd_from_user(call.message, user_id)
@@ -2469,6 +2784,19 @@ def handle_callback(call):
             process_test_premium(chat_id, user_id)
             return
         
+        elif call.data == "support":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(
+                chat_id,
+                "📩 <b>Поддержка</b>\n\n"
+                "Напиши свой вопрос:\n"
+                "/support [текст]\n\n"
+                "Или напиши мне в личные сообщения.",
+                parse_mode='HTML'
+            )
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        
         elif call.data == "status":
             bot.answer_callback_query(call.id)
             status_cmd_from_user(call.message, user_id)
@@ -2487,10 +2815,6 @@ def handle_callback(call):
         elif call.data == "help":
             bot.answer_callback_query(call.id)
             help_cmd_from_user(call.message, user_id)
-        elif call.data == "feedback":
-            bot.answer_callback_query(call.id)
-            msg = bot.send_message(chat_id, "📩 Напиши: /feedback [текст]")
-            user_message_ids[user_id].append(msg.message_id)
         elif call.data == "draw":
             bot.answer_callback_query(call.id)
             msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]")
@@ -2500,25 +2824,93 @@ def handle_callback(call):
         bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
 
 # ============================================================
-# ОСТАЛЬНОЕ
+# ОБРАБОТЧИКИ ОТВЕТОВ
 # ============================================================
-@bot.message_handler(content_types=['video', 'document', 'audio'])
-def other(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
+
+def process_support_reply(message, request_id):
+    """Обработка ответа на обращение в поддержку"""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
     
-    delete_previous_messages(chat_id, user_id)
-    try:
-        bot.delete_message(chat_id, m.message_id)
-    except:
-        pass
+    if not is_authorized(user_id):
+        bot.send_message(chat_id, "❌ Нет прав!")
+        return
     
-    text = (
-        "📁 <b>ПОКА НЕ УМЕЮ</b>\n\n"
-        "Пришли текст, фото или голосовое."
+    reply_text = message.text
+    
+    if not reply_text or len(reply_text.strip()) < 1:
+        bot.send_message(chat_id, "❌ Текст не может быть пустым!")
+        return
+    
+    # Получаем информацию об обращении
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM support_requests WHERE request_id = ?', (request_id,))
+    result = c.fetchone()
+    
+    if not result:
+        conn.close()
+        bot.send_message(chat_id, f"❌ Обращение #{request_id} не найдено!")
+        return
+    
+    target_user = result[0]
+    
+    # Обновляем статус обращения
+    c.execute('UPDATE support_requests SET status = "answered" WHERE request_id = ?', (request_id,))
+    conn.commit()
+    conn.close()
+    
+    # Отправляем ответ пользователю
+    bot.send_message(
+        target_user,
+        f"📩 <b>ОТВЕТ ПОДДЕРЖКИ</b>\n\n"
+        f"🆔 Обращение: #{request_id}\n\n"
+        f"📝 {reply_text}\n\n"
+        "---\n"
+        "Если остались вопросы, напиши ещё раз.",
+        parse_mode='HTML'
     )
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
+    
+    bot.send_message(
+        chat_id,
+        f"✅ Ответ на обращение #{request_id} отправлен!\n\n"
+        f"📝 {reply_text}",
+        parse_mode='HTML'
+    )
+
+def process_feedback_reply(message, target_user):
+    """Обработка ответа на отзыв"""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    
+    if not is_authorized(user_id):
+        bot.send_message(chat_id, "❌ Нет прав!")
+        return
+    
+    reply_text = message.text
+    
+    if not reply_text or len(reply_text.strip()) < 1:
+        bot.send_message(chat_id, "❌ Текст не может быть пустым!")
+        return
+    
+    # Отправляем ответ пользователю
+    bot.send_message(
+        target_user,
+        f"📝 <b>ОТВЕТ НА ОТЗЫВ</b>\n\n"
+        f"✨ AWESOME AI благодарит за отзыв!\n\n"
+        f"📝 {reply_text}\n\n"
+        "---\n"
+        "Спасибо, что пользуешься ботом! ❤️",
+        parse_mode='HTML'
+    )
+    
+    bot.send_message(
+        chat_id,
+        f"✅ Ответ на отзыв отправлен!\n\n"
+        f"👤 Пользователю: {target_user}\n"
+        f"📝 {reply_text}",
+        parse_mode='HTML'
+    )
 
 # ============================================================
 # ЗАПУСК
@@ -2530,7 +2922,9 @@ print("=" * 60)
 print("🧠 AWESOME AI — МЕГА-ИИ 2026!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print("🎨 HTML-ВИЗУАЛ — ВКЛЮЧЁН (БЕЗ ОШИБОК 400)!")
+print("🎨 HTML-ВИЗУАЛ — ВКЛЮЧЁН")
+print("💳 PREMIUM ОПЛАТА — ВКЛЮЧЕНА")
+print("📩 ПОДДЕРЖКА — ВКЛЮЧЕНА")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
