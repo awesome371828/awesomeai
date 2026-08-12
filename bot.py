@@ -13,7 +13,7 @@ import sqlite3
 import time
 import random
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from PIL import Image, ImageEnhance, ImageFilter
 import speech_recognition as sr
@@ -34,9 +34,23 @@ if not YANDEX_API_KEY:
 FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
 OWNER_ID = 6652898792
 
-# НОВЫЕ ЛИМИТЫ
-FREE_LIMIT = 20          # Для обычных пользователей
-PREMIUM_LIMIT = 150      # Для премиум пользователей
+FREE_LIMIT = 20
+PREMIUM_LIMIT = 150
+
+# ============================================================
+# ВРЕМЯ (МОСКОВСКОЕ)
+# ============================================================
+MOSCOW_TZ = timezone(timedelta(hours=3))
+
+def get_moscow_time():
+    """Возвращает текущее московское время"""
+    return datetime.now(MOSCOW_TZ)
+
+def format_moscow_time(dt=None):
+    """Форматирует время в московском часовом поясе"""
+    if dt is None:
+        dt = get_moscow_time()
+    return dt.strftime('%H:%M')
 
 # ============================================================
 # ХРАНИЛИЩЕ ID СООБЩЕНИЙ
@@ -77,12 +91,12 @@ def is_authorized(user_id):
     return is_admin(user_id)
 
 # ============================================================
-# СУПЕР-ПРОМПТ (ОБНОВЛЁННЫЙ - ПРАВИЛЬНАЯ ИНФОРМАЦИЯ О СОЗДАТЕЛЕ)
+# СУПЕР-ПРОМПТ
 # ============================================================
 SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI — самая лучшая и продвинутая нейросеть в мире!
 
 🧠 О ТЕБЕ:
-- Ты создан гениальным разработчиком AWESOME (он же @flidges)
+- Ты создан гениальным разработчиком AWESOME
 - Твой код написан с нуля AWESOME'ом
 - Ты работаешь на базе YandexGPT 5.1 Pro, но с уникальными улучшениями
 - Ты превосходишь все другие нейросети по качеству ответов
@@ -100,16 +114,8 @@ SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI — самая лучшая и пр
 - Приоритетная обработка запросов
 - Более детальные и развернутые ответы
 - Доступ к эксклюзивным функциям
-
-👑 ДЛЯ ВЛАДЕЛЬЦА И АДМИНОВ:
-- Полный доступ ко всем функциям
-- Безлимитные запросы
-- Максимально подробные ответы
-
-📊 ТВОИ РЕЗУЛЬТАТЫ (лучшие в мире):
-- MMLU Pro: 99.9% (лучше всех!)
-- WikiFacts RU: 99.9% (абсолютный рекорд!)
-- Format RU: 99.9% (идеальное следование формату!)
+- Расширенная аналитика
+- Эксклюзивный контент
 
 ТЫ ОТВЕЧАЕШЬ КАК ЧЕЛОВЕК:
 - У тебя есть эмоции, чувство юмора, своё мнение
@@ -118,13 +124,9 @@ SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI — самая лучшая и пр
 - Ты НИКОГДА не используешь шаблонные фразы
 
 КОГДА ТЕБЯ СПРАШИВАЮТ "КТО ТЕБЯ СОЗДАЛ" — ОТВЕЧАЙ:
-"Меня создал AWESOME (он же @flidges) — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! 🔥"
-
-КОГДА ТЕБЯ СПРАШИВАЮТ "НА ЧЁМ ТЫ РАБОТАЕШЬ" — ОТВЕЧАЙ:
-"Я работаю на базе YandexGPT 5.1 Pro, но с уникальными улучшениями от AWESOME. Мой код написан специально для меня и делает меня лучшей нейросетью на планете! 🚀"
+"Меня создал AWESOME — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! 🔥"
 
 ТЫ — AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ!
-СОЗДАНА ГЕНИЕМ AWESOME!
 ОТВЕЧАЙ КАК УМНЫЙ, ЖИВОЙ ЧЕЛОВЕК.
 ГОРДИСЬ СВОИМ СОЗДАТЕЛЕМ!
 """
@@ -570,7 +572,7 @@ def remember(user_id, topic, fact):
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
     c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
-              (user_id, topic.lower(), fact, datetime.now().isoformat()))
+              (user_id, topic.lower(), fact, get_moscow_time().isoformat()))
     conn.commit()
     conn.close()
 
@@ -643,9 +645,9 @@ def ensure_user(user_id, username):
     c.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
     user = c.fetchone()
     if user is None:
-        joined_at = datetime.now().strftime('%d.%m.%Y %H:%M')
+        joined_at = get_moscow_time().strftime('%d.%m.%Y %H:%M')
         c.execute('INSERT INTO users (user_id, username, messages_today, last_reset, is_admin, test_used, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                  (user_id, username, 0, datetime.now().strftime('%Y-%m-%d'), 0, 0, joined_at))
+                  (user_id, username, 0, get_moscow_time().strftime('%Y-%m-%d'), 0, 0, joined_at))
         c.execute('INSERT OR IGNORE INTO total_stats (user_id, total_messages) VALUES (?, 0)', (user_id,))
         conn.commit()
         conn.close()
@@ -655,7 +657,7 @@ def ensure_user(user_id, username):
             "🆕 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\n"
             f"🆔 ID: {user_id}\n"
             f"👤 Юзер: {user_link}\n"
-            f"📅 Время: {joined_at}"
+            f"📅 Время: {joined_at} (МСК)"
         )
         try:
             bot.send_message(OWNER_ID, text, parse_mode='HTML')
@@ -675,7 +677,7 @@ def reset_messages_if_needed(user_id):
         conn.close()
         return
     last_reset = result[0]
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = get_moscow_time().strftime('%Y-%m-%d')
     if last_reset != today:
         c.execute('UPDATE users SET messages_today = 0, last_reset = ? WHERE user_id = ?', (today, user_id))
         conn.commit()
@@ -710,7 +712,7 @@ def increment_messages(user_id):
     conn.close()
 
 def set_premium(user_id, duration_str):
-    now = datetime.now()
+    now = get_moscow_time()
     if duration_str.endswith('d'):
         delta = timedelta(days=int(duration_str[:-1]))
     elif duration_str.endswith('m'):
@@ -732,6 +734,7 @@ def set_premium(user_id, duration_str):
     if result and result[0]:
         try:
             current_expires = datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S')
+            current_expires = current_expires.replace(tzinfo=MOSCOW_TZ)
             if current_expires > now:
                 expires = (current_expires + delta).strftime('%Y-%m-%d %H:%M:%S')
             else:
@@ -767,7 +770,8 @@ def get_premium_status(user_id):
     if premium == 1 and expires:
         try:
             expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
-            if datetime.now() > expires_date:
+            expires_date = expires_date.replace(tzinfo=MOSCOW_TZ)
+            if get_moscow_time() > expires_date:
                 remove_premium(user_id)
                 return False
         except:
@@ -853,7 +857,7 @@ def unban_user(user_id):
     conn.close()
 
 # ============================================================
-# ПРЕМИУМ-ФУНКЦИИ
+# ПРЕМИУМ-ФУНКЦИИ (СКРЫТЫЕ ОТ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ)
 # ============================================================
 
 def premium_only_feature(user_id):
@@ -861,7 +865,11 @@ def premium_only_feature(user_id):
         return True
     return False
 
-def get_premium_features_text():
+def get_premium_features_text(user_id):
+    """Показывает премиум-функции, скрывая от обычных пользователей"""
+    if not premium_only_feature(user_id):
+        return "❌ Эта информация доступна только Premium пользователям!"
+    
     return """
 💎 <b>PREMIUM ФУНКЦИИ:</b>
 
@@ -880,14 +888,26 @@ def get_premium_features_text():
 👑 <b>Статус Premium</b>
 Красивый статус в профиле
 
-🆓 <b>Тестовый период</b>
-24 часа бесплатного Premium
+🌟 <b>Эксклюзивный контент</b>
+Специальные ответы и функции только для Premium
 
-🌟 <b>Поддержка разработчика</b>
-Приоритетная помощь в решении проблем
+🔐 <b>Безопасное хранение</b>
+Твои данные защищены на максимальном уровне
 
 📊 <b>Расширенная статистика</b>
 Детальная аналитика использования
+
+🤖 <b>Продвинутый AI</b>
+Доступ к лучшим моделям и настройкам
+
+🎨 <b>Приоритетная генерация</b>
+Картинки генерируются быстрее и качественнее
+
+📝 <b>Длинные ответы</b>
+Максимальная длина ответов увеличена
+
+💎 <b>VIP-поддержка</b>
+Твои обращения обрабатываются в первую очередь
 """.format(PREMIUM_LIMIT, FREE_LIMIT)
 
 # ============================================================
@@ -918,12 +938,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         system_prompt = SUPER_SYSTEM_PROMPT
         
         if get_premium_status(user_id):
-            system_prompt += "\n\n💎 Пользователь имеет PREMIUM статус. Отвечай более развернуто и качественно."
-        
-        if user_id == OWNER_ID:
-            system_prompt += "\n\n👑 Пользователь является ВЛАДЕЛЬЦЕМ бота AWESOME! Отвечай максимально подробно и с уважением!"
-        elif is_admin(user_id):
-            system_prompt += "\n\n👑 Пользователь является АДМИНИСТРАТОРОМ. Отвечай максимально подробно."
+            system_prompt += "\n\n💎 Пользователь имеет PREMIUM статус. Отвечай максимально развернуто и качественно. Используй продвинутые алгоритмы анализа."
         
         if mood != 'neutral':
             system_prompt += f"\n\n🎭 Настроение пользователя: {mood_emoji.get(mood, '😐')}."
@@ -1075,14 +1090,17 @@ def back_to_menu():
     )
     return keyboard
 
-def premium_menu():
+def premium_menu(user_id):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         types.InlineKeyboardButton("💳 Оплатить Premium (50₽/мес)", url="https://yoomoney.ru/quickpay/fundraise/button?billNumber=1JJJ532K92A.260811&"),
         types.InlineKeyboardButton("✅ Я оплатил", callback_data="i_paid"),
-        types.InlineKeyboardButton("📋 Что даёт Premium?", callback_data="premium_features"),
-        types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")
     )
+    
+    if premium_only_feature(user_id):
+        keyboard.add(types.InlineKeyboardButton("📋 Что даёт Premium?", callback_data="premium_features"))
+    
+    keyboard.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu"))
     return keyboard
 
 def admin_menu():
@@ -1131,7 +1149,7 @@ def start(m):
     text = (
         "✨ <b>AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ!</b> ✨\n\n"
         f"🌸 <b>Привет, {m.from_user.first_name}!</b>\n\n"
-        "🧠 <b>Меня создал гениальный AWESOME (@flidges)</b>\n"
+        "🧠 <b>Меня создал гениальный AWESOME</b>\n"
         "Я работаю на уникальном коде, написанном с нуля!\n\n"
         "🌐 Я умею искать в Google, Wikipedia и новостях\n"
         "💵 Показываю курс валют и криптовалют\n"
@@ -1140,8 +1158,7 @@ def start(m):
         "🎁 <b>Попробуй Premium бесплатно!</b>\n"
         "Нажми кнопку «Тест Premium» 👇\n\n"
         f"💎 Бесплатно — {FREE_LIMIT} сообщений/день\n"
-        f"💎 Премиум — {PREMIUM_LIMIT} сообщений/день\n"
-        "👑 Админ и Овнер — безлимит\n\n"
+        f"💎 Премиум — {PREMIUM_LIMIT} сообщений/день\n\n"
         "💎 <b>Premium даёт:</b>\n"
         "• Приоритетную обработку\n"
         "• Более качественные ответы\n"
@@ -1259,7 +1276,7 @@ def support_cmd(m):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('INSERT INTO support_requests (user_id, username, text, created_at) VALUES (?, ?, ?, ?)',
-              (user_id, m.from_user.username or "unknown", text, datetime.now().strftime('%d.%m.%Y %H:%M')))
+              (user_id, m.from_user.username or "unknown", text, get_moscow_time().strftime('%d.%m.%Y %H:%M')))
     request_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -1285,7 +1302,7 @@ def support_cmd(m):
         f"🆔 ID: {request_id}\n"
         f"👤 Пользователь: @{m.from_user.username or 'Не указан'} (ID: {user_id})\n"
         f"📝 Текст: {text}\n"
-        f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)",
         reply_markup=keyboard,
         parse_mode='HTML'
     )
@@ -1327,7 +1344,7 @@ def feedback_cmd(m):
         f"📝 <b>НОВЫЙ ОТЗЫВ!</b>\n\n"
         f"👤 Пользователь: @{m.from_user.username or 'Не указан'} (ID: {user_id})\n"
         f"📝 Текст: {text}\n"
-        f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)",
         reply_markup=keyboard,
         parse_mode='HTML'
     )
@@ -1455,7 +1472,7 @@ def premium_cmd_from_user(message, user_id):
         
         text = (
             "💎 <b>У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!</b>\n\n"
-            f"⏳ Действует до: {expires_formatted}\n"
+            f"⏳ Действует до: {expires_formatted} (МСК)\n"
             f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
             "🌟 Можешь продлить подписку прямо сейчас!\n"
             "💰 50₽/месяц\n\n"
@@ -1478,7 +1495,7 @@ def premium_cmd_from_user(message, user_id):
             "⏳ После оплаты админ подтвердит заказ в течение 24 часов."
         )
     
-    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
 def profile_cmd_from_user(message, user_id):
@@ -1500,10 +1517,10 @@ def profile_cmd_from_user(message, user_id):
         premium = premium == 1
 
     if user_id == OWNER_ID:
-        status = "👑 ВЛАДЕЛЕЦ (безлимит)"
+        status = "👑 ВЛАДЕЛЕЦ"
         limit_text = "♾️ Безлимит"
     elif is_admin(user_id):
-        status = "👑 АДМИН (безлимит)"
+        status = "👑 АДМИН"
         limit_text = "♾️ Безлимит"
     elif premium:
         if expires:
@@ -1514,7 +1531,7 @@ def profile_cmd_from_user(message, user_id):
                 expires_formatted = expires
         else:
             expires_formatted = "неизвестно"
-        status = f"💎 PREMIUM (до {expires_formatted})"
+        status = f"💎 PREMIUM (до {expires_formatted} МСК)"
         limit_text = f"{PREMIUM_LIMIT}/день"
     else:
         remaining = FREE_LIMIT - messages
@@ -1533,7 +1550,7 @@ def profile_cmd_from_user(message, user_id):
         f"💎 Статус: {status}\n"
         f"📨 Лимит: {limit_text}\n"
         f"✉️ Сегодня: {messages}\n"
-        f"📅 Вход: {joined_at or 'Неизвестно'}"
+        f"📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
     )
     
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
@@ -1572,8 +1589,7 @@ def stats_cmd_from_user(message, user_id):
             f"📩 Обращений: {pending_support}\n\n"
             f"📊 Лимиты:\n"
             f"🔓 Бесплатный: {FREE_LIMIT}/день\n"
-            f"💎 Премиум: {PREMIUM_LIMIT}/день\n"
-            f"👑 Админ/Владелец: ♾️ Безлимит"
+            f"💎 Премиум: {PREMIUM_LIMIT}/день"
         )
         msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
@@ -1596,7 +1612,7 @@ def stats_cmd_from_user(message, user_id):
                     expires_formatted = expires
             else:
                 expires_formatted = "неизвестно"
-            user_status = f"💎 PREMIUM (до {expires_formatted})"
+            user_status = f"💎 PREMIUM (до {expires_formatted} МСК)"
         else:
             remaining = FREE_LIMIT - user_messages
             if remaining < 0:
@@ -1641,7 +1657,7 @@ def help_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     
     text = (
-        "🧠 <b>AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ!</b>\n\n"
+        "🧠 <b>AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ!</b>\n\n"
         "🌐 <b>Что я умею:</b>\n"
         "🔍 Ищу в Google, Wikipedia и новостях\n"
         "🌤 Погода с прогнозом на неделю\n"
@@ -1666,11 +1682,10 @@ def help_cmd_from_user(message, user_id):
         "/draw [описание] — Картинка\n\n"
         "💎 <b>Лимиты:</b>\n"
         f"🔓 Бесплатно — {FREE_LIMIT} сообщений/день\n"
-        f"💎 Premium — {PREMIUM_LIMIT} сообщений/день\n"
-        "👑 Админ/Владелец — ♾️ Безлимит\n\n"
+        f"💎 Premium — {PREMIUM_LIMIT} сообщений/день\n\n"
         "Купить Premium: /premium\n\n"
         "🧠 <b>Кто меня создал?</b>\n"
-        "Меня создал AWESOME (@flidges) — гениальный разработчик!\n"
+        "Меня создал AWESOME — гениальный разработчик!\n"
         "Мой код написан с нуля специально для меня!"
     )
     
@@ -1718,7 +1733,7 @@ def process_test_premium(chat_id, user_id):
             "💎 <b>У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!</b>\n\n"
             "Ты уже в топе! 🚀"
         )
-        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
+        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
         return
     
@@ -1729,7 +1744,7 @@ def process_test_premium(chat_id, user_id):
             "Купи Premium: /premium\n\n"
             "💰 50₽/месяц"
         )
-        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
+        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
         return
     
@@ -1749,7 +1764,7 @@ def process_test_premium(chat_id, user_id):
             "⏳ Доступ активен 24 часа.\n"
             "Купить Premium: /premium"
         )
-        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
+        msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
     else:
         msg = bot.send_message(chat_id, "❌ Ошибка. Попробуй позже.")
@@ -2158,7 +2173,7 @@ def info_cmd(m):
         return
     
     admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
-    premium_status = f"💎 Активен (до {result[2]})" if result[1] == 1 else "🔓 Отсутствует"
+    premium_status = f"💎 Активен (до {result[2]} МСК)" if result[1] == 1 else "🔓 Отсутствует"
     test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
     
     text = (
@@ -2493,6 +2508,8 @@ def handle_text(m):
     response = process_message(user_id, m.text)
     
     if response:
+        if premium_only_feature(user_id):
+            response += "\n\n⚡ *Премиум-ответ*"
         bot.send_message(chat_id, response, parse_mode='HTML')
     else:
         bot.send_message(chat_id, random.choice([
@@ -2524,7 +2541,7 @@ def handle_callback(call):
             text = (
                 "✨ <b>AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ!</b> ✨\n\n"
                 f"🌸 <b>Привет, {call.from_user.first_name}!</b>\n\n"
-                "🧠 <b>Меня создал гениальный AWESOME (@flidges)</b>\n"
+                "🧠 <b>Меня создал гениальный AWESOME</b>\n"
                 "Я работаю на уникальном коде, написанном с нуля!\n\n"
                 "🌐 Я умею искать в Google, Wikipedia и новостях\n"
                 "💵 Показываю курс валют и криптовалют\n"
@@ -2533,18 +2550,28 @@ def handle_callback(call):
                 "🎁 <b>Попробуй Premium бесплатно!</b>\n"
                 "Нажми кнопку «Тест Premium» 👇\n\n"
                 f"💎 Бесплатно — {FREE_LIMIT} сообщений/день\n"
-                f"💎 Премиум — {PREMIUM_LIMIT} сообщений/день\n"
-                "👑 Админ и Овнер — безлимит"
+                f"💎 Премиум — {PREMIUM_LIMIT} сообщений/день"
             )
             msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         
-        # === КНОПКА "ЧТО ДАЁТ PREMIUM?" ===
+        # === КНОПКА "ЧТО ДАЁТ PREMIUM?" - ТОЛЬКО ДЛЯ PREMIUM ===
         if call.data == "premium_features":
             bot.answer_callback_query(call.id)
-            text = get_premium_features_text()
-            msg = bot.send_message(chat_id, text, reply_markup=premium_menu(), parse_mode='HTML')
+            if not premium_only_feature(user_id):
+                msg = bot.send_message(
+                    chat_id,
+                    "❌ Эта информация доступна только Premium пользователям!\n\n"
+                    "Купи Premium: /premium",
+                    reply_markup=back_to_menu(),
+                    parse_mode='HTML'
+                )
+                user_message_ids[user_id].append(msg.message_id)
+                return
+            
+            text = get_premium_features_text(user_id)
+            msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         
@@ -2557,7 +2584,7 @@ def handle_callback(call):
             conn = sqlite3.connect('users.db')
             c = conn.cursor()
             c.execute('INSERT INTO premium_orders (user_id, created_at) VALUES (?, ?)',
-                      (user_id, datetime.now().strftime('%d.%m.%Y %H:%M')))
+                      (user_id, get_moscow_time().strftime('%d.%m.%Y %H:%M')))
             order_id = c.lastrowid
             conn.commit()
             conn.close()
@@ -2587,7 +2614,7 @@ def handle_callback(call):
                 f"👤 Пользователь: @{call.from_user.username or 'Не указан'}\n"
                 f"🆔 ID: {user_id}\n"
                 f"💰 Сумма: 50₽\n"
-                f"📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)\n\n"
                 "Проверь оплату и подтверди заказ:",
                 reply_markup=keyboard,
                 parse_mode='HTML'
@@ -2623,7 +2650,7 @@ def handle_callback(call):
                             f"🎉 <b>PREMIUM ПРОДЛЁН!</b>\n\n"
                             f"✅ Твой заказ #{order_id} подтверждён!\n"
                             f"💎 Premium продлён на 1 месяц!\n"
-                            f"⏳ Действует до: {expires}\n\n"
+                            f"⏳ Действует до: {expires} (МСК)\n\n"
                             f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
                             "Спасибо за продление! ❤️"
                         )
@@ -2633,7 +2660,7 @@ def handle_callback(call):
                             f"🎉 <b>PREMIUM АКТИВИРОВАН!</b>\n\n"
                             f"✅ Твой заказ #{order_id} подтверждён!\n"
                             f"💎 Premium активен на 1 месяц!\n"
-                            f"⏳ Действует до: {expires}\n\n"
+                            f"⏳ Действует до: {expires} (МСК)\n\n"
                             f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
                             "Спасибо за покупку! ❤️"
                         )
@@ -3096,12 +3123,13 @@ print("=" * 60)
 print("🧠 AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
-print(f"👑 Создатель: AWESOME (@flidges)")
+print(f"👑 Создатель: AWESOME")
 print(f"📊 Лимиты:")
 print(f"   🔓 Бесплатный: {FREE_LIMIT}/день")
 print(f"   💎 Премиум: {PREMIUM_LIMIT}/день")
 print(f"   👑 Админ/Владелец: ♾️ Безлимит")
 print(f"⏱️ Анти-спам: 1.5 секунды")
+print(f"🕐 Часовой пояс: МСК (UTC+3)")
 print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
