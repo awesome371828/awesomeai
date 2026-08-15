@@ -2183,8 +2183,8 @@ def delprem_cmd(m):
 @bot.message_handler(commands=['info'])
 def info_cmd(m):
     chat_id = m.chat.id
-   user_id = m.from_user.id
-if not is_authorized(user_id):
+    user_id = m.from_user.id
+    if not is_authorized(user_id):
         msg = bot.send_message(chat_id, "❌ Нет прав!")
         user_message_ids[user_id].append(msg.message_id)
         return
@@ -2199,19 +2199,41 @@ if not is_authorized(user_id):
         user_message_ids[user_id].append(msg.message_id)
         return
     target_id = int(args[1])
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT is_admin, premium, premium_expires, messages_today, test_used FROM users WHERE user_id = ?', (target_id,))
-    result = c.fetchone()
-    conn.close()
-    if result is None:
-        msg = bot.send_message(chat_id, f"❌ Пользователь {target_id} не найден.")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    admin_status = "✅ Админ" if result[0] == 1 else "❌ Не админ"
-    premium_status = f"💎 Активен (до {result[2]} МСК)" if result[1] == 1 else "🔓 Отсутствует"
-    test_status = "✅ Использовал" if result[4] == 1 else "❌ Не использовал"
-    text = f"📊 ИНФО О ПОЛЬЗОВАТЕЛЕ\n\n🆔 ID: <code>{target_id}</code>\n👑 Админ: {admin_status}\n💎 Premium: {premium_status}\n🎁 Тест: {test_status}\n✉️ Сообщений сегодня: {result[3]}"
+    if use_supabase:
+        try:
+            response = supabase.table('users').select('is_admin, premium, premium_expires, messages_today, test_used').eq('user_id', target_id).execute()
+            if response.data:
+                user_data = response.data[0]
+            else:
+                msg = bot.send_message(chat_id, f"❌ Пользователь {target_id} не найден.")
+                user_message_ids[user_id].append(msg.message_id)
+                return
+        except:
+            msg = bot.send_message(chat_id, "❌ Ошибка БД")
+            user_message_ids[user_id].append(msg.message_id)
+            return
+    else:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT is_admin, premium, premium_expires, messages_today, test_used FROM users WHERE user_id = ?', (target_id,))
+        result = c.fetchone()
+        conn.close()
+        if result is None:
+            msg = bot.send_message(chat_id, f"❌ Пользователь {target_id} не найден.")
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        user_data = {
+            'is_admin': result[0],
+            'premium': result[1],
+            'premium_expires': result[2],
+            'messages_today': result[3],
+            'test_used': result[4]
+        }
+    
+    admin_status = "✅ Админ" if user_data.get('is_admin', 0) == 1 else "❌ Не админ"
+    premium_status = f"💎 Активен (до {user_data.get('premium_expires', '')} МСК)" if user_data.get('premium', 0) == 1 else "🔓 Отсутствует"
+    test_status = "✅ Использовал" if user_data.get('test_used', 0) == 1 else "❌ Не использовал"
+    text = f"📊 ИНФО О ПОЛЬЗОВАТЕЛЕ\n\n🆔 ID: <code>{target_id}</code>\n👑 Админ: {admin_status}\n💎 Premium: {premium_status}\n🎁 Тест: {test_status}\n✉️ Сообщений сегодня: {user_data.get('messages_today', 0)}"
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
