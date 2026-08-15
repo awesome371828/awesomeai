@@ -1330,36 +1330,6 @@ def status_cmd(m):
     delete_previous_messages(chat_id, user_id)
     status_cmd_from_user(m, user_id)
 
-def status_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    if user_id == OWNER_ID:
-        status_text = "👑 ВЛАДЕЛЕЦ — безлимит!"
-    elif is_admin(user_id):
-        status_text = "👑 АДМИН — безлимит!"
-    else:
-        premium = get_premium_status(user_id)
-        user_data = get_db_user(user_id)
-        if user_data:
-            messages = user_data.get('messages_today', 0)
-            expires = user_data.get('premium_expires')
-        else:
-            messages = 0
-            expires = None
-        if premium:
-            status_text = f"💎 PREMIUM (до {expires})"
-            remaining = PREMIUM_LIMIT - messages
-            if remaining < 0:
-                remaining = 0
-            status_text += f"\n📨 Осталось: {remaining}/{PREMIUM_LIMIT}"
-        else:
-            remaining = FREE_LIMIT - messages
-            if remaining < 0:
-                remaining = 0
-            status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
-    
-    msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-
 @bot.message_handler(commands=['premium'])
 def premium_cmd(m):
     chat_id = m.chat.id
@@ -1367,80 +1337,12 @@ def premium_cmd(m):
     delete_previous_messages(chat_id, user_id)
     premium_cmd_from_user(m, user_id)
 
-def premium_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    has_premium = get_premium_status(user_id)
-    expires = get_premium_expires(user_id)
-    if has_premium:
-        if expires:
-            try:
-                expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
-                expires_formatted = expires_date.strftime('%d.%m.%Y %H:%M')
-            except:
-                expires_formatted = expires
-        else:
-            expires_formatted = "неизвестно"
-        text = (
-            f"💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n⏳ Действует до: {expires_formatted} (МСК)\n📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n🌟 Можешь продлить подписку!\n💰 50₽/месяц"
-        )
-    else:
-        text = (
-            f"💎 PREMIUM AWESOME AI\n\n✅ Приоритетная обработка\n✅ Более качественные ответы\n✅ Эксклюзивные функции\n\n📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n💰 Цена: 50₽/месяц"
-        )
-    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-
 @bot.message_handler(commands=['profile'])
 def profile_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
     profile_cmd_from_user(m, user_id)
-
-def profile_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    user_data = get_db_user(user_id)
-    if user_data:
-        messages = user_data.get('messages_today', 0)
-        expires = user_data.get('premium_expires')
-        premium = user_data.get('premium', 0) == 1
-        joined_at = user_data.get('joined_at', 'Неизвестно')
-    else:
-        messages = 0
-        expires = None
-        premium = False
-        joined_at = "Неизвестно"
-    
-    if user_id == OWNER_ID:
-        status = "👑 ВЛАДЕЛЕЦ"
-        limit_text = "♾️ Безлимит"
-    elif is_admin(user_id):
-        status = "👑 АДМИН"
-        limit_text = "♾️ Безлимит"
-    elif premium:
-        if expires:
-            try:
-                expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
-                expires_formatted = expires_date.strftime('%d.%m.%Y %H:%M')
-            except:
-                expires_formatted = expires
-        else:
-            expires_formatted = "неизвестно"
-        status = f"💎 PREMIUM (до {expires_formatted} МСК)"
-        limit_text = f"{PREMIUM_LIMIT}/день"
-    else:
-        remaining = FREE_LIMIT - messages
-        if remaining < 0:
-            remaining = 0
-        status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
-        limit_text = f"{FREE_LIMIT}/день"
-    username = message.from_user.username
-    user_link = f"@{username}" if username else "Не указан"
-    text = (
-        f"👤 ТВОЙ ПРОФИЛЬ\n\n🆔 ID: <code>{user_id}</code>\n👤 Юзер: {user_link}\n💎 Статус: {status}\n📨 Лимит: {limit_text}\n✉️ Сегодня: {messages}\n📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
-    )
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
 
 @bot.message_handler(commands=['stats'])
 def stats_cmd(m):
@@ -1524,15 +1426,6 @@ def clear_cmd(m):
     delete_previous_messages(chat_id, user_id)
     clear_cmd_from_user(m, user_id)
 
-def clear_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    if user_id in user_histories:
-        user_histories[user_id] = []
-    if user_id in user_message_ids:
-        user_message_ids[user_id] = []
-    msg = bot.send_message(chat_id, "🧹 ИСТОРИЯ ОЧИЩЕНА", reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-
 @bot.message_handler(commands=['support'])
 def support_cmd(m):
     chat_id = m.chat.id
@@ -1589,6 +1482,28 @@ def draw_cmd(m):
         user_message_ids[user_id].append(msg.message_id)
         return
     generate_and_send_image(m, prompt)
+
+def generate_and_send_image(m, prompt):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    if not can_send_message(user_id):
+        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
+        user_message_ids[user_id].append(msg.message_id)
+        return
+    title = fix_title(prompt)
+    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='HTML')
+    user_message_ids[user_id].append(msg.message_id)
+    image_data = generate_image(prompt)
+    if image_data:
+        increment_messages(user_id)
+        try:
+            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='HTML')
+        except:
+            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
+            user_message_ids[user_id].append(msg.message_id)
+    else:
+        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
+        user_message_ids[user_id].append(msg.message_id)
 
 @bot.message_handler(commands=['test'])
 def test_cmd(m):
@@ -1663,29 +1578,114 @@ def admin_panel(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ГЕНЕРАЦИЯ КАРТИНОК (доп функция)
+# ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ КОМАНД (НЕ УДАЛЯТЬ!)
 # ============================================================
-def generate_and_send_image(m, prompt):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    if not can_send_message(user_id):
-        msg = bot.send_message(chat_id, f"🔴 Лимит! Купи Premium: /premium")
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    title = fix_title(prompt)
-    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-    image_data = generate_image(prompt)
-    if image_data:
-        increment_messages(user_id)
-        try:
-            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='HTML')
-        except:
-            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
-            user_message_ids[user_id].append(msg.message_id)
+def status_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    if user_id == OWNER_ID:
+        status_text = "👑 ВЛАДЕЛЕЦ — безлимит!"
+    elif is_admin(user_id):
+        status_text = "👑 АДМИН — безлимит!"
     else:
-        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
-        user_message_ids[user_id].append(msg.message_id)
+        premium = get_premium_status(user_id)
+        user_data = get_db_user(user_id)
+        if user_data:
+            messages = user_data.get('messages_today', 0)
+            expires = user_data.get('premium_expires')
+        else:
+            messages = 0
+            expires = None
+        if premium:
+            status_text = f"💎 PREMIUM (до {expires})"
+            remaining = PREMIUM_LIMIT - messages
+            if remaining < 0:
+                remaining = 0
+            status_text += f"\n📨 Осталось: {remaining}/{PREMIUM_LIMIT}"
+        else:
+            remaining = FREE_LIMIT - messages
+            if remaining < 0:
+                remaining = 0
+            status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
+    
+    msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
+    user_message_ids[user_id].append(msg.message_id)
+
+def premium_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    has_premium = get_premium_status(user_id)
+    expires = get_premium_expires(user_id)
+    if has_premium:
+        if expires:
+            try:
+                expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
+                expires_formatted = expires_date.strftime('%d.%m.%Y %H:%M')
+            except:
+                expires_formatted = expires
+        else:
+            expires_formatted = "неизвестно"
+        text = (
+            f"💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n⏳ Действует до: {expires_formatted} (МСК)\n📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n🌟 Можешь продлить подписку!\n💰 50₽/месяц"
+        )
+    else:
+        text = (
+            f"💎 PREMIUM AWESOME AI\n\n✅ Приоритетная обработка\n✅ Более качественные ответы\n✅ Эксклюзивные функции\n\n📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n💰 Цена: 50₽/месяц"
+        )
+    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
+    user_message_ids[user_id].append(msg.message_id)
+
+def profile_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    user_data = get_db_user(user_id)
+    if user_data:
+        messages = user_data.get('messages_today', 0)
+        expires = user_data.get('premium_expires')
+        premium = user_data.get('premium', 0) == 1
+        joined_at = user_data.get('joined_at', 'Неизвестно')
+    else:
+        messages = 0
+        expires = None
+        premium = False
+        joined_at = "Неизвестно"
+    
+    if user_id == OWNER_ID:
+        status = "👑 ВЛАДЕЛЕЦ"
+        limit_text = "♾️ Безлимит"
+    elif is_admin(user_id):
+        status = "👑 АДМИН"
+        limit_text = "♾️ Безлимит"
+    elif premium:
+        if expires:
+            try:
+                expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
+                expires_formatted = expires_date.strftime('%d.%m.%Y %H:%M')
+            except:
+                expires_formatted = expires
+        else:
+            expires_formatted = "неизвестно"
+        status = f"💎 PREMIUM (до {expires_formatted} МСК)"
+        limit_text = f"{PREMIUM_LIMIT}/день"
+    else:
+        remaining = FREE_LIMIT - messages
+        if remaining < 0:
+            remaining = 0
+        status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
+        limit_text = f"{FREE_LIMIT}/день"
+    username = message.from_user.username
+    user_link = f"@{username}" if username else "Не указан"
+    text = (
+        f"👤 ТВОЙ ПРОФИЛЬ\n\n🆔 ID: <code>{user_id}</code>\n👤 Юзер: {user_link}\n💎 Статус: {status}\n📨 Лимит: {limit_text}\n✉️ Сегодня: {messages}\n📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
+    )
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    user_message_ids[user_id].append(msg.message_id)
+
+def clear_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
+    if user_id in user_histories:
+        user_histories[user_id] = []
+    if user_id in user_message_ids:
+        user_message_ids[user_id] = []
+    msg = bot.send_message(chat_id, "🧹 ИСТОРИЯ ОЧИЩЕНА", reply_markup=back_to_menu(), parse_mode='HTML')
+    user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
 # АДМИН-КОМАНДЫ
@@ -2036,6 +2036,36 @@ def broadcast_cmd(m):
     )
     msg = bot.send_message(chat_id, f"📢 Подтверждение рассылки\n\n{text[:500]}", reply_markup=keyboard, parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_broadcast:"))
+def confirm_broadcast(call):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    if not is_authorized(user_id):
+        bot.answer_callback_query(call.id, "❌ Нет прав!")
+        return
+    text = call.data.replace("confirm_broadcast:", "")
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM users')
+    users = c.fetchall()
+    conn.close()
+    sent = 0
+    failed = 0
+    for user in users:
+        try:
+            bot.send_message(user[0], f"📢 ОБЪЯВЛЕНИЕ\n\n{text}", parse_mode='HTML')
+            sent += 1
+            time.sleep(0.05)
+        except:
+            failed += 1
+    bot.answer_callback_query(call.id, f"✅ Отправлено: {sent}, Ошибок: {failed}")
+    bot.edit_message_text(f"✅ Рассылка завершена!\n\n📤 Отправлено: {sent}\n❌ Ошибок: {failed}", chat_id=chat_id, message_id=call.message.message_id, parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_broadcast")
+def cancel_broadcast(call):
+    bot.answer_callback_query(call.id, "❌ Отменено")
+    bot.edit_message_text("❌ Отменено.", chat_id=call.message.chat.id, message_id=call.message.message_id)
 
 # ============================================================
 # ЗАПУСК
