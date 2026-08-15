@@ -61,18 +61,7 @@ except Exception as e:
     print(f"❌ Ошибка подключения к Supabase: {e}")
     print("⚠️ Использую локальную БД.")
     use_supabase = False
-def init_db():
-    """Инициализация базы данных (локальной, если Supabase не настроен)"""
-    if use_supabase:
-        try:
-            # Проверяем подключение к Supabase
-            supabase.table('users').select('*').limit(1).execute()
-            print("✅ Supabase таблицы готовы")
-        except Exception as e:
-            print(f"⚠️ Ошибка Supabase: {e}")
-            print("⚠️ Создай таблицы вручную через SQL Editor!")
-        return
-    
+
     # Локальная SQLite
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
