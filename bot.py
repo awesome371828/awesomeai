@@ -1546,10 +1546,11 @@ def status_cmd_from_user(message, user_id):
                 remaining = 0
             status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
     msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
-   total_messages = 0
+total_messages = 0
+
 for u in users:
     if isinstance(u, dict):
-        total_messages += u.get('total_messages', 0)
+    total_messages += u.get('total_messages', 0)
 
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
