@@ -2,13 +2,12 @@
 import sys
 import os
 
-# ПРИНУДИТЕЛЬНО ОТКЛЮЧАЕМ БУФЕРИЗАЦИЮ, ЧТОБЫ ВИДЕТЬ ВСЕ PRINT'Ы
+# ПРИНУДИТЕЛЬНО ОТКЛЮЧАЕМ БУФЕРИЗАЦИЮ ТОЛЬКО ДЛЯ ВЫВОДА
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
 
 print("🔴 БОТ НАЧАЛ ЗАПУСК!")
 print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...")
-
 import telebot
 print("✅ telebot импортирован")
 
