@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-print("🔴 БОТ НАЧАЛ ЗАПУСК!")
-import sys
-print(f"Python версия: {sys.version}")
 import telebot
 import requests
 import json
