@@ -36,7 +36,7 @@ FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
 OWNER_ID = 6652898792
 
 FREE_LIMIT = 20
-PREMIUM_LIMIT = 999999
+PREMIUM_LIMIT = 150
 
 # ============================================================
 # SUPABASE
