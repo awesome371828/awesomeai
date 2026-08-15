@@ -109,7 +109,80 @@ def update_db_user(user_id, data):
 def init_db():
     if use_supabase:
         try:
-            supabase.table('users').select('*').limit(1).execute()
+            # Проверяем наличие таблиц, создаём если нет
+            try:
+                supabase.table('users').select('*').limit(1).execute()
+            except:
+                # Создаём таблицу users через SQL
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        user_id BIGINT PRIMARY KEY,
+                        username TEXT,
+                        premium INTEGER DEFAULT 0,
+                        messages_today INTEGER DEFAULT 0,
+                        last_reset TEXT,
+                        premium_expires TEXT,
+                        is_admin INTEGER DEFAULT 0,
+                        test_used INTEGER DEFAULT 0,
+                        joined_at TEXT,
+                        is_owner INTEGER DEFAULT 0
+                    )
+                """).execute()
+            
+            try:
+                supabase.table('banned').select('*').limit(1).execute()
+            except:
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS banned (
+                        user_id BIGINT PRIMARY KEY
+                    )
+                """).execute()
+            
+            try:
+                supabase.table('muted').select('*').limit(1).execute()
+            except:
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS muted (
+                        user_id BIGINT PRIMARY KEY
+                    )
+                """).execute()
+            
+            try:
+                supabase.table('total_stats').select('*').limit(1).execute()
+            except:
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS total_stats (
+                        user_id BIGINT PRIMARY KEY,
+                        total_messages INTEGER DEFAULT 0
+                    )
+                """).execute()
+            
+            try:
+                supabase.table('premium_orders').select('*').limit(1).execute()
+            except:
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS premium_orders (
+                        order_id SERIAL PRIMARY KEY,
+                        user_id BIGINT,
+                        status TEXT DEFAULT 'pending',
+                        created_at TEXT
+                    )
+                """).execute()
+            
+            try:
+                supabase.table('support_requests').select('*').limit(1).execute()
+            except:
+                supabase.sql("""
+                    CREATE TABLE IF NOT EXISTS support_requests (
+                        request_id SERIAL PRIMARY KEY,
+                        user_id BIGINT,
+                        username TEXT,
+                        text TEXT,
+                        status TEXT DEFAULT 'pending',
+                        created_at TEXT
+                    )
+                """).execute()
+            
             print("✅ Supabase таблицы готовы")
         except Exception as e:
             print(f"⚠️ Ошибка Supabase: {e}")
@@ -537,6 +610,7 @@ def get_premium_status(user_id):
                 expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
                 expires_date = expires_date.replace(tzinfo=MOSCOW_TZ)
                 if get_moscow_time() > expires_date:
+                    remove_premium(user_id)
                     return False
             except:
                 return premium == 1
@@ -1381,6 +1455,7 @@ def status_cmd_from_user(message, user_id):
     elif is_admin(user_id):
         status_text = "👑 АДМИН — безлимит!"
     else:
+        # Проверяем Premium статус (с авто-проверкой истечения)
         premium = get_premium_status(user_id)
         user_data = get_db_user(user_id)
         if user_data:
@@ -1389,8 +1464,13 @@ def status_cmd_from_user(message, user_id):
         else:
             messages = 0
             expires = None
+        
         if premium:
-            status_text = f"💎 PREMIUM (до {format_date(expires)})"
+            if expires and expires != "None":
+                expires_formatted = format_date(expires)
+                status_text = f"💎 PREMIUM (до {expires_formatted} МСК)"
+            else:
+                status_text = "💎 PREMIUM"
             remaining = PREMIUM_LIMIT - messages
             if remaining < 0:
                 remaining = 0
@@ -1413,11 +1493,12 @@ def premium_cmd(m):
 
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
+    # Проверяем Premium статус с авто-проверкой
     has_premium = get_premium_status(user_id)
     expires = get_premium_expires(user_id)
     
     if has_premium:
-        if expires:
+        if expires and expires != "None":
             expires_formatted = format_date(expires)
             text = (
                 f"💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n"
@@ -1425,7 +1506,7 @@ def premium_cmd_from_user(message, user_id):
                 f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
                 f"🌟 Можешь продлить подписку!\n"
                 f"💰 50₽/месяц\n\n"
-                f"💳 После оплаты нажми «Я оплатил» — система автоматически добавит 1 месяц!"
+                f"💳 Нажми «Я оплатил» после оплаты — система автоматически добавит 1 месяц к текущему сроку!"
             )
         else:
             text = (
@@ -1433,7 +1514,7 @@ def premium_cmd_from_user(message, user_id):
                 f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
                 f"🌟 Можешь продлить подписку!\n"
                 f"💰 50₽/месяц\n\n"
-                f"💳 После оплаты нажми «Я оплатил» — система автоматически добавит 1 месяц!"
+                f"💳 Нажми «Я оплатил» после оплаты — система автоматически добавит 1 месяц!"
             )
     else:
         text = (
@@ -1443,7 +1524,7 @@ def premium_cmd_from_user(message, user_id):
             f"✅ Эксклюзивные функции\n\n"
             f"📨 Лимит: {PREMIUM_LIMIT} сообщений/день\n\n"
             f"💰 Цена: 50₽/месяц\n\n"
-            f"💳 После оплаты нажми «Я оплатил» — система автоматически выдаст Premium на 1 месяц!"
+            f"💳 Нажми «Я оплатил» после оплаты — система автоматически выдаст Premium на 1 месяц!"
         )
     
     msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
@@ -1470,6 +1551,10 @@ def profile_cmd_from_user(message, user_id):
         premium = False
         joined_at = "Неизвестно"
     
+    # Проверяем актуальность Premium
+    if not get_premium_status(user_id):
+        premium = False
+    
     if user_id == OWNER_ID:
         status = "👑 ВЛАДЕЛЕЦ"
         limit_text = "♾️ Безлимит"
@@ -1477,7 +1562,7 @@ def profile_cmd_from_user(message, user_id):
         status = "👑 АДМИН"
         limit_text = "♾️ Безлимит"
     elif premium:
-        if expires:
+        if expires and expires != "None":
             expires_formatted = format_date(expires)
             status = f"💎 PREMIUM (до {expires_formatted} МСК)"
         else:
@@ -1502,7 +1587,10 @@ def stats_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
-    
+    stats_cmd_from_user(m, user_id)
+
+def stats_cmd_from_user(message, user_id):
+    chat_id = message.chat.id
     if user_id == OWNER_ID or is_admin(user_id):
         if use_supabase:
             try:
@@ -1540,18 +1628,20 @@ def stats_cmd(m):
             f"🔓 Бесплатных: {total_users - premium_users - admin_users}\n"
             f"📊 Лимиты:\n"
             f"🔓 Бесплатный: {FREE_LIMIT}/день\n"
-            f"💎 Премиум: ♾️ Безлимит"
+            f"💎 Премиум: {PREMIUM_LIMIT}/день"
         )
     else:
         user_data = get_db_user(user_id)
         if user_data:
             messages_today = user_data.get('messages_today', 0)
-            total_messages = user_data.get('total_messages', 0)
-            premium = user_data.get('premium', 0)
+            premium = get_premium_status(user_id)
             
-            if premium == 1:
+            if premium:
                 status = "💎 PREMIUM"
-                limit_text = "♾️"
+                remaining = PREMIUM_LIMIT - messages_today
+                if remaining < 0:
+                    remaining = 0
+                limit_text = f"{remaining}/{PREMIUM_LIMIT}"
             else:
                 remaining = FREE_LIMIT - messages_today
                 if remaining < 0:
@@ -1559,12 +1649,27 @@ def stats_cmd(m):
                 status = "🔓 Бесплатный"
                 limit_text = f"{remaining}/{FREE_LIMIT}"
             
+            # Получаем total_messages
+            if use_supabase:
+                try:
+                    resp = supabase.table('total_stats').select('total_messages').eq('user_id', user_id).execute()
+                    total = resp.data[0].get('total_messages', 0) if resp.data else 0
+                except:
+                    total = 0
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT total_messages FROM total_stats WHERE user_id = ?', (user_id,))
+                result = c.fetchone()
+                conn.close()
+                total = result[0] if result else 0
+            
             text = (
                 "📊 <b>ТВОЯ СТАТИСТИКА</b>\n\n"
                 f"👤 Статус: {status}\n"
                 f"📨 Лимит: {limit_text}\n"
                 f"✉️ Сегодня: {messages_today}\n"
-                f"📊 Всего: {total_messages}"
+                f"📊 Всего: {total}"
             )
         else:
             text = "❌ Не удалось получить данные."
@@ -1598,13 +1703,25 @@ def support_cmd(m):
         msg = bot.send_message(chat_id, "📩 Напиши: /support [текст]", parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
         return
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO support_requests (user_id, username, text, created_at) VALUES (?, ?, ?, ?)',
-              (user_id, m.from_user.username or "unknown", text, get_moscow_time().strftime('%d.%m.%Y %H:%M')))
-    request_id = c.lastrowid
-    conn.commit()
-    conn.close()
+    if use_supabase:
+        try:
+            supabase.table('support_requests').insert({
+                'user_id': user_id,
+                'username': m.from_user.username or "unknown",
+                'text': text,
+                'created_at': get_moscow_time().strftime('%d.%m.%Y %H:%M')
+            }).execute()
+            request_id = 0
+        except:
+            request_id = 0
+    else:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('INSERT INTO support_requests (user_id, username, text, created_at) VALUES (?, ?, ?, ?)',
+                  (user_id, m.from_user.username or "unknown", text, get_moscow_time().strftime('%d.%m.%Y %H:%M')))
+        request_id = c.lastrowid
+        conn.commit()
+        conn.close()
     msg = bot.send_message(chat_id, "✅ Обращение отправлено!", parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -1701,7 +1818,8 @@ def process_test_premium(chat_id, user_id):
             return
         test_used, premium = result
     
-    if premium == 1:
+    # Проверяем актуальность Premium
+    if get_premium_status(user_id):
         msg = bot.send_message(chat_id, "💎 У тебя уже есть Premium!", reply_markup=premium_menu(user_id), parse_mode='HTML')
         user_message_ids[user_id].append(msg.message_id)
         return
@@ -2090,7 +2208,136 @@ def broadcast_cmd(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК (С ПОДТВЕРЖДЕНИЕМ PREMIUM)
+# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ (ГЛАВНЫЙ)
+# ============================================================
+@bot.message_handler(func=lambda m: True)
+def handle_all_messages(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    text = m.text.strip() if m.text else ""
+    
+    # Игнорируем команды (они уже обработаны выше)
+    if text.startswith('/'):
+        return
+    
+    # Проверяем бан и мут
+    if is_banned(user_id):
+        bot.send_message(chat_id, "🚫 Ты забанен!")
+        return
+    
+    if is_muted(user_id):
+        bot.send_message(chat_id, "🔇 Ты замучен!")
+        return
+    
+    # Проверяем спам
+    if check_spam(user_id):
+        return
+    
+    # Регистрируем пользователя
+    ensure_user(user_id, m.from_user.username or "unknown")
+    
+    # Проверяем лимиты
+    if not can_send_message(user_id):
+        user_data = get_db_user(user_id)
+        if user_data:
+            messages = user_data.get('messages_today', 0)
+        else:
+            messages = 0
+        remaining = FREE_LIMIT - messages
+        if remaining < 0:
+            remaining = 0
+        bot.send_message(
+            chat_id,
+            f"🔴 Лимит исчерпан! Осталось: {remaining}/{FREE_LIMIT}\n💎 Купи Premium: /premium",
+            reply_markup=premium_menu(user_id),
+            parse_mode='HTML'
+        )
+        return
+    
+    # Если есть фото — обрабатываем
+    if m.photo:
+        try:
+            file_id = m.photo[-1].file_id
+            file_info = bot.get_file(file_id)
+            file_content = bot.download_file(file_info.file_path)
+            img_desc = analyze_image_from_file(file_content)
+            response = process_message(user_id, text or "Что на картинке?", img_desc)
+            increment_messages(user_id)
+            bot.send_message(chat_id, response, reply_markup=back_to_menu(), parse_mode='HTML')
+        except Exception as e:
+            bot.send_message(chat_id, f"⚠️ Ошибка обработки фото: {e}")
+        return
+    
+    # Если есть голосовое
+    if m.voice:
+        try:
+            file_id = m.voice.file_id
+            file_info = bot.get_file(file_id)
+            file_content = bot.download_file(file_info.file_path)
+            
+            # Сохраняем в временный файл
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
+                tmp.write(file_content)
+                tmp_path = tmp.name
+            
+            # Распознаём речь
+            r = sr.Recognizer()
+            with sr.AudioFile(tmp_path) as source:
+                audio = r.record(source)
+            try:
+                voice_text = r.recognize_google(audio, language='ru-RU')
+                response = process_message(user_id, voice_text)
+                increment_messages(user_id)
+                bot.send_message(chat_id, f"🎤 Распознано: {voice_text}\n\n{response}", reply_markup=back_to_menu(), parse_mode='HTML')
+            except sr.UnknownValueError:
+                bot.send_message(chat_id, "🎤 Не удалось распознать речь.")
+            except Exception as e:
+                bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+            finally:
+                os.unlink(tmp_path)
+        except Exception as e:
+            bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
+        return
+    
+    # Обычное текстовое сообщение
+    if text:
+        # Проверяем на генерацию картинки
+        if is_image_generation(text):
+            generate_and_send_image(m, text)
+            return
+        
+        # Отправляем индикатор печати
+        bot.send_chat_action(chat_id, 'typing')
+        
+        try:
+            response = process_message(user_id, text)
+            if response:
+                increment_messages(user_id)
+                # Отправляем ответ с кнопкой "Главное меню"
+                bot.send_message(
+                    chat_id,
+                    response,
+                    reply_markup=back_to_menu(),
+                    parse_mode='HTML'
+                )
+            else:
+                bot.send_message(
+                    chat_id,
+                    "❌ Не удалось обработать запрос.",
+                    reply_markup=back_to_menu(),
+                    parse_mode='HTML'
+                )
+        except Exception as e:
+            print(f"❌ Ошибка обработки: {e}")
+            bot.send_message(
+                chat_id,
+                f"⚠️ Ошибка: {e}",
+                reply_markup=back_to_menu(),
+                parse_mode='HTML'
+            )
+
+# ============================================================
+# ОБРАБОТЧИК КНОПОК
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -2135,12 +2382,14 @@ def handle_callback(call):
             user_message_ids[user_id].append(msg.message_id)
             return
         
+        # ============================================================
+        # ОБРАБОТКА КНОПКИ "Я ОПЛАТИЛ" (ПОДДЕРЖКА ПРОДЛЕНИЯ)
+        # ============================================================
         if call.data == "i_paid":
-            if get_premium_status(user_id):
-                bot.answer_callback_query(call.id, "❌ У тебя уже есть Premium!")
-                return
+            # Проверяем, есть ли уже Premium
+            has_premium = get_premium_status(user_id)
             
-            # Создаём заказ
+            # Создаём заказ в БД
             if use_supabase:
                 try:
                     # Проверяем есть ли таблица premium_orders
@@ -2177,18 +2426,44 @@ def handle_callback(call):
                 conn.close()
             
             bot.answer_callback_query(call.id, "✅ Заказ создан!")
-            msg = bot.send_message(chat_id, f"✅ ЗАКАЗ ОТПРАВЛЕН!\n\n🆔 Номер заказа: #{order_id}\n⏳ Ожидай подтверждения от админа.", parse_mode='HTML')
+            
+            # Определяем тип заказа
+            order_type = "ПРОДЛЕНИЕ" if has_premium else "ПОКУПКА"
+            expires = get_premium_expires(user_id)
+            expires_text = f"до {format_date(expires)}" if expires and has_premium else "отсутствует"
+            
+            msg = bot.send_message(chat_id, 
+                f"✅ ЗАКАЗ ОТПРАВЛЕН!\n\n"
+                f"🆔 Номер заказа: #{order_id}\n"
+                f"📌 Тип: {order_type}\n"
+                f"⏳ Текущий статус: {expires_text}\n"
+                f"⏳ Ожидай подтверждения от админа.", 
+                parse_mode='HTML'
+            )
             user_message_ids[user_id].append(msg.message_id)
             
+            # Отправляем уведомление владельцу
             keyboard = types.InlineKeyboardMarkup(row_width=2)
             keyboard.add(
                 types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_order:{order_id}"),
                 types.InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_order:{order_id}")
             )
-            is_renewal = "ПРОДЛЕНИЕ" if get_premium_status(user_id) else "ПОКУПКА"
-            bot.send_message(OWNER_ID, f"💳 НОВЫЙ ЗАКАЗ PREMIUM!\n\n🆔 Заказ: #{order_id}\n👤 @{call.from_user.username or 'Не указан'}\n💰 50₽\n📌 Тип: {is_renewal}", reply_markup=keyboard, parse_mode='HTML')
+            bot.send_message(
+                OWNER_ID, 
+                f"💳 НОВЫЙ ЗАКАЗ PREMIUM!\n\n"
+                f"🆔 Заказ: #{order_id}\n"
+                f"👤 @{call.from_user.username or 'Не указан'}\n"
+                f"💰 50₽\n"
+                f"📌 Тип: {order_type}\n"
+                f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)", 
+                reply_markup=keyboard, 
+                parse_mode='HTML'
+            )
             return
         
+        # ============================================================
+        # ПОДТВЕРЖДЕНИЕ ЗАКАЗА АДМИНОМ
+        # ============================================================
         if call.data.startswith("confirm_order:"):
             if not is_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Нет прав!")
@@ -2223,6 +2498,7 @@ def handle_callback(call):
                 bot.answer_callback_query(call.id, f"❌ Заказ уже {status}")
                 return
             
+            # Выдаём Premium на 1 месяц (добавляем к текущему сроку если есть)
             new_expires = add_month_to_premium(target_user)
             
             if new_expires:
@@ -2252,6 +2528,9 @@ def handle_callback(call):
                 bot.answer_callback_query(call.id, "❌ Ошибка при выдаче Premium")
             return
         
+        # ============================================================
+        # ОТКЛОНЕНИЕ ЗАКАЗА
+        # ============================================================
         if call.data.startswith("reject_order:"):
             if not is_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Нет прав!")
@@ -2303,41 +2582,71 @@ def handle_callback(call):
             bot.send_message(target_user, f"❌ ЗАКАЗ ОТКЛОНЁН\n\nЗаказ #{order_id}\nАдминистратор отклонил заказ.", parse_mode='HTML')
             return
         
-        # Админ кнопки
+        # ============================================================
+        # АДМИН КНОПКИ
+        # ============================================================
         if call.data == "admin_stats":
             bot.answer_callback_query(call.id)
             stats_cmd_from_user(call.message, user_id)
             return
         if call.data == "admin_list":
             bot.answer_callback_query(call.id)
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
-            admins = c.fetchall()
-            conn.close()
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username').eq('is_admin', 1).execute()
+                    admins = response.data
+                except:
+                    admins = []
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
+                admins = c.fetchall()
+                conn.close()
             if not admins:
                 text = "👑 АДМИНЫ\n\nНет админов."
             else:
                 text = "👑 АДМИНЫ\n\n"
                 for admin in admins:
-                    text += f"• @{admin[1] if admin[1] else admin[0]}\n"
+                    if isinstance(admin, dict):
+                        text += f"• @{admin.get('username', admin.get('user_id'))}\n"
+                    else:
+                        text += f"• @{admin[1] if admin[1] else admin[0]}\n"
             msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_list_users":
             bot.answer_callback_query(call.id)
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT user_id, username, premium, is_admin FROM users ORDER BY user_id')
-            users = c.fetchall()
-            conn.close()
-            text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
-            for user in users:
-                uid, username, premium, is_admin = user
-                status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
-                text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
-            msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
-            user_message_ids[user_id].append(msg.message_id)
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username, premium, is_admin').execute()
+                    users = response.data
+                    text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                    for u in users:
+                        uid = u.get('user_id')
+                        username = u.get('username', 'Не указан')
+                        premium = u.get('premium', 0)
+                        is_admin_flag = u.get('is_admin', 0)
+                        status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                        text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                    msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                    user_message_ids[user_id].append(msg.message_id)
+                except:
+                    msg = bot.send_message(chat_id, "❌ Ошибка получения списка пользователей")
+                    user_message_ids[user_id].append(msg.message_id)
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username, premium, is_admin FROM users ORDER BY user_id')
+                users = c.fetchall()
+                conn.close()
+                text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                for user in users:
+                    uid, username, premium, is_admin_flag = user
+                    status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                    text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                user_message_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_broadcast":
             bot.answer_callback_query(call.id)
@@ -2412,7 +2721,9 @@ def handle_callback(call):
             admin_support_cmd_from_user(call.message, user_id)
             return
         
-        # Основные кнопки
+        # ============================================================
+        # ОСНОВНЫЕ КНОПКИ
+        # ============================================================
         if call.data == "test":
             bot.answer_callback_query(call.id, "🎁 Активирую...")
             process_test_premium(chat_id, user_id)
@@ -2456,16 +2767,24 @@ def confirm_broadcast(call):
         bot.answer_callback_query(call.id, "❌ Нет прав!")
         return
     text = call.data.replace("confirm_broadcast:", "")
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT user_id FROM users')
-    users = c.fetchall()
-    conn.close()
+    if use_supabase:
+        try:
+            response = supabase.table('users').select('user_id').execute()
+            users = response.data
+        except:
+            users = []
+    else:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT user_id FROM users')
+        users = c.fetchall()
+        conn.close()
     sent = 0
     failed = 0
     for user in users:
         try:
-            bot.send_message(user[0], f"📢 ОБЪЯВЛЕНИЕ\n\n{text}", parse_mode='HTML')
+            uid = user.get('user_id') if isinstance(user, dict) else user[0]
+            bot.send_message(uid, f"📢 ОБЪЯВЛЕНИЕ\n\n{text}", parse_mode='HTML')
             sent += 1
             time.sleep(0.05)
         except:
@@ -2481,77 +2800,6 @@ def cancel_broadcast(call):
 # ============================================================
 # ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ АДМИН-КНОПОК
 # ============================================================
-def stats_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    if user_id == OWNER_ID or is_admin(user_id):
-        if use_supabase:
-            try:
-                response = supabase.table('users').select('*').execute()
-                users = response.data
-            except:
-                users = []
-        else:
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT * FROM users')
-            users = c.fetchall()
-            conn.close()
-        
-        total_users = len(users)
-        premium_users = 0
-        admin_users = 0
-        for u in users:
-            if isinstance(u, dict):
-                if u.get('premium', 0) == 1:
-                    premium_users += 1
-                if u.get('is_admin', 0) == 1:
-                    admin_users += 1
-            else:
-                if u[2] == 1:
-                    premium_users += 1
-                if u[7] == 1:
-                    admin_users += 1
-        
-        text = (
-            "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
-            f"👥 Всего: {total_users}\n"
-            f"👑 Админов: {admin_users}\n"
-            f"💎 Premium: {premium_users}\n"
-            f"🔓 Бесплатных: {total_users - premium_users - admin_users}\n"
-            f"📊 Лимиты:\n"
-            f"🔓 Бесплатный: {FREE_LIMIT}/день\n"
-            f"💎 Премиум: ♾️ Безлимит"
-        )
-    else:
-        user_data = get_db_user(user_id)
-        if user_data:
-            messages_today = user_data.get('messages_today', 0)
-            total_messages = user_data.get('total_messages', 0)
-            premium = user_data.get('premium', 0)
-            
-            if premium == 1:
-                status = "💎 PREMIUM"
-                limit_text = "♾️"
-            else:
-                remaining = FREE_LIMIT - messages_today
-                if remaining < 0:
-                    remaining = 0
-                status = "🔓 Бесплатный"
-                limit_text = f"{remaining}/{FREE_LIMIT}"
-            
-            text = (
-                "📊 <b>ТВОЯ СТАТИСТИКА</b>\n\n"
-                f"👤 Статус: {status}\n"
-                f"📨 Лимит: {limit_text}\n"
-                f"✉️ Сегодня: {messages_today}\n"
-                f"📊 Всего: {total_messages}"
-            )
-        else:
-            text = "❌ Не удалось получить данные."
-    
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-
 def stats_users_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     if use_supabase:
@@ -2613,17 +2861,27 @@ def admin_orders_cmd_from_user(message, user_id):
 
 def admin_support_cmd_from_user(message, user_id):
     chat_id = message.chat.id
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT request_id, user_id, username, text, created_at FROM support_requests WHERE status = "pending" ORDER BY request_id DESC')
-    requests = c.fetchall()
-    conn.close()
+    if use_supabase:
+        try:
+            response = supabase.table('support_requests').select('*').eq('status', 'pending').order('request_id', desc=True).execute()
+            requests = response.data
+        except:
+            requests = []
+    else:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT request_id, user_id, username, text, created_at FROM support_requests WHERE status = "pending" ORDER BY request_id DESC')
+        requests = c.fetchall()
+        conn.close()
     if not requests:
         text = "📩 ОБРАЩЕНИЯ\n\nНет активных обращений."
     else:
         text = f"📩 ОБРАЩЕНИЯ\n\nВсего: {len(requests)}\n\n"
         for req in requests:
-            text += f"🆔 #{req[0]} | @{req[2] or 'Не указан'} | {req[4]}\n📝 {req[3][:50]}...\n\n"
+            if isinstance(req, dict):
+                text += f"🆔 #{req['request_id']} | @{req.get('username', 'Не указан')} | {req['created_at']}\n📝 {req['text'][:50]}...\n\n"
+            else:
+                text += f"🆔 #{req[0]} | @{req[2] or 'Не указан'} | {req[4]}\n📝 {req[3][:50]}...\n\n"
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
