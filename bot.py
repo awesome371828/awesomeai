@@ -51,7 +51,14 @@ else:
     use_supabase = True
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("✅ Supabase подключен!")
-
+    
+    # ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+    try:
+        test = supabase.table('users').select('*').limit(1).execute()
+        print(f"✅ Таблица users найдена! Записей: {len(test.data)}")
+    except Exception as e:
+        print(f"❌ Ошибка доступа к таблице users: {e}")
+        print("⚠️ Проверь имя таблицы и права доступа!")
 def init_db():
     """Инициализация базы данных (локальной, если Supabase не настроен)"""
     if use_supabase:
