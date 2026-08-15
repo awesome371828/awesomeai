@@ -1,3 +1,6 @@
+print("🔴 БОТ НАЧАЛ ЗАПУСК!")
+import sys
+print(f"Python версия: {sys.version}")
 #!/usr/bin/env python3
 
 import telebot
