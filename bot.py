@@ -2183,7 +2183,8 @@ def delprem_cmd(m):
 @bot.message_handler(commands=['info'])
 def info_cmd(m):
     chat_id = m.chat.id
-    user_id = m.from_user.id    if not is_authorized(user_id):
+   user_id = m.from_user.id
+if not is_authorized(user_id):
         msg = bot.send_message(chat_id, "❌ Нет прав!")
         user_message_ids[user_id].append(msg.message_id)
         return
