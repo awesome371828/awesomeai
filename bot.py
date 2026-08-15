@@ -1546,7 +1546,10 @@ def status_cmd_from_user(message, user_id):
                 remaining = 0
             status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
     msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
+   total_messages = 0
+for u in users:
+    if isinstance(u, dict):
+        total_messages += u.get('total_messages', 0)
 
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
@@ -1642,8 +1645,19 @@ def stats_cmd(m):
             conn.close()
         
         total_users = len(users)
-        premium_users = sum(1 for u in users if (u.get('premium') if isinstance(u, dict) else u[2]) == 1)
-        admin_users = sum(1 for u in users if (u.get('is_admin') if isinstance(u, dict) else u[7]) == 1)
+        premium_users = 0
+        admin_users = 0
+        for u in users:
+            if isinstance(u, dict):
+                if u.get('premium', 0) == 1:
+                    premium_users += 1
+                if u.get('is_admin', 0) == 1:
+                    admin_users += 1
+            else:
+                if u[2] == 1:
+                    premium_users += 1
+                if u[7] == 1:
+                    admin_users += 1
         
         text = (
             "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
@@ -1701,7 +1715,7 @@ def stats_cmd(m):
     
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
-
+    
 def clear_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     if user_id in user_histories:
