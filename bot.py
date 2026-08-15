@@ -59,6 +59,7 @@ else:
     except Exception as e:
         print(f"❌ Ошибка доступа к таблице users: {e}")
         print("⚠️ Проверь имя таблицы и права доступа!")
+        
 def init_db():
     """Инициализация базы данных (локальной, если Supabase не настроен)"""
     if use_supabase:
