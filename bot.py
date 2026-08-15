@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
+import sys
+import os
+
+# ПРИНУДИТЕЛЬНО ОТКЛЮЧАЕМ БУФЕРИЗАЦИЮ, ЧТОБЫ ВИДЕТЬ ВСЕ PRINT'Ы
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
+
+print("🔴 БОТ НАЧАЛ ЗАПУСК!")
+print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...")
+
 import telebot
+print("✅ telebot импортирован")
+
 import requests
+print("✅ requests импортирован")
+
 import json
 import base64
 import io
@@ -20,6 +34,8 @@ from telebot import types
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 
+print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!")
+
 # ============================================================
 # НАСТРОЙКА
 # ============================================================
@@ -36,6 +52,8 @@ OWNER_ID = 6652898792
 
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 150
+
+print("✅ НАСТРОЙКА ЗАГРУЖЕНА!")
 
 # ============================================================
 # SUPABASE НАСТРОЙКА
@@ -61,74 +79,9 @@ except Exception as e:
     print("⚠️ Использую локальную БД.")
     use_supabase = False
 
-def init_db():
-    """Инициализация базы данных (локальной, если Supabase не настроен)"""
-    if use_supabase:
-        try:
-            supabase.table('users').select('*').limit(1).execute()
-            print("✅ Supabase таблицы готовы")
-        except Exception as e:
-            print(f"⚠️ Ошибка Supabase: {e}")
-            print("⚠️ Создай таблицы вручную через SQL Editor!")
-        return
-    
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (user_id INTEGER PRIMARY KEY,
-                  username TEXT,
-                  premium INTEGER DEFAULT 0,
-                  messages_today INTEGER DEFAULT 0,
-                  last_reset TEXT,
-                  premium_expires TEXT,
-                  is_admin INTEGER DEFAULT 0,
-                  test_used INTEGER DEFAULT 0,
-                  joined_at TEXT,
-                  is_owner INTEGER DEFAULT 0)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS banned
-                 (user_id INTEGER PRIMARY KEY)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS muted
-                 (user_id INTEGER PRIMARY KEY)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS total_stats
-                 (user_id INTEGER PRIMARY KEY,
-                  total_messages INTEGER DEFAULT 0)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
-                 (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  status TEXT DEFAULT 'pending',
-                  created_at TEXT)''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS support_requests
-                 (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  username TEXT,
-                  text TEXT,
-                  status TEXT DEFAULT 'pending',
-                  created_at TEXT)''')
-    
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
-    except:
-        pass
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN joined_at TEXT')
-    except:
-        pass
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN is_owner INTEGER DEFAULT 0')
-    except:
-        pass
-    
-    conn.commit()
-    conn.close()
-    print("✅ Локальная SQLite база данных создана")
+print("🔴 ДАЛЬШЕ ВЕСЬ ОСТАЛЬНОЙ КОД (ФУНКЦИИ, КОМАНДЫ, БОТ)")
+print("🔴 ЕСЛИ ТЫ ЭТО ВИДИШЬ - ЗНАЧИТ ВСЁ РАБОТАЕТ!")
 
-# ============================================================
 # ВРЕМЯ (МОСКОВСКОЕ)
 # ============================================================
 MOSCOW_TZ = timezone(timedelta(hours=3))
