@@ -1,21 +1,7 @@
+#!/usr/bin/env python3
 print("🔴 БОТ НАЧАЛ ЗАПУСК!")
 import sys
 print(f"Python версия: {sys.version}")
-#!/usr/bin/env python3
-print("🔴 ШАГ 1: БОТ НАЧАЛ ЗАПУСК!")
-
-import sys
-print(f"🔴 ШАГ 2: Python версия: {sys.version}")
-
-print("🔴 ШАГ 3: Пробую импортировать библиотеки...")
-import telebot
-print("🔴 ШАГ 4: telebot импортирован")
-
-import requests
-print("🔴 ШАГ 5: requests импортирован")
-
-# ... и так далее для каждой библиотеки
-
 import telebot
 import requests
 import json
