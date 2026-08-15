@@ -2000,8 +2000,7 @@ def handle_voice(m):
             user_message_ids[user_id].append(msg.message_id)
             response = process_message(user_id, recognized)
             if response:
-                if get_premium_status(user_id):
-                    response += "\n\n💎 *Премиум-ответ*"
+        
                 msg = bot.send_message(chat_id, response, parse_mode='HTML')
                 user_message_ids[user_id].append(msg.message_id)
         else:
