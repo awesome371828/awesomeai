@@ -2542,7 +2542,27 @@ print("=" * 60)
 print("✅ БОТ ЗАПУЩЕН!")
 print("=" * 60)
 
+# ПРОВЕРКА SUPABASE
+import sys
+print("=" * 60, file=sys.stderr)
+print("🔍 ПРОВЕРКА SUPABASE:", file=sys.stderr)
+print(f"SUPABASE_URL: {SUPABASE_URL}", file=sys.stderr)
+print(f"SUPABASE_KEY: {SUPABASE_KEY[:20] if SUPABASE_KEY else 'None'}...", file=sys.stderr)
+print(f"use_supabase: {use_supabase}", file=sys.stderr)
+
+if use_supabase:
+    try:
+        test = supabase.table('users').select('*').limit(1).execute()
+        print("✅ Supabase доступен! Таблицы существуют.", file=sys.stderr)
+    except Exception as e:
+        print(f"❌ Ошибка доступа к Supabase: {e}", file=sys.stderr)
+else:
+    print("⚠️ Используется локальная БД", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
+print("✅ БОТ ЗАПУЩЕН!", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
 while True:
+    
     try:
         bot.polling(none_stop=True)
     except Exception as e:
