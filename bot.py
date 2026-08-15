@@ -1548,6 +1548,7 @@ def status_cmd_from_user(message, user_id):
     
     msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
+    
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     has_premium = get_premium_status(user_id)
