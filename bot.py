@@ -2,10 +2,13 @@
 import sys
 print("🔴 БОТ НАЧАЛ ЗАПУСК!", flush=True)
 print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...", flush=True)
+
 import telebot
 print("✅ telebot импортирован", flush=True)
+
 import requests
 print("✅ requests импортирован", flush=True)
+
 import json
 import base64
 import io
@@ -25,8 +28,7 @@ from telebot import types
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 
-print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!")
-sys.stdout.flush()
+print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!", flush=True)
 
 # ============================================================
 # НАСТРОЙКА
@@ -45,7 +47,7 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 150
 
-print("✅ НАСТРОЙКА ЗАГРУЖЕНА!")
+print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
 # SUPABASE НАСТРОЙКА
@@ -53,27 +55,99 @@ print("✅ НАСТРОЙКА ЗАГРУЖЕНА!")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-# ПРИНУДИТЕЛЬНО ИСПОЛЬЗУЕМ SUPABASE
 use_supabase = True
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Supabase подключен принудительно!")
+    print("✅ Supabase подключен принудительно!", flush=True)
     
-    # ПРОВЕРКА ПОДКЛЮЧЕНИЯ
     try:
         test = supabase.table('users').select('*').limit(1).execute()
-        print(f"✅ Таблица users найдена! Записей: {len(test.data)}")
+        print(f"✅ Таблица users найдена! Записей: {len(test.data)}", flush=True)
     except Exception as e:
-        print(f"❌ Ошибка доступа к таблице users: {e}")
-        print("⚠️ Проверь имя таблицы и права доступа!")
+        print(f"❌ Ошибка доступа к таблице users: {e}", flush=True)
 except Exception as e:
-    print(f"❌ Ошибка подключения к Supabase: {e}")
-    print("⚠️ Использую локальную БД.")
+    print(f"❌ Ошибка подключения к Supabase: {e}", flush=True)
+    print("⚠️ Использую локальную БД.", flush=True)
     use_supabase = False
 
-print("🔴 ДАЛЬШЕ ВЕСЬ ОСТАЛЬНОЙ КОД (ФУНКЦИИ, КОМАНДЫ, БОТ)")
-print("🔴 ЕСЛИ ТЫ ЭТО ВИДИШЬ - ЗНАЧИТ ВСЁ РАБОТАЕТ!")
+# ============================================================
+# ИНИЦИАЛИЗАЦИЯ БД
+# ============================================================
+def init_db():
+    if use_supabase:
+        try:
+            supabase.table('users').select('*').limit(1).execute()
+            print("✅ Supabase таблицы готовы")
+        except Exception as e:
+            print(f"⚠️ Ошибка Supabase: {e}")
+        return
+    
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (user_id INTEGER PRIMARY KEY,
+                  username TEXT,
+                  premium INTEGER DEFAULT 0,
+                  messages_today INTEGER DEFAULT 0,
+                  last_reset TEXT,
+                  premium_expires TEXT,
+                  is_admin INTEGER DEFAULT 0,
+                  test_used INTEGER DEFAULT 0,
+                  joined_at TEXT,
+                  is_owner INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS banned
+                 (user_id INTEGER PRIMARY KEY)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS muted
+                 (user_id INTEGER PRIMARY KEY)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS total_stats
+                 (user_id INTEGER PRIMARY KEY,
+                  total_messages INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
+                 (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS support_requests
+                 (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  username TEXT,
+                  text TEXT,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
+    except:
+        pass
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN joined_at TEXT')
+    except:
+        pass
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN is_owner INTEGER DEFAULT 0')
+    except:
+        pass
+    conn.commit()
+    conn.close()
+    print("✅ Локальная SQLite база данных создана")
 
+def init_memory_db():
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS memory
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  topic TEXT,
+                  fact TEXT,
+                  timestamp TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS personality
+                 (user_id INTEGER PRIMARY KEY,
+                  style TEXT,
+                  mood TEXT,
+                  last_interaction TEXT)''')
+    conn.commit()
+    conn.close()
+
+# ============================================================
 # ВРЕМЯ (МОСКОВСКОЕ)
 # ============================================================
 MOSCOW_TZ = timezone(timedelta(hours=3))
@@ -161,7 +235,6 @@ SUPER_SYSTEM_PROMPT = """Ты — AWESOME AI — самая лучшая и пр
 # ============================================================
 # ФУНКЦИИ БАЗЫ ДАННЫХ
 # ============================================================
-
 def ensure_user(user_id, username):
     if use_supabase:
         try:
@@ -920,23 +993,6 @@ def fix_title(prompt):
 # ============================================================
 # ПАМЯТЬ
 # ============================================================
-def init_memory_db():
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS memory
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  topic TEXT,
-                  fact TEXT,
-                  timestamp TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS personality
-                 (user_id INTEGER PRIMARY KEY,
-                  style TEXT,
-                  mood TEXT,
-                  last_interaction TEXT)''')
-    conn.commit()
-    conn.close()
-
 def remember(user_id, topic, fact):
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
@@ -1473,7 +1529,6 @@ def admin_panel(m):
 # ============================================================
 # ФУНКЦИИ ДЛЯ КОМАНД
 # ============================================================
-
 def status_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     if user_id == OWNER_ID:
@@ -2091,7 +2146,7 @@ def handle_callback(call):
 
 # ============================================================
 # АДМИН-КОМАНДЫ
-# ============================================================== 
+# ============================================================
 @bot.message_handler(commands=['list_users'])
 def list_users_cmd(m):
     chat_id = m.chat.id
