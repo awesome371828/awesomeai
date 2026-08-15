@@ -1546,7 +1546,6 @@ def status_cmd_from_user(message, user_id):
                 remaining = 0
             status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
     
-    msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
     
 def premium_cmd_from_user(message, user_id):
