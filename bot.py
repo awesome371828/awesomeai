@@ -2,17 +2,17 @@
 import sys
 import os
 
-# ПРИНУДИТЕЛЬНО ОТКЛЮЧАЕМ БУФЕРИЗАЦИЮ ТОЛЬКО ДЛЯ ВЫВОДА
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
-
 print("🔴 БОТ НАЧАЛ ЗАПУСК!")
 print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...")
+sys.stdout.flush()
+
 import telebot
 print("✅ telebot импортирован")
+sys.stdout.flush()
 
 import requests
 print("✅ requests импортирован")
+sys.stdout.flush()
 
 import json
 import base64
@@ -34,6 +34,7 @@ from bs4 import BeautifulSoup
 from supabase import create_client, Client
 
 print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!")
+sys.stdout.flush()
 
 # ============================================================
 # НАСТРОЙКА
