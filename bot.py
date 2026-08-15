@@ -2524,6 +2524,23 @@ print("=" * 60)
 print("БОТ ГОТОВ!")
 print("=" * 60)
 
+# ВРЕМЕННАЯ ПРОВЕРКА
+print("=" * 60)
+print("🔍 ПРОВЕРКА SUPABASE:")
+print(f"SUPABASE_URL: {SUPABASE_URL}")
+print(f"SUPABASE_KEY: {SUPABASE_KEY[:20] if SUPABASE_KEY else 'None'}...")
+print(f"use_supabase: {use_supabase}")
+
+if use_supabase:
+    try:
+        test = supabase.table('users').select('*').limit(1).execute()
+        print("✅ Supabase доступен! Таблицы существуют.")
+    except Exception as e:
+        print(f"❌ Ошибка доступа к Supabase: {e}")
+else:
+    print("⚠️ Используется локальная БД")
+print("=" * 60)
+
 while True:
     try:
         bot.polling(none_stop=True)
