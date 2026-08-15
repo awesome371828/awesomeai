@@ -2580,3 +2580,4 @@ while True:
     except Exception as e:
         print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
         time.sleep(5)
+        Fix init_db
