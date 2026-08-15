@@ -44,13 +44,11 @@ PREMIUM_LIMIT = 150
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("⚠️ SUPABASE не настроен! Использую локальную БД.")
-    use_supabase = False
-else:
-    use_supabase = True
+# ПРИНУДИТЕЛЬНО ИСПОЛЬЗУЕМ SUPABASE
+use_supabase = True
+try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Supabase подключен!")
+    print("✅ Supabase подключен принудительно!")
     
     # ПРОВЕРКА ПОДКЛЮЧЕНИЯ
     try:
@@ -59,7 +57,10 @@ else:
     except Exception as e:
         print(f"❌ Ошибка доступа к таблице users: {e}")
         print("⚠️ Проверь имя таблицы и права доступа!")
-        
+except Exception as e:
+    print(f"❌ Ошибка подключения к Supabase: {e}")
+    print("⚠️ Использую локальную БД.")
+    use_supabase = False
 def init_db():
     """Инициализация базы данных (локальной, если Supabase не настроен)"""
     if use_supabase:
