@@ -1574,10 +1574,20 @@ def profile_cmd_from_user(message, user_id):
             remaining = 0
         status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
         limit_text = f"{FREE_LIMIT}/день"
+    
+    # ✅ ИСПРАВЛЕНО: берём username из объекта message.from_user
     username = message.from_user.username
+    # Если нет username, показываем "Не указан"
     user_link = f"@{username}" if username else "Не указан"
+    
     text = (
-        f"👤 ТВОЙ ПРОФИЛЬ\n\n🆔 ID: <code>{user_id}</code>\n👤 Юзер: {user_link}\n💎 Статус: {status}\n📨 Лимит: {limit_text}\n✉️ Сегодня: {messages}\n📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
+        f"👤 ТВОЙ ПРОФИЛЬ\n\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"👤 Юзер: {user_link}\n"
+        f"💎 Статус: {status}\n"
+        f"📨 Лимит: {limit_text}\n"
+        f"✉️ Сегодня: {messages}\n"
+        f"📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
     )
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
@@ -2337,7 +2347,7 @@ def handle_all_messages(m):
             )
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК
+# ОБРАБОТЧИК КНОПОК (ИСПРАВЛЕН - УБРАНО EDIT_MESSAGE)
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -2345,9 +2355,6 @@ def handle_callback(call):
         chat_id = call.message.chat.id
         user_id = call.from_user.id
         ensure_user(user_id, call.from_user.username or "unknown")
-        
-        # НЕ УДАЛЯЕМ СООБЩЕНИЕ СРАЗУ! Только если это не основное меню
-        # delete_previous_messages(chat_id, user_id)
         
         # Удаляем только если это переход в главное меню или другие кнопки
         if call.data in ["back_to_menu", "status", "premium", "profile", "stats", "clear", "help", "support", "draw", "test"]:
@@ -2388,7 +2395,7 @@ def handle_callback(call):
             return
         
         # ============================================================
-        # ОБРАБОТКА КНОПКИ "Я ОПЛАТИЛ" (ИСПРАВЛЕНО)
+        # ОБРАБОТКА КНОПКИ "Я ОПЛАТИЛ"
         # ============================================================
         if call.data == "i_paid":
             # Проверяем, есть ли уже Premium
@@ -2468,7 +2475,7 @@ def handle_callback(call):
             return
         
         # ============================================================
-        # ПОДТВЕРЖДЕНИЕ ЗАКАЗА АДМИНОМ (ИСПРАВЛЕНО)
+        # ПОДТВЕРЖДЕНИЕ ЗАКАЗА АДМИНОМ (ИСПРАВЛЕНО - БЕЗ EDIT)
         # ============================================================
         if call.data.startswith("confirm_order:"):
             if not is_authorized(user_id):
@@ -2522,7 +2529,7 @@ def handle_callback(call):
                 
                 bot.answer_callback_query(call.id, "✅ Premium выдан!")
                 
-                # Отправляем новое сообщение вместо редактирования
+                # ✅ ОТПРАВЛЯЕМ НОВОЕ СООБЩЕНИЕ вместо редактирования
                 bot.send_message(chat_id, f"✅ Заказ #{order_id} ПОДТВЕРЖДЁН!\nPremium выдан на 1 месяц.", parse_mode='HTML')
                 
                 expires_formatted = format_date(new_expires)
@@ -2537,7 +2544,7 @@ def handle_callback(call):
             return
         
         # ============================================================
-        # ОТКЛОНЕНИЕ ЗАКАЗА (ИСПРАВЛЕНО)
+        # ОТКЛОНЕНИЕ ЗАКАЗА (ИСПРАВЛЕНО - БЕЗ EDIT)
         # ============================================================
         if call.data.startswith("reject_order:"):
             if not is_authorized(user_id):
@@ -2586,11 +2593,187 @@ def handle_callback(call):
                 conn.close()
             
             bot.answer_callback_query(call.id, "❌ Заказ отклонён")
+            # ✅ ОТПРАВЛЯЕМ НОВОЕ СООБЩЕНИЕ вместо редактирования
             bot.send_message(chat_id, f"❌ Заказ #{order_id} ОТКЛОНЁН!", parse_mode='HTML')
             bot.send_message(target_user, f"❌ ЗАКАЗ ОТКЛОНЁН\n\nЗаказ #{order_id}\nАдминистратор отклонил заказ.", parse_mode='HTML')
             return
         
-        # ... остальные обработчики кнопок ...
+        # ============================================================
+        # АДМИН КНОПКИ
+        # ============================================================
+        if call.data == "admin_stats":
+            bot.answer_callback_query(call.id)
+            stats_cmd_from_user(call.message, user_id)
+            return
+        if call.data == "admin_list":
+            bot.answer_callback_query(call.id)
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username').eq('is_admin', 1).execute()
+                    admins = response.data
+                except:
+                    admins = []
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
+                admins = c.fetchall()
+                conn.close()
+            if not admins:
+                text = "👑 АДМИНЫ\n\nНет админов."
+            else:
+                text = "👑 АДМИНЫ\n\n"
+                for admin in admins:
+                    if isinstance(admin, dict):
+                        text += f"• @{admin.get('username', admin.get('user_id'))}\n"
+                    else:
+                        text += f"• @{admin[1] if admin[1] else admin[0]}\n"
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_list_users":
+            bot.answer_callback_query(call.id)
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username, premium, is_admin').execute()
+                    users = response.data
+                    text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                    for u in users:
+                        uid = u.get('user_id')
+                        username = u.get('username', 'Не указан')
+                        premium = u.get('premium', 0)
+                        is_admin_flag = u.get('is_admin', 0)
+                        status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                        text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                    msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                    user_message_ids[user_id].append(msg.message_id)
+                except:
+                    msg = bot.send_message(chat_id, "❌ Ошибка получения списка пользователей")
+                    user_message_ids[user_id].append(msg.message_id)
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username, premium, is_admin FROM users ORDER BY user_id')
+                users = c.fetchall()
+                conn.close()
+                text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                for user in users:
+                    uid, username, premium, is_admin_flag = user
+                    status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                    text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_broadcast":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📢 Напиши текст рассылки:\n/broadcast [текст]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_giveprem":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "💎 /giveprem [ID] [срок]\nСрок: 1d, 1m, 1h, 1mes, 1y", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_givetest":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎁 /givetest [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_ban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🚫 /ban [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_unban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "✅ /unban [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_mute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔇 /mute [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_unmute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔊 /unmute [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_giveadmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 /giveadmin [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_deladmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 /deladmin [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_info":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📊 /info [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_stats_users":
+            bot.answer_callback_query(call.id)
+            stats_users_cmd_from_user(call.message, user_id)
+            return
+        if call.data == "admin_clear_messages":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🧹 /clear_messages [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_close":
+            bot.answer_callback_query(call.id, "❌ Закрыто")
+            msg = bot.send_message(chat_id, "❌ Панель закрыта", reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_orders":
+            bot.answer_callback_query(call.id)
+            admin_orders_cmd_from_user(call.message, user_id)
+            return
+        if call.data == "admin_support":
+            bot.answer_callback_query(call.id)
+            admin_support_cmd_from_user(call.message, user_id)
+            return
+        
+        # ============================================================
+        # ОСНОВНЫЕ КНОПКИ
+        # ============================================================
+        if call.data == "test":
+            bot.answer_callback_query(call.id, "🎁 Активирую...")
+            process_test_premium(chat_id, user_id)
+            return
+        if call.data == "support":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📩 Напиши: /support [текст]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "status":
+            bot.answer_callback_query(call.id)
+            status_cmd_from_user(call.message, user_id)
+        elif call.data == "premium":
+            bot.answer_callback_query(call.id)
+            premium_cmd_from_user(call.message, user_id)
+        elif call.data == "profile":
+            bot.answer_callback_query(call.id)
+            profile_cmd_from_user(call.message, user_id)
+        elif call.data == "stats":
+            bot.answer_callback_query(call.id)
+            stats_cmd_from_user(call.message, user_id)
+        elif call.data == "clear":
+            bot.answer_callback_query(call.id)
+            clear_cmd_from_user(call.message, user_id)
+        elif call.data == "help":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "/help", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+        elif call.data == "draw":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+    except Exception as e:
+        bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_broadcast:"))
 def confirm_broadcast(call):
@@ -2623,12 +2806,20 @@ def confirm_broadcast(call):
         except:
             failed += 1
     bot.answer_callback_query(call.id, f"✅ Отправлено: {sent}, Ошибок: {failed}")
-    bot.edit_message_text(f"✅ Рассылка завершена!\n\n📤 Отправлено: {sent}\n❌ Ошибок: {failed}", chat_id=chat_id, message_id=call.message.message_id, parse_mode='HTML')
+    bot.send_message(chat_id, f"✅ Рассылка завершена!\n\n📤 Отправлено: {sent}\n❌ Ошибок: {failed}", parse_mode='HTML')
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass
 
 @bot.callback_query_handler(func=lambda call: call.data == "cancel_broadcast")
 def cancel_broadcast(call):
     bot.answer_callback_query(call.id, "❌ Отменено")
-    bot.edit_message_text("❌ Отменено.", chat_id=call.message.chat.id, message_id=call.message.message_id)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+    bot.send_message(call.message.chat.id, "❌ Отменено.", parse_mode='HTML')
 
 # ============================================================
 # ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ АДМИН-КНОПОК
