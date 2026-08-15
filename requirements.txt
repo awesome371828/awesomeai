@@ -4,3 +4,4 @@ beautifulsoup4
 Pillow
 speechrecognition
 python-dateutil
+supabase-py
