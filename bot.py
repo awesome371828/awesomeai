@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 import sys
-import os
-
-print("🔴 БОТ НАЧАЛ ЗАПУСК!")
-print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...")
-sys.stdout.flush()
-
+print("🔴 БОТ НАЧАЛ ЗАПУСК!", flush=True)
+print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...", flush=True)
 import telebot
-print("✅ telebot импортирован")
-sys.stdout.flush()
-
+print("✅ telebot импортирован", flush=True)
 import requests
-print("✅ requests импортирован")
-sys.stdout.flush()
-
+print("✅ requests импортирован", flush=True)
 import json
 import base64
 import io
