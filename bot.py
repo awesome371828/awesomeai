@@ -50,6 +50,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 def init_db():
     """Инициализация базы данных (локальной, если Supabase не настроен)"""
     if use_supabase:
+        else:
+    use_supabase = True
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ Supabase подключен!")
         try:
             # Проверяем подключение к Supabase
             supabase.table('users').select('*').limit(1).execute()
