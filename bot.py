@@ -2521,10 +2521,8 @@ else:
 print(f"📊 Лимиты: Бесплатный: {FREE_LIMIT}/день | Премиум: {PREMIUM_LIMIT}/день")
 print(f"🕐 Часовой пояс: МСК (UTC+3)")
 print("=" * 60)
-print("БОТ ГОТОВ!")
-print("=" * 60)
 
-# ВРЕМЕННАЯ ПРОВЕРКА
+# ПРОВЕРКА SUPABASE
 print("=" * 60)
 print("🔍 ПРОВЕРКА SUPABASE:")
 print(f"SUPABASE_URL: {SUPABASE_URL}")
@@ -2539,6 +2537,9 @@ if use_supabase:
         print(f"❌ Ошибка доступа к Supabase: {e}")
 else:
     print("⚠️ Используется локальная БД")
+print("=" * 60)
+
+print("✅ БОТ ЗАПУЩЕН!")
 print("=" * 60)
 
 while True:
