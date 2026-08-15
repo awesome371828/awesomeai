@@ -1617,60 +1617,88 @@ def profile_cmd_from_user(message, user_id):
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
-def stats_cmd_from_user(message, user_id):
-    chat_id = message.chat.id
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
+@bot.message_handler(commands=['stats'])
+def stats_cmd(m):
+    chat_id = m.chat.id
+    user_id = m.from_user.id
+    delete_previous_messages(chat_id, user_id)
+    try:
+        bot.delete_message(chat_id, m.message_id)
+    except:
+        pass
+    
     if user_id == OWNER_ID or is_admin(user_id):
-        c.execute('SELECT SUM(messages_today) FROM users')
-        today_messages = c.fetchone()[0] or 0
-        c.execute('SELECT COUNT(*) FROM users')
-        total_users = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM users WHERE premium = 1')
-        premium_users = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM users WHERE is_admin = 1')
-        admin_users = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM premium_orders WHERE status = "pending"')
-        pending_orders = c.fetchone()[0]
-        c.execute('SELECT COUNT(*) FROM support_requests WHERE status = "pending"')
-        pending_support = c.fetchone()[0]
-        conn.close()
-        text = (
-            f"📊 СТАТИСТИКА СЕРВЕРА\n\n👥 Всего: {total_users}\n👑 Админов: {admin_users}\n💎 Premium: {premium_users}\n🔓 Бесплатных: {total_users - premium_users - admin_users}\n📨 Сообщений сегодня: {today_messages}\n💳 Заказов: {pending_orders}\n📩 Обращений: {pending_support}\n\n📊 Лимиты:\n🔓 Бесплатный: {FREE_LIMIT}/день\n💎 Премиум: {PREMIUM_LIMIT}/день"
-        )
-        msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
-        user_message_ids[user_id].append(msg.message_id)
-        return
-    c.execute('SELECT messages_today, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
-    result = c.fetchone()
-    conn.close()
-    if result is None:
-        user_messages = 0
-        user_status = "🔓 Бесплатный"
-    else:
-        user_messages, premium, expires = result
-        if premium == 1:
-            if expires:
-                try:
-                    expires_date = datetime.strptime(expires, '%Y-%m-%d %H:%M:%S')
-                    expires_formatted = expires_date.strftime('%d.%m.%Y %H:%M')
-                except:
-                    expires_formatted = expires
-            else:
-                expires_formatted = "неизвестно"
-            user_status = f"💎 PREMIUM (до {expires_formatted} МСК)"
+        if use_supabase:
+            try:
+                response = supabase.table('users').select('*').execute()
+                users = response.data
+            except:
+                users = []
         else:
-            remaining = FREE_LIMIT - user_messages
-            if remaining < 0:
-                remaining = 0
-            user_status = f"🔓 Бесплатный ({remaining}/{FREE_LIMIT})"
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('SELECT total_messages FROM total_stats WHERE user_id = ?', (user_id,))
-    res = c.fetchone()
-    total_user_messages = res[0] if res else 0
-    conn.close()
-    text = f"📊 ТВОЯ СТАТИСТИКА\n\n👤 Статус: {user_status}\n✉️ Сегодня: {user_messages}\n📨 Всего: {total_user_messages}"
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT * FROM users')
+            users = c.fetchall()
+            conn.close()
+        
+        total_users = len(users)
+        premium_users = sum(1 for u in users if (u.get('premium') if isinstance(u, dict) else u[2]) == 1)
+        admin_users = sum(1 for u in users if (u.get('is_admin') if isinstance(u, dict) else u[7]) == 1)
+        
+        text = (
+            "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
+            f"👥 Всего: {total_users}\n"
+            f"👑 Админов: {admin_users}\n"
+            f"💎 Premium: {premium_users}\n"
+            f"🔓 Бесплатных: {total_users - premium_users - admin_users}\n"
+            f"📊 Лимиты:\n"
+            f"🔓 Бесплатный: {FREE_LIMIT}/день\n"
+            f"💎 Премиум: ♾️ Безлимит"
+        )
+    else:
+        if use_supabase:
+            try:
+                response = supabase.table('users').select('messages_today, total_messages, premium, premium_expires').eq('user_id', user_id).execute()
+                user_data = response.data[0] if response.data else None
+            except:
+                user_data = None
+        else:
+            conn = sqlite3.connect('users.db')
+            c = conn.cursor()
+            c.execute('SELECT messages_today, total_messages, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
+            user_data = c.fetchone()
+            conn.close()
+        
+        if user_data:
+            if isinstance(user_data, dict):
+                messages_today = user_data.get('messages_today', 0)
+                total_messages = user_data.get('total_messages', 0)
+                premium = user_data.get('premium', 0)
+            else:
+                messages_today = user_data[0] if user_data else 0
+                total_messages = user_data[1] if user_data and len(user_data) > 1 else 0
+                premium = user_data[2] if user_data and len(user_data) > 2 else 0
+            
+            if premium == 1:
+                status = "💎 PREMIUM"
+                limit_text = "♾️"
+            else:
+                remaining = FREE_LIMIT - messages_today
+                if remaining < 0:
+                    remaining = 0
+                status = "🔓 Бесплатный"
+                limit_text = f"{remaining}/{FREE_LIMIT}"
+            
+            text = (
+                "📊 <b>ТВОЯ СТАТИСТИКА</b>\n\n"
+                f"👤 Статус: {status}\n"
+                f"📨 Лимит: {limit_text}\n"
+                f"✉️ Сегодня: {messages_today}\n"
+                f"📊 Всего: {total_messages}"
+            )
+        else:
+            text = "❌ Не удалось получить данные."
+    
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
