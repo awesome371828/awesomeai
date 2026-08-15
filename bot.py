@@ -47,10 +47,81 @@ SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("⚠️ SUPABASE не настроен! Использую локальную БД.")
     use_supabase = False
-else:
-    use_supabase = True
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Supabase подключен!")
+def init_db():
+    """Инициализация базы данных (локальной, если Supabase не настроен)"""
+    if use_supabase:
+        try:
+            # Проверяем подключение к Supabase
+            supabase.table('users').select('*').limit(1).execute()
+            print("✅ Supabase таблицы готовы")
+        except Exception as e:
+            print(f"⚠️ Ошибка Supabase: {e}")
+            print("⚠️ Создай таблицы вручную через SQL Editor!")
+        return
+    
+    # Локальная SQLite
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # Таблица пользователей
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (user_id INTEGER PRIMARY KEY,
+                  username TEXT,
+                  premium INTEGER DEFAULT 0,
+                  messages_today INTEGER DEFAULT 0,
+                  last_reset TEXT,
+                  premium_expires TEXT,
+                  is_admin INTEGER DEFAULT 0,
+                  test_used INTEGER DEFAULT 0,
+                  joined_at TEXT,
+                  is_owner INTEGER DEFAULT 0)''')
+    
+    # Таблица забаненных
+    c.execute('''CREATE TABLE IF NOT EXISTS banned
+                 (user_id INTEGER PRIMARY KEY)''')
+    
+    # Таблица замученных
+    c.execute('''CREATE TABLE IF NOT EXISTS muted
+                 (user_id INTEGER PRIMARY KEY)''')
+    
+    # Таблица статистики
+    c.execute('''CREATE TABLE IF NOT EXISTS total_stats
+                 (user_id INTEGER PRIMARY KEY,
+                  total_messages INTEGER DEFAULT 0)''')
+    
+    # Таблица заказов Premium
+    c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
+                 (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
+    
+    # Таблица обращений в поддержку
+    c.execute('''CREATE TABLE IF NOT EXISTS support_requests
+                 (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  username TEXT,
+                  text TEXT,
+                  status TEXT DEFAULT 'pending',
+                  created_at TEXT)''')
+    
+    # Добавляем колонки если их нет (для обратной совместимости)
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
+    except:
+        pass
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN joined_at TEXT')
+    except:
+        pass
+    try:
+        c.execute('ALTER TABLE users ADD COLUMN is_owner INTEGER DEFAULT 0')
+    except:
+        pass
+    
+    conn.commit()
+    conn.close()
+    print("✅ Локальная SQLite база данных создана")
 
 # ============================================================
 # ВРЕМЯ (МОСКОВСКОЕ)
