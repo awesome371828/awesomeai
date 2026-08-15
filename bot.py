@@ -1550,7 +1550,7 @@ total_messages = 0
 
 for u in users:
     if isinstance(u, dict):
-    total_messages += u.get('total_messages', 0)
+        total_messages += u.get('total_messages', 0)
 
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
