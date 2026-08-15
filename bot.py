@@ -62,11 +62,20 @@ except Exception as e:
     print("⚠️ Использую локальную БД.")
     use_supabase = False
 
-    # Локальная SQLite
+def init_db():
+    """Инициализация базы данных (локальной, если Supabase не настроен)"""
+    if use_supabase:
+        try:
+            supabase.table('users').select('*').limit(1).execute()
+            print("✅ Supabase таблицы готовы")
+        except Exception as e:
+            print(f"⚠️ Ошибка Supabase: {e}")
+            print("⚠️ Создай таблицы вручную через SQL Editor!")
+        return
+    
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     
-    # Таблица пользователей
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -79,27 +88,22 @@ except Exception as e:
                   joined_at TEXT,
                   is_owner INTEGER DEFAULT 0)''')
     
-    # Таблица забаненных
     c.execute('''CREATE TABLE IF NOT EXISTS banned
                  (user_id INTEGER PRIMARY KEY)''')
     
-    # Таблица замученных
     c.execute('''CREATE TABLE IF NOT EXISTS muted
                  (user_id INTEGER PRIMARY KEY)''')
     
-    # Таблица статистики
     c.execute('''CREATE TABLE IF NOT EXISTS total_stats
                  (user_id INTEGER PRIMARY KEY,
                   total_messages INTEGER DEFAULT 0)''')
     
-    # Таблица заказов Premium
     c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
                  (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
                   status TEXT DEFAULT 'pending',
                   created_at TEXT)''')
     
-    # Таблица обращений в поддержку
     c.execute('''CREATE TABLE IF NOT EXISTS support_requests
                  (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -108,7 +112,6 @@ except Exception as e:
                   status TEXT DEFAULT 'pending',
                   created_at TEXT)''')
     
-    # Добавляем колонки если их нет (для обратной совместимости)
     try:
         c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
     except:
@@ -374,6 +377,19 @@ def increment_messages(user_id):
     c.execute('UPDATE total_stats SET total_messages = total_messages + 1 WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
+
+def remove_premium(user_id):
+    if use_supabase:
+        try:
+            supabase.table('users').update({'premium': 0, 'premium_expires': None}).eq('user_id', user_id).execute()
+        except:
+            pass
+    else:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('UPDATE users SET premium = 0, premium_expires = NULL WHERE user_id = ?', (user_id,))
+        conn.commit()
+        conn.close()
 
 def set_premium(user_id, duration_str):
     now = get_moscow_time()
@@ -1546,7 +1562,7 @@ def status_cmd_from_user(message, user_id):
     
     msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
-    
+
 def premium_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     has_premium = get_premium_status(user_id)
@@ -1616,102 +1632,6 @@ def profile_cmd_from_user(message, user_id):
     msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
     user_message_ids[user_id].append(msg.message_id)
 
-@bot.message_handler(commands=['stats'])
-def stats_cmd(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    delete_previous_messages(chat_id, user_id)
-    try:
-        bot.delete_message(chat_id, m.message_id)
-    except:
-        pass
-    
-    if user_id == OWNER_ID or is_admin(user_id):
-        if use_supabase:
-            try:
-                response = supabase.table('users').select('*').execute()
-                users = response.data
-            except:
-                users = []
-        else:
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT * FROM users')
-            users = c.fetchall()
-            conn.close()
-        
-        total_users = len(users)
-        premium_users = 0
-        admin_users = 0
-        for u in users:
-            if isinstance(u, dict):
-                if u.get('premium', 0) == 1:
-                    premium_users += 1
-                if u.get('is_admin', 0) == 1:
-                    admin_users += 1
-            else:
-                if u[2] == 1:
-                    premium_users += 1
-                if u[7] == 1:
-                    admin_users += 1
-        
-        text = (
-            "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
-            f"👥 Всего: {total_users}\n"
-            f"👑 Админов: {admin_users}\n"
-            f"💎 Premium: {premium_users}\n"
-            f"🔓 Бесплатных: {total_users - premium_users - admin_users}\n"
-            f"📊 Лимиты:\n"
-            f"🔓 Бесплатный: {FREE_LIMIT}/день\n"
-            f"💎 Премиум: ♾️ Безлимит"
-        )
-    else:
-        if use_supabase:
-            try:
-                response = supabase.table('users').select('messages_today, total_messages, premium, premium_expires').eq('user_id', user_id).execute()
-                user_data = response.data[0] if response.data else None
-            except:
-                user_data = None
-        else:
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute('SELECT messages_today, total_messages, premium, premium_expires FROM users WHERE user_id = ?', (user_id,))
-            user_data = c.fetchone()
-            conn.close()
-        
-        if user_data:
-            if isinstance(user_data, dict):
-                messages_today = user_data.get('messages_today', 0)
-                total_messages = user_data.get('total_messages', 0)
-                premium = user_data.get('premium', 0)
-            else:
-                messages_today = user_data[0] if user_data else 0
-                total_messages = user_data[1] if user_data and len(user_data) > 1 else 0
-                premium = user_data[2] if user_data and len(user_data) > 2 else 0
-            
-            if premium == 1:
-                status = "💎 PREMIUM"
-                limit_text = "♾️"
-            else:
-                remaining = FREE_LIMIT - messages_today
-                if remaining < 0:
-                    remaining = 0
-                status = "🔓 Бесплатный"
-                limit_text = f"{remaining}/{FREE_LIMIT}"
-            
-            text = (
-                "📊 <b>ТВОЯ СТАТИСТИКА</b>\n\n"
-                f"👤 Статус: {status}\n"
-                f"📨 Лимит: {limit_text}\n"
-                f"✉️ Сегодня: {messages_today}\n"
-                f"📊 Всего: {total_messages}"
-            )
-        else:
-            text = "❌ Не удалось получить данные."
-    
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-    
 def clear_cmd_from_user(message, user_id):
     chat_id = message.chat.id
     if user_id in user_histories:
