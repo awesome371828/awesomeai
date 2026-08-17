@@ -41,7 +41,8 @@ YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 if not YANDEX_API_KEY:
     raise ValueError("❌ YANDEX_API_KEY не найден!")
 
-FOLDER_ID = "b1g4aq87c7j61c6g3i5l"
+FOLDER_ID = os.getenv("FOLDER_ID", "b1g4aq87c7j61c6g3i5l")
+GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
 OWNER_ID = 6652898792
 
 FREE_LIMIT = 20
