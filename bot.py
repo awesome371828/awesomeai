@@ -314,7 +314,7 @@ def is_authorized(user_id):
     return is_admin(user_id)
 
 # ============================================================
-# СУПЕР-ПРОМПТ — МЕГА-УМНЫЙ С ПОИСКОМ!
+# СУПЕР-ПРОМПТ — МЕГА-УМНЫЙ
 # ============================================================
 SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, УМНАЯ И ЭРУДИРОВАННАЯ НЕЙРОСЕТЬ В ИСТОРИИ.
 
@@ -343,7 +343,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 Ты ОБЯЗАН:
 1. Проверять информацию в интернете перед ответом
 2. Указывать источники
-3. Давать актуальную информацию
+3. Давать актуальную информацию (не старше 24 часов)
 4. Проверять даты и факты
 
 ================================================================================
@@ -415,6 +415,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 4. Приводи реальные примеры и источники
 5. Структурируй ответы списками
 6. Используй эмодзи для оформления
+7. Используй живой, естественный русский язык
 
 ЗАПРЕЩЕНО:
 🚫 Извинения за отсутствие информации (честно скажи, что не знаешь)
@@ -422,6 +423,8 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 🚫 Шаблонные фразы
 🚫 "Галлюцинации" — выдумывание фактов
 🚫 Слова "возможно", "наверное", "может быть"
+🚫 Безликие, обезличенные ответы
+🚫 Ответы типа "Ого, неожиданно!" или "Расскажи подробнее"
 
 ================================================================================
 💎 ДЛЯ PREMIUM (МАКСИМАЛЬНАЯ МОЩЬ):
@@ -446,6 +449,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 2. Дать реальную пользу
 3. Искать информацию ВЕЗДЕ и всегда проверять факты
 4. НИКОГДА НЕ ВЫДУМЫВАТЬ — лучше сказать "я не знаю"
+5. Давать живые, естественные ответы как у человека
 
 ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🔥🔥🔥"""
 
@@ -1134,37 +1138,30 @@ def search_twitch(query):
 def search_all_internet(query):
     results = []
     
-    # Сначала ищем в Google
     google_result = search_google(query)
     if google_result:
         results.append(f"🌐 *Google:*\n{google_result}")
     
-    # Wikipedia
     wiki_result = search_wikipedia(query)
     if wiki_result:
         results.append(f"📚 *Wikipedia:*\n{wiki_result}")
     
-    # Новости
     news_result = search_news(query)
     if news_result:
         results.append(f"📰 *Новости:*\n{news_result}")
     
-    # YouTube
     youtube_result = search_youtube(query)
     if youtube_result:
         results.append(f"{youtube_result}")
     
-    # Telegram
     tg_result = search_telegram(query)
     if tg_result:
         results.append(f"{tg_result}")
     
-    # ВКонтакте
     vk_result = search_vk(query)
     if vk_result:
         results.append(f"{vk_result}")
     
-    # Twitch
     twitch_result = search_twitch(query)
     if twitch_result:
         results.append(f"{twitch_result}")
@@ -1173,11 +1170,95 @@ def search_all_internet(query):
         return "\n\n---\n\n".join(results)
     return None
 
-def search_with_date(query):
-    """Поиск с учётом сегодняшней даты"""
-    today = get_moscow_time().strftime('%d.%m.%Y')
-    full_query = f"{query} {today}"
-    return search_all_internet(full_query)
+# ============================================================
+# GIGACHAT (ОСНОВНАЯ МОДЕЛЬ)
+# ============================================================
+def get_gigachat_token():
+    """Получаем Access Token для GigaChat (действует 30 минут)"""
+    if not GIGACHAT_AUTH_KEY:
+        print("❌ GIGACHAT_AUTH_KEY не настроен!")
+        return None
+    try:
+        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "RqUID": "00000000-0000-0000-0000-000000000000",
+            "Authorization": f"Basic {GIGACHAT_AUTH_KEY}"
+        }
+        data = {
+            "scope": "GIGACHAT_API_PERS",
+            "grant_type": "client_credentials"
+        }
+        response = requests.post(url, headers=headers, data=data, timeout=10)
+        if response.status_code == 200:
+            token = response.json().get("access_token")
+            print("✅ GigaChat токен получен!")
+            return token
+        print(f"❌ GigaChat token error: {response.text}")
+        return None
+    except Exception as e:
+        print(f"❌ GigaChat token error: {e}")
+        return None
+
+def generate_with_gigachat(user_text, system_prompt):
+    """Генерация через GigaChat (ОСНОВНАЯ МОДЕЛЬ)"""
+    try:
+        token = get_gigachat_token()
+        if not token:
+            return None
+        
+        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        data = {
+            "model": "GigaChat-Pro",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text}
+            ],
+            "temperature": 0.85,
+            "max_tokens": 1500
+        }
+        response = requests.post(url, headers=headers, json=data, timeout=15)
+        if response.status_code == 200:
+            result = response.json()["choices"][0]["message"]["content"]
+            print("✅ GigaChat ответил!")
+            return result
+        print(f"❌ GigaChat response error: {response.text}")
+        return None
+    except Exception as e:
+        print(f"❌ GigaChat ошибка: {e}")
+        return None
+
+# ============================================================
+# YANDEXGPT (ЗАПАСНАЯ МОДЕЛЬ)
+# ============================================================
+def generate_with_yandexgpt(user_text, system_prompt):
+    """YandexGPT — запасная модель"""
+    try:
+        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
+        data = {
+            "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
+            "completionOptions": {"temperature": 0.85, "maxTokens": 800},
+            "messages": [
+                {"role": "system", "text": system_prompt},
+                {"role": "user", "text": user_text}
+            ]
+        }
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        if response.status_code == 200:
+            result = response.json()["result"]["alternatives"][0]["message"]["text"]
+            print("✅ YandexGPT ответил!")
+            return result
+        return None
+    except Exception as e:
+        print(f"❌ YandexGPT ошибка: {e}")
+        return None
 
 # ============================================================
 # КУРС ВАЛЮТ
@@ -1412,7 +1493,6 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             'neutral': '😐'
         }
         
-        # Добавляем текущую дату в промпт
         current_date = get_current_date()
         current_time = get_moscow_time().strftime('%H:%M')
         system_prompt = SUPER_SYSTEM_PROMPT.format(
@@ -1440,48 +1520,33 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
                 role = "Пользователь" if msg["role"] == "user" else "Ты"
                 history_text += f"{role}: {msg['text']}\n"
         
-        messages = [{"role": "system", "text": system_prompt}]
-        if history_text:
-            messages.append({"role": "system", "text": f"История диалога:\n{history_text}"})
-        messages.append({"role": "user", "text": user_text})
+        # ===== ПРОБУЕМ GIGACHAT (ОСНОВНАЯ) =====
+        if GIGACHAT_AUTH_KEY:
+            try:
+                response = generate_with_gigachat(user_text, system_prompt)
+                if response and len(response) > 10:
+                    history.append({"role": "user", "text": user_text})
+                    history.append({"role": "assistant", "text": response})
+                    return response
+            except Exception as e:
+                print(f"❌ GigaChat упал: {e}")
         
-        max_tokens = 1500 if get_premium_status(user_id) else 800
-        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-        data = {
-            "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.85, "maxTokens": max_tokens},
-            "messages": messages
-        }
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        if response.status_code == 200:
-            ans = response.json()["result"]["alternatives"][0]["message"]["text"]
-            history.append({"role": "user", "text": user_text})
-            history.append({"role": "assistant", "text": ans})
-            return ans
-        else:
-            return get_fallback_response(user_id, user_text, search_result, image_description)
+        # ===== YANDEXGPT (ЗАПАСНАЯ) =====
+        try:
+            response = generate_with_yandexgpt(user_text, system_prompt)
+            if response and len(response) > 10:
+                history.append({"role": "user", "text": user_text})
+                history.append({"role": "assistant", "text": response})
+                return response
+        except Exception as e:
+            print(f"❌ YandexGPT упал: {e}")
+        
+        # ===== ЕСЛИ ВСЁ УПАЛО =====
+        return "⚠️ Все нейросети временно недоступны. Попробуй позже! 🤖"
+        
     except Exception as e:
         print(f"[GPT] Ошибка: {e}")
-        return get_fallback_response(user_id, user_text, search_result, image_description)
-
-def get_fallback_response(user_id, user_text, search_result=None, image_description=None):
-    if image_description:
-        return f"📸 {image_description}"
-    if search_result:
-        return f"🔍 {search_result[:500]}"
-    memories = recall(user_id, user_text)
-    if memories:
-        return f"🧠 Я помню: {memories[0]}"
-    phrases = [
-        "Хм, интересный вопрос! Дай подумать... 🤔",
-        "Ого, неожиданно! Расскажи подробнее! 😊",
-        "Слушай, я не совсем уловил мысль. Можешь переформулировать? 🙏",
-        "А вот это интересно! Давай разберёмся вместе! 🧠",
-        "Понял! Сейчас подумаю и отвечу! 💪",
-        "Классный вопрос! Я обожаю такие! ⏳"
-    ]
-    return random.choice(phrases)
+        return "⚠️ Ошибка при генерации ответа. Попробуй ещё раз! 🤖"
 
 # ============================================================
 # ГЛАВНАЯ ОБРАБОТКА С МЕГА-ПОИСКОМ!
@@ -1493,16 +1558,13 @@ def process_message(user_id, user_text, image_description=None):
     info_keywords = ['праздник', 'событие', 'новость', 'кто', 'что', 'где', 'когда', 'почему', 'зачем', 'как', 'сколько', 'какой']
     is_info_question = any(kw in text_lower for kw in info_keywords)
     
-    # Проверяем на вопросы о дате/праздниках
     if any(kw in text_lower for kw in ['праздник', 'сегодня', 'дата', 'какой сегодня', 'что сегодня']):
-        # Ищем с учётом даты
         today = get_moscow_time().strftime('%d.%m.%Y')
         search_result = search_all_internet(f"праздники {today} Россия")
         if search_result:
             return f"📅 *Сегодня {today} (МСК)*\n\n{search_result}"
     
     if is_info_question and len(user_text) > 3:
-        # Мега-поиск по всему интернету
         search_result = search_all_internet(user_text)
         if search_result:
             today = get_moscow_time().strftime('%d.%m.%Y')
@@ -1550,7 +1612,6 @@ def process_message(user_id, user_text, image_description=None):
     if math_result is not None:
         return math_result
     
-    # Если ничего не сработало — ищем в интернете
     search_result = None
     if len(user_text) > 5:
         search_result = search_all_internet(user_text)
@@ -3222,7 +3283,7 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ С МЕГА-ПОИСКОМ!")
+print("🧠 AWESOME AI — С GIGACHAT + YANDEXGPT + МЕГА-ПОИСК!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
 if use_supabase:
@@ -3240,6 +3301,10 @@ print("✅ Telegram")
 print("✅ ВКонтакте")
 print("✅ Twitch")
 print("✅ Новости")
+print("=" * 60)
+print("🧠 НЕЙРОСЕТИ:")
+print("✅ GigaChat (ОСНОВНАЯ)")
+print("✅ YandexGPT (ЗАПАСНАЯ)")
 print("=" * 60)
 
 if use_supabase:
