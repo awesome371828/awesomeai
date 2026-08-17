@@ -2993,33 +2993,38 @@ else:
     print("⚠️ Используется локальная БД")
 print("=" * 60)
 
-print("✅ БОТ ЗАПУЩЕН!")
+print("✅ БОТ ГОТОВ К ЗАПУСКУ!")
 print("=" * 60)
 
 # ============================================================
-# ЗАПУСК С ЗАЩИТОЙ ОТ ОШИБКИ 409
+# ПРАВИЛЬНЫЙ ЗАПУСК - БЕЗ ОШИБКИ 409!
 # ============================================================
-while True:
-    try:
-        # Останавливаем предыдущие потоки
+if __name__ == "__main__":
+    while True:
         try:
-            bot.stop_polling()
-        except:
-            pass
-        time.sleep(1)
-        
-        # Запускаем с правильными параметрами
-        bot.polling(none_stop=True, timeout=30, long_polling_timeout=30)
-    except Exception as e:
-        error_msg = str(e)
-        if "409" in error_msg or "Conflict" in error_msg:
-            print("⚠️ Обнаружен конфликт (409). Останавливаем старые экземпляры...")
+            # ОСТАНАВЛИВАЕМ ВСЕ СТАРЫЕ ПОТОКИ
             try:
                 bot.stop_polling()
+                print("🛑 Старые потоки остановлены")
             except:
                 pass
-            time.sleep(3)
-            continue
-        else:
-            print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
-            time.sleep(5)
+            time.sleep(2)
+            
+            # ЗАПУСКАЕМ
+            print("🚀 Бот запускается...")
+            bot.polling(
+                none_stop=True,
+                timeout=30,
+                long_polling_timeout=30,
+                allowed_updates=['message', 'callback_query']
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if "409" in error_msg or "Conflict" in error_msg:
+                print("⚠️ КОНФЛИКТ 409! Перезапуск через 5 секунд...")
+                time.sleep(5)
+                continue
+            else:
+                print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
+                time.sleep(5)
+                continue
