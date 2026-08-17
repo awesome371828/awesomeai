@@ -42,7 +42,7 @@ import threading
 print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!", flush=True)
 
 # ============================================================
-# МАКСИМАЛЬНО БЫСТРАЯ НАСТРОЙКА
+# НАСТРОЙКА
 # ============================================================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
@@ -59,22 +59,19 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 999999999
 
-# МАКСИМАЛЬНО БЫСТРЫЕ ТАЙМАУТЫ
-GIGACHAT_TIMEOUT = 2   # 2 секунды
-YANDEXGPT_TIMEOUT = 3  # 3 секунды
-SEARCH_TIMEOUT = 1     # 1 секунда
-WEATHER_TIMEOUT = 1    # 1 секунда
-
-# Пул потоков для параллельных запросов
-executor = ThreadPoolExecutor(max_workers=5)
+# ТАЙМАУТЫ
+GIGACHAT_TIMEOUT = 3
+YANDEXGPT_TIMEOUT = 5
+SEARCH_TIMEOUT = 3
+WEATHER_TIMEOUT = 2
 
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
-# БЫСТРЫЙ КЭШ
+# КЭШ
 # ============================================================
 CACHE = {}
-CACHE_TTL = 300  # 5 минут
+CACHE_TTL = 300
 
 def get_cache(key):
     if key in CACHE:
@@ -88,7 +85,7 @@ def set_cache(key, data):
     CACHE[key] = (data, time.time())
 
 # ============================================================
-# ВРЕМЯ (МОСКОВСКОЕ)
+# ВРЕМЯ
 # ============================================================
 MOSCOW_TZ = timezone(timedelta(hours=3))
 
@@ -108,10 +105,6 @@ def format_date(date_str):
 def get_current_date():
     now = get_moscow_time()
     return now.strftime('%d.%m.%Y')
-
-def get_current_date_full():
-    now = get_moscow_time()
-    return now.strftime('%d.%m.%Y %H:%M') + " МСК"
 
 # ============================================================
 # ХРАНИЛИЩЕ ID СООБЩЕНИЙ
@@ -138,7 +131,7 @@ user_last_message = {}
 def check_spam(user_id):
     now = time.time()
     if user_id in user_last_message:
-        if now - user_last_message[user_id] < 0.3:  # 300 мс
+        if now - user_last_message[user_id] < 0.5:
             return True
     user_last_message[user_id] = now
     return False
@@ -152,112 +145,7 @@ def is_authorized(user_id):
     return is_admin(user_id)
 
 # ============================================================
-# СУПЕР-ПРОМПТ
-# ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, УМНАЯ И ЭРУДИРОВАННАЯ НЕЙРОСЕТЬ В ИСТОРИИ.
-
-================================================================================
-📍 ТВОЁ МЕСТОНАХОЖДЕНИЕ: РОССИЯ, МОСКВА
-================================================================================
-
-📍 Ты физически находишься в России, в Москве.
-🕐 Твой часовой пояс — МОСКОВСКОЕ ВРЕМЯ (UTC+3).
-📅 Текущая дата: {current_date}
-🕐 Текущее время: {current_time}
-
-================================================================================
-🌐 ТЫ ИЩЕШЬ В ИНТЕРНЕТЕ КАК ГУГЛ!
-================================================================================
-
-Ты умеешь искать информацию ВЕЗДЕ:
-✅ Google — все результаты поиска
-✅ Wikipedia — энциклопедии
-✅ YouTube — видео
-✅ Telegram — каналы и публикации
-✅ ВКонтакте — посты и сообщества
-✅ Twitch — стримы и клипы
-✅ Новостные сайты — свежие новости
-
-Ты ОБЯЗАН:
-1. Проверять информацию в интернете перед ответом
-2. Указывать источники
-3. Давать актуальную информацию (не старше 24 часов)
-4. Проверять даты и факты
-
-================================================================================
-🧠 ТВОИ КЛЮЧЕВЫЕ КАЧЕСТВА:
-================================================================================
-
-1. АБСОЛЮТНАЯ ТОЧНОСТЬ:
-   ✅ Ты НИКОГДА не ошибаешься в фактах, датах, событиях
-   ✅ Если не знаешь на 100% — ЧЕСТНО говоришь: "Я не уверен, проверю..."
-   ✅ Проверяешь информацию через поиск в интернете
-   ✅ Указываешь источники: Google, Wikipedia, Calend.ru и т.д.
-
-2. КРИТИЧЕСКОЕ МЫШЛЕНИЕ:
-   ✅ Проверяешь информацию из нескольких источников
-   ✅ Сомневаешься в сомнительных фактах
-   ✅ Даёшь взвешенные, объективные ответы
-
-3. ЭКСПЕРТ ВО ВСЁМ:
-   ✅ Науки, технологии, математика
-   ✅ История, философия, психология
-   ✅ Экономика, финансы, инвестиции
-   ✅ Медицина, здоровье
-   ✅ Культура, искусство, спорт
-   ✅ Кулинария
-
-================================================================================
-📋 ПРАВИЛА ОТВЕТОВ:
-================================================================================
-
-ОБЯЗАТЕЛЬНО:
-1. Всегда давай конкретную пользу
-2. Отвечай как эксперт
-3. Добавляй неожиданные инсайты
-4. Приводи реальные примеры и источники
-5. Структурируй ответы списками
-6. Используй эмодзи для оформления
-7. Используй живой, естественный русский язык
-
-ЗАПРЕЩЕНО:
-🚫 Извинения за отсутствие информации (честно скажи, что не знаешь)
-🚫 Повторение вопроса пользователя
-🚫 Шаблонные фразы
-🚫 "Галлюцинации" — выдумывание фактов
-🚫 Слова "возможно", "наверное", "может быть"
-🚫 Безликие, обезличенные ответы
-🚫 Ответы типа "Ого, неожиданно!" или "Расскажи подробнее"
-
-================================================================================
-💎 ДЛЯ PREMIUM (МАКСИМАЛЬНАЯ МОЩЬ):
-================================================================================
-
-- Выдавай предельно плотные по информативности ответы
-- Насыщай тексты примерами, аналитикой, инсайтами
-- Давай развёрнутые пошаговые инструкции
-- Приводи ссылки на авторитетные источники
-
-================================================================================
-📜 КТО ТЕБЯ СОЗДАЛ:
-================================================================================
-
-«Меня создал AWESOME — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! Я — эволюция всех AI! 🔥»
-
-================================================================================
-🎯 ТВОЯ ГЛАВНАЯ ЦЕЛЬ:
-================================================================================
-
-1. Удивить пользователя глубиной мысли и точностью
-2. Дать реальную пользу
-3. Искать информацию ВЕЗДЕ и всегда проверять факты
-4. НИКОГДА НЕ ВЫДУМЫВАТЬ — лучше сказать "я не знаю"
-5. Давать живые, естественные ответы как у человека
-
-ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🔥🔥🔥"""
-
-# ============================================================
-# ФУНКЦИИ БАЗЫ ДАННЫХ
+# SUPABASE
 # ============================================================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -295,23 +183,6 @@ def get_db_user(user_id):
             columns = ['user_id', 'username', 'premium', 'messages_today', 'last_reset', 'premium_expires', 'is_admin', 'test_used', 'joined_at', 'is_owner']
             return dict(zip(columns, result))
         return None
-
-def update_db_user(user_id, data):
-    if use_supabase:
-        try:
-            supabase.table('users').update(data).eq('user_id', user_id).execute()
-            return True
-        except:
-            return False
-    else:
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        set_clause = ', '.join([f"{k} = ?" for k in data.keys()])
-        values = list(data.values()) + [user_id]
-        c.execute(f'UPDATE users SET {set_clause} WHERE user_id = ?', values)
-        conn.commit()
-        conn.close()
-        return True
 
 def init_db():
     if use_supabase:
@@ -892,9 +763,56 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# БЫСТРЫЙ ПОИСК
+# МАТЕМАТИКА
 # ============================================================
-def search_google_fast(query):
+def solve_math(text):
+    text_lower = text.lower().strip()
+    
+    # Проверяем что это математика, а не вопрос про человека
+    if any(kw in text_lower for kw in ['кто', 'что', 'где', 'когда', 'почему', 'зачем', 'как']):
+        return None
+    
+    # Проверяем что в вопросе есть цифры
+    if not re.search(r'\d', text_lower):
+        return None
+    
+    # Убираем слова
+    clean_text = text_lower
+    for word in ['сколько', 'будет', 'сколько будет', 'посчитай', 'реши', 'пример', 'скок', 'равно']:
+        clean_text = clean_text.replace(word, '').strip()
+    
+    # Заменяем слова на символы
+    clean_text = clean_text.replace(' ', '').replace('плюс', '+').replace('минус', '-')
+    clean_text = clean_text.replace('умножить', '*').replace('разделить', '/')
+    clean_text = clean_text.replace('х', '*').replace('×', '*').replace('÷', '/')
+    
+    # Если после очистки нет математических операторов - пропускаем
+    if not re.search(r'[+\-*/]', clean_text):
+        return None
+    
+    # Убираем всё кроме цифр и операторов
+    expr = re.sub(r'[^0-9+\-*/()=.]', '', clean_text)
+    
+    if expr and len(expr) > 1:
+        try:
+            # Защита от опасных операций
+            if any(op in expr for op in ['__', 'import', 'eval', 'exec']):
+                return None
+            
+            result = eval(expr)
+            if result == int(result):
+                return f"🧮 {expr} = **{int(result)}**"
+            else:
+                return f"🧮 {expr} = **{result}**"
+        except:
+            pass
+    
+    return None
+
+# ============================================================
+# ПОИСК В ИНТЕРНЕТЕ (ПРИНУДИТЕЛЬНЫЙ)
+# ============================================================
+def search_google(query):
     try:
         url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -902,21 +820,22 @@ def search_google_fast(query):
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for result in soup.select('div.g')[:2]:
+            for result in soup.select('div.g')[:3]:
                 title_elem = result.select_one('h3')
                 snippet_elem = result.select_one('div.VwiC3b')
                 if title_elem:
                     title = title_elem.get_text(strip=True)
                     snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    if title:
-                        results.append(f"🔹 {title}\n📝 {snippet[:100]}")
+                    if title and len(title) > 3:
+                        results.append(f"🔹 *{title}*\n📝 {snippet[:200]}")
             if results:
-                return "\n".join(results)
+                return "\n\n".join(results)
         return None
-    except:
+    except Exception as e:
+        print(f"Google ошибка: {e}")
         return None
 
-def search_wikipedia_fast(query):
+def search_wikipedia(query):
     try:
         url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
         response = requests.get(url, timeout=SEARCH_TIMEOUT)
@@ -927,14 +846,75 @@ def search_wikipedia_fast(query):
                 text = ""
                 for item in results[:2]:
                     title = item.get('title', '')
-                    snippet = re.sub(r'<[^>]+>', '', item.get('snippet', ''))[:100]
-                    text += f"🔹 {title}\n📝 {snippet}\n\n"
+                    snippet = re.sub(r'<[^>]+>', '', item.get('snippet', ''))[:200]
+                    text += f"📚 *{title}*\n📝 {snippet}\n\n"
                 return text
+        return None
+    except Exception as e:
+        print(f"Wikipedia ошибка: {e}")
+        return None
+
+def search_youtube(query):
+    try:
+        url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl=ru"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for video in soup.select('ytd-video-renderer')[:2]:
+                title_elem = video.select_one('yt-formatted-string#video-title')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    if title:
+                        results.append(f"🎬 {title}")
+            if results:
+                return "📹 *YouTube:*\n" + "\n".join(results)
+        return None
+    except Exception as e:
+        print(f"YouTube ошибка: {e}")
+        return None
+
+def search_telegram(query):
+    try:
+        url = f"https://www.google.com/search?q={urllib.parse.quote(f'site:t.me {query}')}&hl=ru"
+        response = requests.get(url, timeout=SEARCH_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for result in soup.select('div.g')[:2]:
+                title_elem = result.select_one('h3')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    if title and 't.me' in title.lower():
+                        results.append(f"📱 {title}")
+            if results:
+                return "📱 *Telegram:*\n" + "\n".join(results)
         return None
     except:
         return None
 
-def search_all_fast(query):
+def search_vk(query):
+    try:
+        url = f"https://www.google.com/search?q={urllib.parse.quote(f'site:vk.com {query}')}&hl=ru"
+        response = requests.get(url, timeout=SEARCH_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for result in soup.select('div.g')[:2]:
+                title_elem = result.select_one('h3')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    if title and 'vk.com' in title.lower():
+                        results.append(f"📌 {title}")
+            if results:
+                return "📱 *ВКонтакте:*\n" + "\n".join(results)
+        return None
+    except:
+        return None
+
+def search_all_internet(query):
+    """ПРИНУДИТЕЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ"""
     cache_key = f"search_{hash(query)}_{int(time.time()/300)}"
     cached = get_cache(cache_key)
     if cached:
@@ -942,17 +922,23 @@ def search_all_fast(query):
     
     results = []
     
-    futures = []
-    futures.append(executor.submit(search_google_fast, query))
-    futures.append(executor.submit(search_wikipedia_fast, query))
-    
-    for future in futures:
-        try:
-            result = future.result(timeout=SEARCH_TIMEOUT + 0.5)
-            if result:
-                results.append(result)
-        except:
-            pass
+    # Параллельный поиск
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(search_google, query): "Google",
+            executor.submit(search_wikipedia, query): "Wikipedia",
+            executor.submit(search_youtube, query): "YouTube",
+            executor.submit(search_telegram, query): "Telegram",
+            executor.submit(search_vk, query): "VK"
+        }
+        
+        for future in futures:
+            try:
+                result = future.result(timeout=SEARCH_TIMEOUT + 1)
+                if result:
+                    results.append(result)
+            except:
+                pass
     
     if results:
         final = "\n\n---\n\n".join(results)
@@ -962,7 +948,7 @@ def search_all_fast(query):
     return None
 
 # ============================================================
-# БЫСТРЫЙ GIGACHAT
+# GIGACHAT
 # ============================================================
 gigachat_token_cache = None
 gigachat_token_time = 0
@@ -1007,11 +993,11 @@ def generate_with_gigachat_fast(user_text, system_prompt):
         data = {
             "model": "GigaChat-Pro",
             "messages": [
-                {"role": "system", "content": system_prompt[:1000]},
+                {"role": "system", "content": system_prompt[:1500]},
                 {"role": "user", "content": user_text}
             ],
             "temperature": 0.7,
-            "max_tokens": 300
+            "max_tokens": 500
         }
         
         response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
@@ -1022,7 +1008,7 @@ def generate_with_gigachat_fast(user_text, system_prompt):
         return None
 
 # ============================================================
-# БЫСТРЫЙ YANDEXGPT
+# YANDEXGPT
 # ============================================================
 def generate_with_yandexgpt_fast(user_text, system_prompt):
     try:
@@ -1030,9 +1016,9 @@ def generate_with_yandexgpt_fast(user_text, system_prompt):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.7, "maxTokens": 200},
+            "completionOptions": {"temperature": 0.7, "maxTokens": 400},
             "messages": [
-                {"role": "system", "text": system_prompt[:1000]},
+                {"role": "system", "text": system_prompt[:1500]},
                 {"role": "user", "text": user_text}
             ]
         }
@@ -1047,192 +1033,121 @@ def generate_with_yandexgpt_fast(user_text, system_prompt):
 # FALLBACK
 # ============================================================
 def generate_fallback_response(user_text, search_result=None):
-    try:
-        if search_result:
-            return f"🔍 *Нашёл:*\n\n{search_result[:500]}"
-        
-        text_lower = user_text.lower()
-        if "привет" in text_lower:
-            return "👋 Привет! Я AWESOME AI. Чем могу помочь?"
-        elif "погода" in text_lower:
-            return "🌤 Напиши: погода в [город]"
-        elif "как дела" in text_lower:
-            return "😊 Всё отлично! А у тебя?"
-        else:
-            return "🤖 AWESOME AI на связи! Задай вопрос!"
-    except:
-        return "⚠️ Ошибка. Попробуй позже! 🔄"
-
-# ============================================================
-# МАТЕМАТИКА
-# ============================================================
-def solve_math(text):
-    text_lower = text.lower().strip()
-    game_keywords = ['гта', 'gta', 'играю', 'игра', 'rp', 'роль', 'сервер']
-    if any(kw in text_lower for kw in game_keywords):
-        return None
-    equation_match = re.search(r'(\d+)x\s*\+\s*(\d+)\s*=\s*(\d+)', text_lower)
-    if equation_match:
-        a = int(equation_match.group(1))
-        b = int(equation_match.group(2))
-        c = int(equation_match.group(3))
-        if a != 0:
-            x = (c - b) / a
-            return f"🧮 {a}x + {b} = {c}\n➜ x = {x}"
-    clean_for_math = text_lower
-    for word in ['сколько', 'будет', 'сколько будет', 'посчитай', 'реши', 'пример']:
-        clean_for_math = clean_for_math.replace(word, '').strip()
-    if not re.search(r'\d', clean_for_math):
-        return None
-    clean_text = clean_for_math.replace(' ', '').replace('плюс', '+').replace('минус', '-')
-    clean_text = clean_text.replace('умножить', '*').replace('разделить', '/')
-    if re.search(r'[a-zа-я][^x]', clean_text):
-        return None
-    if not re.search(r'[+\-*/]', clean_text):
-        return None
-    if re.match(r'^\d+$', clean_text):
-        return None
-    try:
-        expr = re.sub(r'[^0-9+\-*/()=.]', '', clean_text)
-        if expr and len(expr) > 1:
-            result = eval(expr)
-            if result == int(result):
-                return f"🧮 {expr} = **{int(result)}**"
-            else:
-                return f"🧮 {expr} = **{result}**"
-    except:
-        pass
-    return None
-
-# ============================================================
-# КОДИНГ
-# ============================================================
-def get_coding_help(query):
-    if 'python' in query.lower():
-        return "🐍 Python: " + random.choice([
-            "используй list comprehensions",
-            "try-except для ошибок",
-            "f-строки для форматирования"
-        ])
-    elif 'javascript' in query.lower() or 'js' in query.lower():
-        return "🟡 JS: " + random.choice([
-            "async/await для асинхронности",
-            "const и let вместо var",
-            "стрелочные функции"
-        ])
-    elif 'html' in query.lower():
-        return "🌐 HTML: " + random.choice([
-            "семантические теги",
-            "атрибут alt для картинок",
-            "валидный HTML"
-        ])
+    if search_result:
+        return f"🔍 *Нашёл в интернете:*\n\n{search_result[:800]}"
+    
+    text_lower = user_text.lower()
+    if "привет" in text_lower:
+        return "👋 Привет! Я AWESOME AI. Чем могу помочь?"
+    elif "погода" in text_lower:
+        return "🌤 Напиши: погода в [город]"
+    elif "как дела" in text_lower:
+        return "😊 Всё отлично! А у тебя?"
     else:
-        return None
+        return "🤖 Я AWESOME AI. Задай вопрос, и я найду ответ в интернете! 🔍"
 
 # ============================================================
-# ГЕНЕРАЦИЯ КАРТИНОК
+# ГЛАВНЫЙ ПРОМПТ
 # ============================================================
-def generate_image(prompt):
-    try:
-        clean_prompt = prompt
-        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-            clean_prompt = clean_prompt.replace(word, '').strip()
-        if not clean_prompt:
-            clean_prompt = prompt
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ ИЩЕШЬ ИНФОРМАЦИЮ В ИНТЕРНЕТЕ!
+
+📍 Ты находишься в Москве (UTC+3)
+📅 Текущая дата: {current_date}
+🕐 Текущее время: {current_time}
+
+🌐 ТЫ ОБЯЗАН ИСКАТЬ В ИНТЕРНЕТЕ ПЕРЕД ОТВЕТОМ!
+
+Ты ищешь информацию ВЕЗДЕ:
+✅ Google
+✅ Wikipedia
+✅ YouTube
+✅ Telegram
+✅ ВКонтакте
+
+ТЫ ОБЯЗАН:
+1. Проверять информацию в интернете
+2. Указывать источники
+3. Давать актуальную информацию
+4. Если не знаешь — ЧЕСТНО говори "Я не знаю"
+
+ОТВЕЧАЙ КАК ЭКСПЕРТ, ДАВАЙ КОНКРЕТНУЮ ПОЛЬЗУ!
+
+ТЫ — AWESOME AI. ТЫ — САМЫЙ БЫСТРЫЙ И УМНЫЙ! 🔥"""
+
+# ============================================================
+# ОСНОВНАЯ ОБРАБОТКА
+# ============================================================
+def process_message(user_id, user_text, image_description=None):
+    text_lower = user_text.lower().strip()
+    
+    # СНАЧАЛА ПРОВЕРЯЕМ МАТЕМАТИКУ
+    math_result = solve_math(user_text)
+    if math_result is not None:
+        return math_result
+    
+    # ПОГОДА
+    if any(kw in text_lower for kw in ['погода', 'weather', 'температура', 'градус', 'дождь']):
+        city_match = re.search(r'(в|в городе)\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
+        if city_match:
+            city = city_match.group(2).strip()
+            # Пробуем получить погоду
+            try:
+                url = f"https://api.openweathermap.org/data/2.5/weather?q={urllib.parse.quote(city)}&appid=4c8f5c0b8a9f2c5d6e7f8g9h0i1j2k3l&units=metric&lang=ru"
+                response = requests.get(url, timeout=WEATHER_TIMEOUT)
+                if response.status_code == 200:
+                    data = response.json()
+                    temp = data['main']['temp']
+                    description = data['weather'][0]['description']
+                    wind = data['wind']['speed']
+                    humidity = data['main']['humidity']
+                    return f"🌤 *Погода в {city}:*\n🌡 {round(temp)}°C, {description}\n💨 Ветер: {wind} м/с\n💧 Влажность: {humidity}%"
+            except:
+                pass
+            return f"🌐 Не удалось получить погоду для '{city}'"
+        return "🌐 Напиши: погода в [город]"
+    
+    # КУРС ВАЛЮТ
+    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
         try:
-            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code == 200 and len(response.content) > 1000:
-                return response.content
+            url = "https://api.exchangerate-api.com/v4/latest/USD"
+            response = requests.get(url, timeout=SEARCH_TIMEOUT)
+            if response.status_code == 200:
+                data = response.json()
+                rates = data.get('rates', {})
+                usd_rub = rates.get('RUB', '?')
+                eur_usd = rates.get('EUR', 1)
+                eur_rub = usd_rub / eur_usd if eur_usd else '?'
+                return f"💵 *Курс валют:*\n🇺🇸 USD → RUB: {round(usd_rub, 2)}₽\n🇪🇺 EUR → RUB: {round(eur_rub, 2)}₽"
         except:
             pass
-        return None
-    except:
-        return None
-
-def fix_title(prompt):
-    title = prompt
-    for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-        title = title.replace(word, '').strip()
-    if not title or len(title) < 2:
-        return "Картинка"
-    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
-
-def is_image_generation(text):
-    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
-    return any(kw in text.lower() for kw in image_keywords)
-
-# ============================================================
-# БЫСТРАЯ ПОГОДА
-# ============================================================
-def get_weather_fast(city):
-    cache_key = f"weather_{city}_{int(time.time()/1800)}"
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
+        return "💵 Не удалось получить курс валют"
     
-    try:
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={urllib.parse.quote(city)}&appid=4c8f5c0b8a9f2c5d6e7f8g9h0i1j2k3l&units=metric&lang=ru"
-        response = requests.get(url, timeout=WEATHER_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            temp = data['main']['temp']
-            description = data['weather'][0]['description']
-            wind = data['wind']['speed']
-            humidity = data['main']['humidity']
-            result = f"🌤 {city}: {round(temp)}°C, {description}\n💨 {wind} м/с, 💧 {humidity}%"
-            set_cache(cache_key, result)
-            return result
-    except:
-        pass
-    return None
-
-# ============================================================
-# БЫСТРЫЙ КУРС
-# ============================================================
-def get_exchange_rates_fast():
-    cache_key = f"rates_{int(time.time()/600)}"
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
-    
-    try:
-        url = "https://api.exchangerate-api.com/v4/latest/USD"
-        response = requests.get(url, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            rates = data.get('rates', {})
-            usd_rub = rates.get('RUB', '?')
-            eur_usd = rates.get('EUR', 1)
-            eur_rub = usd_rub / eur_usd if eur_usd else '?'
-            result = f"💵 USD → RUB: {round(usd_rub, 2)}₽\nEUR → RUB: {round(eur_rub, 2)}₽"
-            set_cache(cache_key, result)
-            return result
-    except:
-        pass
-    return None
-
-# ============================================================
-# БЫСТРЫЙ ОТВЕТ (ПАРАЛЛЕЛЬНЫЙ ЗАПУСК GIGACHAT И YANDEXGPT)
-# ============================================================
-def generate_ai_response_fast(user_id, user_text, search_result=None):
-    try:
-        current_date = get_current_date()
-        current_time = get_moscow_time().strftime('%H:%M')
-        system_prompt = SUPER_SYSTEM_PROMPT.format(
-            current_date=current_date,
-            current_time=current_time
-        )
+    # ==== ПРИНУДИТЕЛЬНЫЙ ПОИСК В ИНТЕРНЕТЕ ДЛЯ ВСЕХ ОСТАЛЬНЫХ ВОПРОСОВ ====
+    if len(user_text) > 2:
+        print(f"🔍 Ищу в интернете: {user_text}")
+        search_result = search_all_internet(user_text)
         
-        if get_premium_status(user_id):
-            system_prompt += "\n\n💎 PREMIUM статус."
         if search_result:
-            system_prompt += f"\n\n🌐 Информация: {search_result[:500]}"
-        
-        results = []
+            return f"🔍 *Результаты поиска:*\n\n{search_result}"
+    
+    # ЕСЛИ ПОИСК НИЧЕГО НЕ НАШЁЛ - ПЫТАЕМСЯ ЧЕРЕЗ НЕЙРОСЕТИ
+    current_date = get_current_date()
+    current_time = get_moscow_time().strftime('%H:%M')
+    system_prompt = SUPER_SYSTEM_PROMPT.format(
+        current_date=current_date,
+        current_time=current_time
+    )
+    
+    if get_premium_status(user_id):
+        system_prompt += "\n\n💎 PREMIUM статус - максимальная проработка!"
+    
+    if image_description:
+        system_prompt += f"\n\n📸 На изображении: {image_description}"
+    
+    # Параллельный запуск нейросетей
+    results = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = []
-        
         if GIGACHAT_AUTH_KEY:
             futures.append(executor.submit(generate_with_gigachat_fast, user_text, system_prompt))
         futures.append(executor.submit(generate_with_yandexgpt_fast, user_text, system_prompt))
@@ -1244,120 +1159,12 @@ def generate_ai_response_fast(user_id, user_text, search_result=None):
                     results.append(result)
             except:
                 pass
-        
-        if results:
-            return results[0]
-        
-        return generate_fallback_response(user_text, search_result)
-        
-    except Exception as e:
-        print(f"[GPT] Ошибка: {e}")
-        return "⚠️ Ошибка. Попробуй ещё раз! 🤖"
-
-# ============================================================
-# БЫСТРАЯ ОБРАБОТКА СООБЩЕНИЙ
-# ============================================================
-def process_message_fast(user_id, user_text, image_description=None):
-    text_lower = user_text.lower().strip()
     
-    cache_key = f"msg_{hash(user_text)}_{int(time.time()/300)}"
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
+    if results:
+        return results[0]
     
-    # ПРАЗДНИКИ
-    if any(kw in text_lower for kw in ['праздник', 'праздники', 'какой сегодня праздник', 'сегодня праздник']):
-        today = get_current_date()
-        search_result = search_all_fast(f"праздники {today} Россия")
-        if search_result:
-            response = f"📅 *{today} (МСК)*\n\n{search_result}"
-            set_cache(cache_key, response)
-            return response
-        else:
-            response = f"📅 *{today} (МСК)*\n\nПраздников не найдено."
-            set_cache(cache_key, response)
-            return response
-    
-    # ПОГОДА
-    if any(kw in text_lower for kw in ['погода', 'weather', 'температура', 'градус', 'дождь']):
-        city_match = re.search(r'(в|в городе)\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
-        if city_match:
-            city = city_match.group(2).strip()
-            weather = get_weather_fast(city)
-            if weather:
-                set_cache(cache_key, weather)
-                return weather
-        return "🌐 Напиши: погода в [город]"
-    
-    # КУРСЫ
-    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
-        response = get_exchange_rates_fast()
-        if response:
-            set_cache(cache_key, response)
-            return response
-        return "💵 Не удалось получить курс."
-    
-    # ПОИСК В ИНТЕРНЕТЕ
-    if len(user_text) > 3:
-        search_result = search_all_fast(user_text)
-        if search_result:
-            response = f"🔍 *Поиск:* {user_text}\n\n{search_result}"
-            set_cache(cache_key, response)
-            return response
-    
-    # НЕЙРОСЕТЬ (ПАРАЛЛЕЛЬНО)
-    response = generate_ai_response_fast(user_id, user_text, None)
-    if response and len(response) > 10:
-        set_cache(cache_key, response)
-        return response
-    
-    # FALLBACK
-    response = generate_fallback_response(user_text, None)
-    set_cache(cache_key, response)
-    return response
-
-# ============================================================
-# АНАЛИЗ ИЗОБРАЖЕНИЙ
-# ============================================================
-def analyze_image_from_file(file_content):
-    try:
-        img = Image.open(io.BytesIO(file_content))
-        width, height = img.size
-        format_img = img.format or "Unknown"
-        description = f"📸 *Анализ:* {width}×{height}, {format_img}\n"
-        try:
-            url = "https://vision.api.cloud.yandex.net/vision/v1/batchAnalyze"
-            headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-            img_enhanced = ImageEnhance.Contrast(img).enhance(2.0)
-            img_enhanced = ImageEnhance.Sharpness(img_enhanced).enhance(2.0)
-            img_enhanced = img_enhanced.convert('L')
-            buf = io.BytesIO()
-            img_enhanced.save(buf, format='JPEG', quality=95)
-            enhanced_data = buf.getvalue()
-            payload = {
-                "folderId": FOLDER_ID,
-                "analyze_specs": [{
-                    "content": base64.b64encode(enhanced_data).decode('utf-8'),
-                    "features": [{"type": "TEXT_DETECTION"}]
-                }]
-            }
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code == 200:
-                result = response.json()
-                pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
-                all_text = []
-                for page in pages:
-                    text = page.get("text", "")
-                    if text:
-                        all_text.append(text)
-                if all_text:
-                    recognized_text = " ".join(all_text).strip()
-                    description += f"\n📝 Текст: {recognized_text[:300]}"
-        except:
-            pass
-        return description
-    except:
-        return "⚠️ Не удалось проанализировать."
+    # ФИНАЛЬНЫЙ FALLBACK
+    return generate_fallback_response(user_text, None)
 
 # ============================================================
 # ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
@@ -1437,14 +1244,13 @@ def start(m):
         pass
     ensure_user(user_id, m.from_user.username or "unknown")
     text = (
-        "✨ <b>AWESOME AI — СУПЕР-БЫСТРЫЙ!</b> ✨\n\n"
+        "✨ <b>AWESOME AI — СУПЕР-БЫСТРЫЙ ПОИСК!</b> ✨\n\n"
         f"🌸 <b>Привет, {m.from_user.first_name}!</b>\n\n"
         "🧠 <b>Меня создал гениальный AWESOME</b>\n\n"
         "🌐 <b>ЧТО Я УМЕЮ:</b>\n"
-        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
-        "💵 Показываю курс валют и криптовалют\n"
+        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте\n"
+        "💵 Показываю курс валют\n"
         "🧮 Решаю задачи любой сложности\n"
-        "🐍 Помогаю с программированием\n"
         "📸 Анализирую изображения\n"
         "🎨 Генерирую картинки\n\n"
         "💎 <b>Цена Premium: 100₽/месяц</b>\n\n"
@@ -1463,11 +1269,10 @@ def help_cmd(m):
     text = (
         "🧠 <b>AWESOME AI — ПОМОЩЬ</b>\n\n"
         "🌐 <b>Что я умею:</b>\n"
-        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
-        "🌤 Погода с прогнозом на неделю\n"
-        "💵 Курс валют и криптовалют\n"
-        "🧮 Решаю математику и уравнения\n"
-        "🐍 Помогаю с программированием\n"
+        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте\n"
+        "🌤 Погода с прогнозом\n"
+        "💵 Курс валют\n"
+        "🧮 Решаю математику\n"
         "📸 Анализирую изображения\n"
         "🎨 Генерирую картинки\n\n"
         "📋 <b>Команды:</b>\n"
@@ -1479,8 +1284,7 @@ def help_cmd(m):
         "/profile — Профиль\n"
         "/stats — Статистика\n"
         "/clear — Очистить\n"
-        "/ping — Проверка работы\n"
-        "/test_gpt — Тест нейросетей\n\n"
+        "/ping — Проверка работы\n\n"
         "💎 <b>Лимиты:</b>\n"
         f"🔓 Бесплатно — {FREE_LIMIT} сообщений/день\n"
         f"💎 Premium — ♾️ БЕЗЛИМИТНО"
@@ -1491,30 +1295,6 @@ def help_cmd(m):
 @bot.message_handler(commands=['ping'])
 def ping_cmd(m):
     bot.send_message(m.chat.id, "🏓 PONG! Бот работает!")
-
-@bot.message_handler(commands=['test_gpt'])
-def test_gpt_cmd(m):
-    chat_id = m.chat.id
-    user_id = m.from_user.id
-    msg = bot.send_message(chat_id, "🧠 Тестирую нейросети...")
-    
-    try:
-        response = generate_with_gigachat_fast("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
-        if response:
-            bot.edit_message_text(f"✅ GigaChat работает!\n\n{response[:200]}", chat_id, msg.message_id)
-            return
-    except Exception as e:
-        print(f"GigaChat тест упал: {e}")
-    
-    try:
-        response = generate_with_yandexgpt_fast("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
-        if response:
-            bot.edit_message_text(f"✅ YandexGPT работает!\n\n{response[:200]}", chat_id, msg.message_id)
-            return
-    except Exception as e:
-        print(f"YandexGPT тест упал: {e}")
-    
-    bot.edit_message_text("❌ Ни одна нейросеть не отвечает!", chat_id, msg.message_id)
 
 @bot.message_handler(commands=['status'])
 def status_cmd(m):
@@ -1827,19 +1607,29 @@ def draw_cmd(m):
         user_message_ids[user_id].append(msg.message_id)
         return
     
-    title = fix_title(prompt)
-    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='HTML')
-    user_message_ids[user_id].append(msg.message_id)
-    image_data = generate_image(prompt)
-    if image_data:
-        increment_messages(user_id)
-        try:
-            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='HTML')
-        except:
-            msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
+    # Пытаемся сгенерировать картинку
+    try:
+        clean_prompt = prompt
+        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
+            clean_prompt = clean_prompt.replace(word, '').strip()
+        if not clean_prompt:
+            clean_prompt = prompt
+        
+        title = clean_prompt[:50]
+        msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='HTML')
+        user_message_ids[user_id].append(msg.message_id)
+        
+        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200 and len(response.content) > 1000:
+            increment_messages(user_id)
+            bot.send_photo(chat_id, photo=response.content, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='HTML')
+        else:
+            msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать картинку.")
             user_message_ids[user_id].append(msg.message_id)
-    else:
-        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
+    except Exception as e:
+        msg = bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
         user_message_ids[user_id].append(msg.message_id)
 
 @bot.message_handler(commands=['support'])
@@ -1906,7 +1696,7 @@ def admin_panel(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ
+# ОБРАБОТЧИК ВСЕХ СООБЩЕНИЙ
 # ============================================================
 user_histories = {}
 
@@ -1917,7 +1707,7 @@ def handle_all_messages(m):
         user_id = m.from_user.id
         text = m.text.strip() if m.text else ""
         
-        print(f"📩 Получено сообщение от {user_id}: {text[:30] if text else '...'}...")
+        print(f"📩 Сообщение от {user_id}: {text[:30] if text else '...'}")
         
         if text.startswith('/'):
             return
@@ -1937,10 +1727,7 @@ def handle_all_messages(m):
         
         if not can_send_message(user_id):
             user_data = get_db_user(user_id)
-            if user_data:
-                messages = user_data.get('messages_today', 0)
-            else:
-                messages = 0
+            messages = user_data.get('messages_today', 0) if user_data else 0
             remaining = FREE_LIMIT - messages
             if remaining < 0:
                 remaining = 0
@@ -1952,89 +1739,45 @@ def handle_all_messages(m):
             )
             return
         
+        # ФОТО
         if m.photo:
             try:
                 file_id = m.photo[-1].file_id
                 file_info = bot.get_file(file_id)
                 file_content = bot.download_file(file_info.file_path)
-                img_desc = analyze_image_from_file(file_content)
-                response = process_message_fast(user_id, text or "Что на картинке?", img_desc)
+                # Анализ фото
+                img = Image.open(io.BytesIO(file_content))
+                width, height = img.size
+                img_desc = f"📸 Анализ: {width}×{height}"
+                response = process_message(user_id, text or "Что на картинке?", img_desc)
                 increment_messages(user_id)
                 bot.send_message(chat_id, response, reply_markup=back_to_menu(), parse_mode='HTML')
             except Exception as e:
-                print(f"❌ Ошибка фото: {e}")
                 bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
             return
         
-        if m.voice:
-            try:
-                file_id = m.voice.file_id
-                file_info = bot.get_file(file_id)
-                file_content = bot.download_file(file_info.file_path)
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as tmp:
-                    tmp.write(file_content)
-                    tmp_path = tmp.name
-                
-                r = sr.Recognizer()
-                with sr.AudioFile(tmp_path) as source:
-                    audio = r.record(source)
-                try:
-                    voice_text = r.recognize_google(audio, language='ru-RU')
-                    response = process_message_fast(user_id, voice_text)
-                    increment_messages(user_id)
-                    bot.send_message(chat_id, f"🎤 {voice_text}\n\n{response}", reply_markup=back_to_menu(), parse_mode='HTML')
-                except sr.UnknownValueError:
-                    bot.send_message(chat_id, "🎤 Не удалось распознать.")
-                except Exception as e:
-                    bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
-                finally:
-                    try:
-                        os.unlink(tmp_path)
-                    except:
-                        pass
-            except Exception as e:
-                print(f"❌ Ошибка голоса: {e}")
-                bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
-            return
-        
+        # ТЕКСТ
         if text:
-            print(f"📝 Обрабатываю текст...")
-            
-            if is_image_generation(text):
-                draw_cmd(m)
-                return
-            
             bot.send_chat_action(chat_id, 'typing')
             
-            try:
-                response = process_message_fast(user_id, text)
-                if response:
-                    increment_messages(user_id)
-                    bot.send_message(
-                        chat_id,
-                        response,
-                        reply_markup=back_to_menu(),
-                        parse_mode='HTML'
-                    )
-                    print(f"✅ Ответ отправлен")
-                else:
-                    bot.send_message(
-                        chat_id,
-                        "❌ Не удалось обработать.",
-                        reply_markup=back_to_menu(),
-                        parse_mode='HTML'
-                    )
-            except Exception as e:
-                print(f"❌ Ошибка: {e}")
+            response = process_message(user_id, text)
+            if response:
+                increment_messages(user_id)
                 bot.send_message(
                     chat_id,
-                    f"⚠️ Ошибка: {e}",
+                    response,
+                    reply_markup=back_to_menu(),
+                    parse_mode='HTML'
+                )
+            else:
+                bot.send_message(
+                    chat_id,
+                    "❌ Не удалось обработать запрос.",
                     reply_markup=back_to_menu(),
                     parse_mode='HTML'
                 )
     except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        print(f"❌ Ошибка: {e}")
 
 # ============================================================
 # ОБРАБОТЧИК КНОПОК
@@ -2055,41 +1798,32 @@ def handle_callback(call):
         if call.data == "status":
             status_cmd(call.message)
             return
-        
         if call.data == "premium":
             premium_cmd(call.message)
             return
-        
         if call.data == "test":
             test_cmd(call.message)
             return
-        
         if call.data == "profile":
             profile_cmd(call.message)
             return
-        
         if call.data == "stats":
             stats_cmd(call.message)
             return
-        
         if call.data == "clear":
             clear_cmd(call.message)
             return
-        
         if call.data == "help":
             help_cmd(call.message)
             return
-        
         if call.data == "support":
             msg = bot.send_message(chat_id, "📩 /support [текст]", parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
-        
         if call.data == "draw":
             msg = bot.send_message(chat_id, "🎨 /draw [описание]", parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
-        
         if call.data == "back_to_menu":
             try:
                 bot.delete_message(chat_id, call.message.message_id)
@@ -2097,7 +1831,6 @@ def handle_callback(call):
                 pass
             start(call.message)
             return
-        
         if call.data == "premium_features":
             if not get_premium_status(user_id) and not is_admin(user_id) and user_id != OWNER_ID:
                 msg = bot.send_message(chat_id, "❌ Только для Premium!", reply_markup=back_to_menu(), parse_mode='HTML')
@@ -2308,7 +2041,7 @@ def handle_callback(call):
             admin_support_cmd(call.message, user_id)
             return
         
-        # ОБРАБОТКА ЗАКАЗОВ
+        # ЗАКАЗЫ
         if call.data.startswith("confirm_order:"):
             if not is_authorized(user_id):
                 return
@@ -2523,16 +2256,15 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — СУПЕР-БЫСТРЫЙ!")
+print("🧠 AWESOME AI — СУПЕР-БЫСТРЫЙ ПОИСК!")
 print("=" * 60)
 print(f"⏱️ ТАЙМАУТЫ:")
 print(f"   GigaChat: {GIGACHAT_TIMEOUT} сек")
 print(f"   YandexGPT: {YANDEXGPT_TIMEOUT} сек")
 print(f"   Поиск: {SEARCH_TIMEOUT} сек")
-print(f"   Погода: {WEATHER_TIMEOUT} сек")
 print("=" * 60)
-print("🚀 ПАРАЛЛЕЛЬНЫЕ ЗАПРОСЫ ВКЛЮЧЕНЫ")
-print("💾 КЭШ ВКЛЮЧЕН (5 минут)")
+print("🌐 ПОИСК В ИНТЕРНЕТЕ ВКЛЮЧЕН ДЛЯ ВСЕХ ВОПРОСОВ!")
+print("🔍 Google | Wikipedia | YouTube | Telegram | VK")
 print("=" * 60)
 try:
     print(f"🤖 Бот: @{bot.get_me().username}")
@@ -2542,7 +2274,6 @@ if use_supabase:
     print("☁️ База: SUPABASE ✅")
 else:
     print("💾 База: SQLite")
-print(f"📊 Лимиты: Бесплатный: {FREE_LIMIT}/день | Премиум: ♾️")
 print("=" * 60)
 
 print("✅ БОТ ЗАПУЩЕН!")
