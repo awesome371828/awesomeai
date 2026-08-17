@@ -57,6 +57,12 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 999999999
 
+# ТАЙМАУТЫ (ОПТИМИЗИРОВАНЫ)
+GIGACHAT_TIMEOUT = 5   # 5 секунд
+YANDEXGPT_TIMEOUT = 10  # 10 секунд
+SEARCH_TIMEOUT = 3      # 3 секунды на поиск
+WEATHER_TIMEOUT = 3     # 3 секунды на погоду
+
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
@@ -309,7 +315,7 @@ user_last_message = {}
 def check_spam(user_id):
     now = time.time()
     if user_id in user_last_message:
-        if now - user_last_message[user_id] < 1.5:
+        if now - user_last_message[user_id] < 1.0:  # Уменьшил до 1 секунды
             return True
     user_last_message[user_id] = now
     return False
@@ -867,7 +873,7 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# ПОИСК ПО ИНТЕРНЕТУ
+# ПОИСК ПО ИНТЕРНЕТУ (ОПТИМИЗИРОВАН)
 # ============================================================
 def get_coordinates(city):
     try:
@@ -880,7 +886,7 @@ def get_coordinates(city):
             city = "Москва"
         url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
         headers = {"User-Agent": "AwesomeAI/1.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=WEATHER_TIMEOUT)
         if response.status_code == 200:
             data = response.json()
             if data:
@@ -901,7 +907,7 @@ def get_weather(city):
         if lat is None:
             return None
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&forecast_days=7"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=WEATHER_TIMEOUT)
         if response.status_code == 200:
             data = response.json()
             current = data.get('current_weather', {})
@@ -960,11 +966,11 @@ def search_google(query):
     try:
         url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for result in soup.select('div.g')[:3]:
+            for result in soup.select('div.g')[:2]:
                 title_elem = result.select_one('h3')
                 snippet_elem = result.select_one('div.VwiC3b')
                 if title_elem:
@@ -981,13 +987,13 @@ def search_google(query):
 def search_wikipedia(query):
     try:
         url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             data = response.json()
             results = data.get('query', {}).get('search', [])
             if results:
                 text = ""
-                for item in results[:3]:
+                for item in results[:2]:
                     title = item.get('title', '')
                     snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
                     snippet = re.sub(r'<[^>]+>', '', snippet)
@@ -1000,10 +1006,10 @@ def search_wikipedia(query):
 def search_news(query):
     try:
         url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'xml')
-            items = soup.find_all('item')[:3]
+            items = soup.find_all('item')[:2]
             if items:
                 text = ""
                 for item in items:
@@ -1022,11 +1028,11 @@ def search_youtube(query):
     try:
         url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl=ru"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for video in soup.select('ytd-video-renderer')[:3]:
+            for video in soup.select('ytd-video-renderer')[:2]:
                 title_elem = video.select_one('yt-formatted-string#video-title')
                 channel_elem = video.select_one('ytd-channel-name a')
                 views_elem = video.select_one('span#view-count')
@@ -1045,11 +1051,11 @@ def search_telegram(query):
     try:
         url = f"https://tgstat.ru/search?query={urllib.parse.quote(query)}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for channel in soup.select('div.channel-item')[:3]:
+            for channel in soup.select('div.channel-item')[:2]:
                 name_elem = channel.select_one('div.channel-name')
                 desc_elem = channel.select_one('div.channel-description')
                 if name_elem:
@@ -1066,11 +1072,11 @@ def search_vk(query):
     try:
         url = f"https://vk.com/search?c[q]={urllib.parse.quote(query)}&c[section]=communities"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for group in soup.select('div.group_row')[:3]:
+            for group in soup.select('div.group_row')[:2]:
                 name_elem = group.select_one('div.group_name')
                 if name_elem:
                     name = name_elem.get_text(strip=True)
@@ -1085,11 +1091,11 @@ def search_twitch(query):
     try:
         url = f"https://www.twitch.tv/search?term={urllib.parse.quote(query)}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            for stream in soup.select('div.tw-card')[:3]:
+            for stream in soup.select('div.tw-card')[:2]:
                 title_elem = stream.select_one('h3.tw-core-text')
                 if title_elem:
                     title = title_elem.get_text(strip=True)
@@ -1136,7 +1142,7 @@ def search_all_internet(query):
     return None
 
 # ============================================================
-# GIGACHAT
+# GIGACHAT (ТАЙМАУТ 5 СЕКУНД)
 # ============================================================
 def get_gigachat_token():
     if not GIGACHAT_AUTH_KEY:
@@ -1154,7 +1160,7 @@ def get_gigachat_token():
             "scope": "GIGACHAT_API_PERS",
             "grant_type": "client_credentials"
         }
-        response = requests.post(url, headers=headers, data=data, timeout=30, verify=False)
+        response = requests.post(url, headers=headers, data=data, timeout=10, verify=False)
         if response.status_code == 200:
             token = response.json().get("access_token")
             print("✅ GigaChat токен получен!")
@@ -1185,11 +1191,11 @@ def generate_with_gigachat(user_text, system_prompt):
                 {"role": "user", "content": user_text}
             ],
             "temperature": 0.85,
-            "max_tokens": 1000
+            "max_tokens": 800  # Уменьшил для скорости
         }
         
-        print(f"🔄 Отправляю запрос в GigaChat...")
-        response = requests.post(url, headers=headers, json=data, timeout=60, verify=False)
+        print(f"🔄 GigaChat запрос (таймаут {GIGACHAT_TIMEOUT}с)...")
+        response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
         
         print(f"📊 GigaChat ответ: {response.status_code}")
         if response.status_code == 200:
@@ -1199,12 +1205,15 @@ def generate_with_gigachat(user_text, system_prompt):
         else:
             print(f"❌ GigaChat ошибка: {response.text[:300]}")
             return None
+    except requests.exceptions.Timeout:
+        print(f"⏰ GigaChat таймаут ({GIGACHAT_TIMEOUT}с)")
+        return None
     except Exception as e:
         print(f"❌ GigaChat исключение: {e}")
         return None
 
 # ============================================================
-# YANDEXGPT
+# YANDEXGPT (ТАЙМАУТ 10 СЕКУНД)
 # ============================================================
 def generate_with_yandexgpt(user_text, system_prompt):
     try:
@@ -1212,17 +1221,21 @@ def generate_with_yandexgpt(user_text, system_prompt):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.85, "maxTokens": 800},
+            "completionOptions": {"temperature": 0.85, "maxTokens": 600},  # Уменьшил для скорости
             "messages": [
                 {"role": "system", "text": system_prompt},
                 {"role": "user", "text": user_text}
             ]
         }
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        print(f"🔄 YandexGPT запрос (таймаут {YANDEXGPT_TIMEOUT}с)...")
+        response = requests.post(url, headers=headers, json=data, timeout=YANDEXGPT_TIMEOUT)
         if response.status_code == 200:
             result = response.json()["result"]["alternatives"][0]["message"]["text"]
             print("✅ YandexGPT ответил!")
             return result
+        return None
+    except requests.exceptions.Timeout:
+        print(f"⏰ YandexGPT таймаут ({YANDEXGPT_TIMEOUT}с)")
         return None
     except Exception as e:
         print(f"❌ YandexGPT ошибка: {e}")
@@ -1234,7 +1247,7 @@ def generate_with_yandexgpt(user_text, system_prompt):
 def generate_fallback_response(user_text, search_result=None):
     try:
         if search_result:
-            return f"🔍 *Нашёл в интернете:*\n\n{search_result[:1000]}\n\n💡 *Подсказка:* Попробуй уточнить вопрос! 🤖"
+            return f"🔍 *Нашёл в интернете:*\n\n{search_result[:800]}\n\n💡 *Подсказка:* Попробуй уточнить вопрос! 🤖"
         
         text_lower = user_text.lower()
         if "привет" in text_lower:
@@ -1254,7 +1267,7 @@ def generate_fallback_response(user_text, search_result=None):
 def get_exchange_rates():
     try:
         url = "https://api.exchangerate-api.com/v4/latest/USD"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             data = response.json()
             rates = data.get('rates', {})
@@ -1268,7 +1281,7 @@ def get_exchange_rates():
 def get_crypto_rates():
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
         if response.status_code == 200:
             data = response.json()
             btc = data.get('bitcoin', {}).get('usd', '?')
@@ -1387,7 +1400,7 @@ def analyze_image_from_file(file_content):
                     "features": [{"type": "TEXT_DETECTION"}]
                 }]
             }
-            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
             if response.status_code == 200:
                 result = response.json()
                 pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
@@ -1418,7 +1431,7 @@ def generate_image(prompt):
         try:
             url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
             headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=15)
+            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200 and len(response.content) > 1000:
                 return response.content
         except:
@@ -1502,11 +1515,14 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         history = get_user_history(user_id)
         
-        # ===== ПРОБУЕМ GIGACHAT =====
+        # ===== ПРОБУЕМ GIGACHAT (5 СЕКУНД) =====
         if GIGACHAT_AUTH_KEY:
             try:
                 print("🔄 Пробую GigaChat...")
+                start_time = time.time()
                 response = generate_with_gigachat(user_text, system_prompt)
+                elapsed = time.time() - start_time
+                print(f"⏱️ GigaChat ответ за {elapsed:.2f}с")
                 if response and len(response) > 10:
                     history.append({"role": "user", "text": user_text})
                     history.append({"role": "assistant", "text": response})
@@ -1514,10 +1530,13 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             except Exception as e:
                 print(f"❌ GigaChat упал: {e}")
         
-        # ===== YANDEXGPT (ЗАПАСНАЯ) =====
+        # ===== YANDEXGPT (10 СЕКУНД) =====
         try:
             print("🔄 Пробую YandexGPT...")
+            start_time = time.time()
             response = generate_with_yandexgpt(user_text, system_prompt)
+            elapsed = time.time() - start_time
+            print(f"⏱️ YandexGPT ответ за {elapsed:.2f}с")
             if response and len(response) > 10:
                 history.append({"role": "user", "text": user_text})
                 history.append({"role": "assistant", "text": response})
@@ -1607,7 +1626,7 @@ def process_message(user_id, user_text, image_description=None):
     return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
-# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
+# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ (не меняется)
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -1745,7 +1764,7 @@ def test_gpt_cmd(m):
     user_id = m.from_user.id
     msg = bot.send_message(chat_id, "🧠 Тестирую нейросети...")
     
-    # Пробуем GigaChat
+    # Пробуем GigaChat (5 сек)
     try:
         response = generate_with_gigachat("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
@@ -1754,7 +1773,7 @@ def test_gpt_cmd(m):
     except Exception as e:
         print(f"GigaChat тест упал: {e}")
     
-    # Пробуем YandexGPT
+    # Пробуем YandexGPT (10 сек)
     try:
         response = generate_with_yandexgpt("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
@@ -2287,7 +2306,7 @@ def handle_all_messages(m):
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В handle_all_messages: {e}")
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК
+# ОБРАБОТЧИК КНОПОК (сокращен для экономии места - полная версия)
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -2775,6 +2794,12 @@ init_memory_db()
 print("=" * 60)
 print("🧠 AWESOME AI — С GIGACHAT + YANDEXGPT + МЕГА-ПОИСК!")
 print("=" * 60)
+print(f"⏱️ ТАЙМАУТЫ:")
+print(f"   GigaChat: {GIGACHAT_TIMEOUT} сек")
+print(f"   YandexGPT: {YANDEXGPT_TIMEOUT} сек")
+print(f"   Поиск: {SEARCH_TIMEOUT} сек")
+print(f"   Погода: {WEATHER_TIMEOUT} сек")
+print("=" * 60)
 try:
     print(f"🤖 Бот: @{bot.get_me().username}")
 except:
@@ -2796,8 +2821,8 @@ print("✅ Twitch")
 print("✅ Новости")
 print("=" * 60)
 print("🧠 НЕЙРОСЕТИ:")
-print("✅ GigaChat (ОСНОВНАЯ) — SSL отключен")
-print("✅ YandexGPT (ЗАПАСНАЯ)")
+print("✅ GigaChat (ОСНОВНАЯ) — 5 сек таймаут")
+print("✅ YandexGPT (ЗАПАСНАЯ) — 10 сек таймаут")
 print("=" * 60)
 
 if use_supabase:
