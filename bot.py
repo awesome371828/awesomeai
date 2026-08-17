@@ -67,6 +67,55 @@ WEATHER_TIMEOUT = 2
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
+# ВСТРОЕННЫЙ КАЛЕНДАРЬ ПРАЗДНИКОВ
+# ============================================================
+HOLIDAYS = {
+    '01.01': 'Новый год',
+    '07.01': 'Рождество Христово',
+    '14.01': 'Старый Новый год',
+    '25.01': 'Татьянин день',
+    '14.02': 'День всех влюбленных (Валентинов день)',
+    '23.02': 'День защитника Отечества',
+    '08.03': 'Международный женский день',
+    '01.04': 'День смеха',
+    '12.04': 'День космонавтики',
+    '01.05': 'Праздник Весны и Труда',
+    '09.05': 'День Победы',
+    '12.06': 'День России',
+    '22.06': 'День памяти и скорби',
+    '08.07': 'День семьи, любви и верности',
+    '01.08': 'День тыла Вооружённых Сил РФ',
+    '17.08': '17 августа:\n• День авиации\n• День строителя\n• Международный день бездомных животных',
+    '22.08': 'День Государственного флага РФ',
+    '01.09': 'День знаний',
+    '02.09': 'День окончания Второй мировой войны',
+    '01.10': 'День пожилого человека',
+    '05.10': 'День учителя',
+    '31.10': 'Хэллоуин',
+    '04.11': 'День народного единства',
+    '30.11': 'День матери',
+    '12.12': 'День Конституции РФ',
+}
+
+def get_holidays(date_str):
+    """БЫСТРЫЙ ПОИСК ПРАЗДНИКОВ ИЗ ВСТРОЕННОГО КАЛЕНДАРЯ"""
+    cache_key = f"holidays_{date_str}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+    
+    month_day = date_str[3:5] + '.' + date_str[0:2]
+    
+    if month_day in HOLIDAYS:
+        result = HOLIDAYS[month_day]
+        set_cache(cache_key, result)
+        return result
+    
+    result = "Праздников не найдено"
+    set_cache(cache_key, result)
+    return result
+
+# ============================================================
 # SUPABASE НАСТРОЙКА
 # ============================================================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -272,6 +321,63 @@ def init_memory_db():
                   style TEXT,
                   mood TEXT,
                   last_interaction TEXT)''')
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# ПАМЯТЬ
+# ============================================================
+def remember(user_id, topic, fact):
+    """ЗАПОМИНАЕТ ФАКТ"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
+              (user_id, topic.lower(), fact, get_moscow_time().isoformat()))
+    conn.commit()
+    conn.close()
+
+def recall(user_id, topic):
+    """ВСПОМИНАЕТ ФАКТ"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('SELECT fact FROM memory WHERE user_id = ? AND topic LIKE ? ORDER BY timestamp DESC LIMIT 5',
+              (user_id, f'%{topic.lower()}%'))
+    results = c.fetchall()
+    conn.close()
+    if results:
+        return [f"🧠 {r[0]}" for r in results]
+    return []
+
+def get_personality(user_id):
+    """ПОЛУЧАЕТ ЛИЧНОСТЬ ПОЛЬЗОВАТЕЛЯ"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('SELECT style, mood, last_interaction FROM personality WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        return {'style': result[0], 'mood': result[1], 'last_interaction': result[2]}
+    return None
+
+def set_personality(user_id, style=None, mood=None):
+    """УСТАНАВЛИВАЕТ ЛИЧНОСТЬ ПОЛЬЗОВАТЕЛЯ"""
+    conn = sqlite3.connect('memory.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM personality WHERE user_id = ?', (user_id,))
+    exists = c.fetchone()
+    if exists:
+        if style:
+            c.execute('UPDATE personality SET style = ?, last_interaction = ? WHERE user_id = ?', 
+                     (style, get_moscow_time().isoformat(), user_id))
+        elif mood:
+            c.execute('UPDATE personality SET mood = ?, last_interaction = ? WHERE user_id = ?', 
+                     (mood, get_moscow_time().isoformat(), user_id))
+        else:
+            c.execute('UPDATE personality SET last_interaction = ? WHERE user_id = ?', 
+                     (get_moscow_time().isoformat(), user_id))
+    else:
+        c.execute('INSERT INTO personality (user_id, style, mood, last_interaction) VALUES (?, ?, ?, ?)',
+                  (user_id, style or 'neutral', mood or 'neutral', get_moscow_time().isoformat()))
     conn.commit()
     conn.close()
 
@@ -1517,27 +1623,9 @@ def fix_title(prompt):
         return "Картинка"
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
-# ============================================================
-# ПАМЯТЬ
-# ============================================================
-def remember(user_id, topic, fact):
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
-              (user_id, topic.lower(), fact, get_moscow_time().isoformat()))
-    conn.commit()
-    conn.close()
-
-def recall(user_id, topic):
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('SELECT fact FROM memory WHERE user_id = ? AND topic LIKE ? ORDER BY timestamp DESC LIMIT 3',
-              (user_id, f'%{topic.lower()}%'))
-    results = c.fetchall()
-    conn.close()
-    if results:
-        return [f"🧠 {r[0]}" for r in results]
-    return []
+def is_image_generation(text):
+    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
+    return any(kw in text.lower() for kw in image_keywords)
 
 # ============================================================
 # ОСНОВНАЯ ОБРАБОТКА
@@ -1549,12 +1637,9 @@ def get_user_history(user_id):
         user_histories[user_id] = []
     return user_histories[user_id]
 
-def is_image_generation(text):
-    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
-    return any(kw in text.lower() for kw in image_keywords)
-
 def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
     try:
+        # ПАМЯТЬ - ВСПОМИНАЕМ
         memories = recall(user_id, user_text)
         mood = analyze_mood(user_text)
         mood_emoji = {
@@ -1624,27 +1709,83 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         return "⚠️ Ошибка при генерации ответа. Попробуй ещё раз! 🤖"
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
+# ГЛАВНАЯ ОБРАБОТКА С ПАМЯТЬЮ И ПРАЗДНИКАМИ
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
     text_lower = user_text.lower().strip()
     
-    info_keywords = ['праздник', 'событие', 'новость', 'кто', 'что', 'где', 'когда', 'почему', 'зачем', 'как', 'сколько', 'какой']
-    is_info_question = any(kw in text_lower for kw in info_keywords)
-    
+    # ===== ПРАЗДНИКИ (ИЗ ВСТРОЕННОГО КАЛЕНДАРЯ) =====
     if any(kw in text_lower for kw in ['праздник', 'праздники', 'какой сегодня праздник', 'сегодня праздник', 'седня']):
         today = get_current_date()
-        search_result = search_all_internet(f"праздники {today} Россия")
-        if search_result:
-            return f"📅 *Сегодня {today} (МСК)*\n\n{search_result}"
-        else:
-            return f"📅 *{today} (МСК)*\n\nПраздников не найдено"
+        holidays = get_holidays(today)
+        return f"📅 *{today} (МСК)*\n\n{holidays}"
     
-    if is_info_question and len(user_text) > 3:
+    # ===== ПАМЯТЬ - ЗАПОМИНАЕМ ИНТЕРЕСНЫЕ ФАКТЫ =====
+    if len(user_text) > 30 and any(kw in text_lower for kw in ['я', 'мой', 'моя', 'моё', 'мне', 'меня']):
+        # Запоминаем факты о пользователе
+        remember(user_id, "пользователь", user_text[:100])
+        set_personality(user_id, mood=analyze_mood(user_text))
+    
+    # ===== ПОГОДА =====
+    weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
+    if any(kw in text_lower for kw in weather_keywords):
+        city = extract_city_from_query(user_text)
+        if city:
+            weather_info = get_weather(city)
+            if weather_info:
+                return weather_info
+            else:
+                return f"🌐 Не нашёл город '{city}'. Попробуй ещё."
+        else:
+            return "🌐 В каком городе? Напиши: погода в [город]"
+    
+    # ===== КУРС ВАЛЮТ =====
+    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
+        rates = get_exchange_rates()
+        if rates:
+            return rates
+        else:
+            return "💵 Не удалось получить курс валют."
+    
+    # ===== КРИПТОВАЛЮТЫ =====
+    if any(kw in text_lower for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
+        crypto = get_crypto_rates()
+        if crypto:
+            return crypto
+        else:
+            return "🪙 Не удалось получить курс криптовалют."
+    
+    # ===== КОДИНГ =====
+    if any(kw in text_lower for kw in ['python', 'javascript', 'html', 'код', 'программа']):
+        coding_help = get_coding_help(user_text)
+        if coding_help:
+            return coding_help
+    
+    # ===== ГЕНЕРАЦИЯ КАРТИНОК =====
+    if is_image_generation(user_text):
+        return None
+    
+    # ===== МАТЕМАТИКА =====
+    math_result = solve_math(user_text)
+    if math_result is not None:
+        return math_result
+    
+    # ===== ПОИСК В ИНТЕРНЕТЕ =====
+    search_result = None
+    if len(user_text) > 3:
         search_result = search_all_internet(user_text)
         if search_result:
-            today = get_current_date()
-            return f"📅 *{today} (МСК)*\n\n{search_result}"
+            return f"🔍 *Результаты поиска:*\n\n{search_result}"
+    
+    # ===== НЕЙРОСЕТИ =====
+    return generate_ai_response(user_id, user_text, None, image_description)
+
+# ============================================================
+# ОСТАЛЬНОЙ КОД (МЕНЮ, КНОПКИ, КОМАНДЫ) - ТАКОЙ ЖЕ КАК В ПРЕДЫДУЩЕЙ ВЕРСИИ
+# ============================================================
+# (ВСЕ ФУНКЦИИ main_menu, back_to_menu, premium_menu, admin_menu,
+#  commands: start, help, ping, test_gpt, status, premium, test, profile, stats, clear, draw, support, feedback, admin
+#  и обработчики handle_all_messages, handle_callback - ТЕ ЖЕ САМЫЕ)
     
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
