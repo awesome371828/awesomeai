@@ -3,7 +3,7 @@ name: Run Telegram Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'   # Перезапуск каждые 4 часов
+    - cron: '0 */4 * * *'   # Перезапуск каждые 4 часа
 
 jobs:
   build:
@@ -25,7 +25,9 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          FOLDER_ID: ${{ secrets.FOLDER_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GIGACHAT_AUTH_KEY: ${{ secrets.GIGACHAT_AUTH_KEY }}
         run: |
           python -u bot.py
