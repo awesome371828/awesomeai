@@ -58,7 +58,7 @@ OWNER_ID = 6652898792
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 999999999
 
-# ТАЙМАУТЫ - МАКСИМУМ 5 СЕКУНД
+# ТАЙМАУТЫ
 GIGACHAT_TIMEOUT = 3
 YANDEXGPT_TIMEOUT = 3
 SEARCH_TIMEOUT = 3
@@ -1168,7 +1168,7 @@ def search_all_internet(query):
     return None
 
 # ============================================================
-# GIGACHAT - ОСНОВНОЙ (ПЕРВЫЙ)
+# GIGACHAT - ОСНОВНОЙ
 # ============================================================
 gigachat_token_cache = None
 gigachat_token_time = 0
@@ -1247,7 +1247,7 @@ def generate_with_gigachat(user_text, system_prompt):
         return None
 
 # ============================================================
-# YANDEXGPT - КАК БАЗА ДАННЫХ ИНТЕРНЕТА (ВТОРОЙ)
+# YANDEXGPT - БАЗА ДАННЫХ ИНТЕРНЕТА
 # ============================================================
 def generate_with_yandexgpt(user_text, system_prompt):
     try:
@@ -1564,7 +1564,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             except Exception as e:
                 print(f"❌ GigaChat упал: {e}")
         
-        # ===== YANDEXGPT (КАК БАЗА ДАННЫХ ИНТЕРНЕТА) =====
+        # ===== YANDEXGPT (БАЗА ДАННЫХ ИНТЕРНЕТА) =====
         try:
             print("🔄 Пробую YandexGPT (БАЗА ДАННЫХ ИНТЕРНЕТА)...")
             start_time = time.time()
@@ -2817,7 +2817,7 @@ def admin_support_cmd(message, user_id):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ЗАПУСК
+# ЗАПУСК - С ОБРАБОТКОЙ ОШИБКИ 409!
 # ============================================================
 init_db()
 init_memory_db()
@@ -2867,9 +2867,30 @@ print("=" * 60)
 print("✅ БОТ ЗАПУЩЕН!")
 print("=" * 60)
 
+# ============================================================
+# ЗАПУСК С ЗАЩИТОЙ ОТ ОШИБКИ 409
+# ============================================================
 while True:
     try:
-        bot.polling(none_stop=True, timeout=60)
+        # Останавливаем предыдущие потоки
+        try:
+            bot.stop_polling()
+        except:
+            pass
+        time.sleep(1)
+        
+        # Запускаем с правильными параметрами
+        bot.polling(none_stop=True, timeout=30, long_polling_timeout=30)
     except Exception as e:
-        print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
-        time.sleep(5)
+        error_msg = str(e)
+        if "409" in error_msg or "Conflict" in error_msg:
+            print("⚠️ Обнаружен конфликт (409). Останавливаем старые экземпляры...")
+            try:
+                bot.stop_polling()
+            except:
+                pass
+            time.sleep(3)
+            continue
+        else:
+            print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
+            time.sleep(5)
