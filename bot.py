@@ -52,16 +52,16 @@ if not YANDEX_API_KEY:
 
 FOLDER_ID = os.getenv("FOLDER_ID", "b1g4aq87c7j61c6g3i5l")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
-OWNER_ID = 6652898792
+OWNER_ID = 6652898792  # ВЛАДЕЛЕЦ
 
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 999999999
 
-# ТАЙМАУТЫ (ОПТИМИЗИРОВАНЫ)
-GIGACHAT_TIMEOUT = 5   # 5 секунд
-YANDEXGPT_TIMEOUT = 10  # 10 секунд
-SEARCH_TIMEOUT = 3      # 3 секунды на поиск
-WEATHER_TIMEOUT = 3     # 3 секунды на погоду
+# ТАЙМАУТЫ
+GIGACHAT_TIMEOUT = 5
+YANDEXGPT_TIMEOUT = 10
+SEARCH_TIMEOUT = 3
+WEATHER_TIMEOUT = 3
 
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
@@ -315,7 +315,7 @@ user_last_message = {}
 def check_spam(user_id):
     now = time.time()
     if user_id in user_last_message:
-        if now - user_last_message[user_id] < 1.0:  # Уменьшил до 1 секунды
+        if now - user_last_message[user_id] < 1.0:
             return True
     user_last_message[user_id] = now
     return False
@@ -873,7 +873,7 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# ПОИСК ПО ИНТЕРНЕТУ (ОПТИМИЗИРОВАН)
+# ПОИСК ПО ИНТЕРНЕТУ
 # ============================================================
 def get_coordinates(city):
     try:
@@ -1142,7 +1142,7 @@ def search_all_internet(query):
     return None
 
 # ============================================================
-# GIGACHAT (ТАЙМАУТ 5 СЕКУНД)
+# GIGACHAT
 # ============================================================
 def get_gigachat_token():
     if not GIGACHAT_AUTH_KEY:
@@ -1191,7 +1191,7 @@ def generate_with_gigachat(user_text, system_prompt):
                 {"role": "user", "content": user_text}
             ],
             "temperature": 0.85,
-            "max_tokens": 800  # Уменьшил для скорости
+            "max_tokens": 800
         }
         
         print(f"🔄 GigaChat запрос (таймаут {GIGACHAT_TIMEOUT}с)...")
@@ -1213,7 +1213,7 @@ def generate_with_gigachat(user_text, system_prompt):
         return None
 
 # ============================================================
-# YANDEXGPT (ТАЙМАУТ 10 СЕКУНД)
+# YANDEXGPT
 # ============================================================
 def generate_with_yandexgpt(user_text, system_prompt):
     try:
@@ -1221,7 +1221,7 @@ def generate_with_yandexgpt(user_text, system_prompt):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.85, "maxTokens": 600},  # Уменьшил для скорости
+            "completionOptions": {"temperature": 0.85, "maxTokens": 600},
             "messages": [
                 {"role": "system", "text": system_prompt},
                 {"role": "user", "text": user_text}
@@ -1515,7 +1515,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         
         history = get_user_history(user_id)
         
-        # ===== ПРОБУЕМ GIGACHAT (5 СЕКУНД) =====
+        # ПРОБУЕМ GIGACHAT (5 СЕКУНД)
         if GIGACHAT_AUTH_KEY:
             try:
                 print("🔄 Пробую GigaChat...")
@@ -1530,7 +1530,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             except Exception as e:
                 print(f"❌ GigaChat упал: {e}")
         
-        # ===== YANDEXGPT (10 СЕКУНД) =====
+        # ПРОБУЕМ YANDEXGPT (10 СЕКУНД)
         try:
             print("🔄 Пробую YandexGPT...")
             start_time = time.time()
@@ -1544,7 +1544,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         except Exception as e:
             print(f"❌ YandexGPT упал: {e}")
         
-        # ===== FALLBACK =====
+        # FALLBACK
         fallback = generate_fallback_response(user_text, search_result)
         history.append({"role": "user", "text": user_text})
         history.append({"role": "assistant", "text": fallback})
@@ -1626,7 +1626,7 @@ def process_message(user_id, user_text, image_description=None):
     return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
-# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ (не меняется)
+# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -1764,7 +1764,7 @@ def test_gpt_cmd(m):
     user_id = m.from_user.id
     msg = bot.send_message(chat_id, "🧠 Тестирую нейросети...")
     
-    # Пробуем GigaChat (5 сек)
+    # Пробуем GigaChat
     try:
         response = generate_with_gigachat("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
@@ -1773,7 +1773,7 @@ def test_gpt_cmd(m):
     except Exception as e:
         print(f"GigaChat тест упал: {e}")
     
-    # Пробуем YandexGPT (10 сек)
+    # Пробуем YandexGPT
     try:
         response = generate_with_yandexgpt("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
@@ -1789,21 +1789,25 @@ def status_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
+    
+    # Получаем данные пользователя
+    user_data = get_db_user(user_id)
+    if user_data:
+        messages = user_data.get('messages_today', 0)
+        expires = user_data.get('premium_expires')
+        premium = user_data.get('premium', 0) == 1
+    else:
+        messages = 0
+        expires = None
+        premium = False
+    
+    # Проверяем актуальный статус
     if user_id == OWNER_ID:
         status_text = "👑 ВЛАДЕЛЕЦ — ♾️ БЕЗЛИМИТ!"
     elif is_admin(user_id):
         status_text = "👑 АДМИН — ♾️ БЕЗЛИМИТ!"
     else:
-        premium = get_premium_status(user_id)
-        user_data = get_db_user(user_id)
-        if user_data:
-            messages = user_data.get('messages_today', 0)
-            expires = user_data.get('premium_expires')
-        else:
-            messages = 0
-            expires = None
-        
-        if premium:
+        if get_premium_status(user_id):
             if expires and expires != "None":
                 expires_formatted = format_date(expires)
                 status_text = f"💎 PREMIUM (до {expires_formatted})"
@@ -1933,6 +1937,8 @@ def profile_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
+    
+    # Получаем данные пользователя
     user_data = get_db_user(user_id)
     if user_data:
         messages = user_data.get('messages_today', 0)
@@ -1945,22 +1951,23 @@ def profile_cmd(m):
         premium = False
         joined_at = "Неизвестно"
     
-    if not get_premium_status(user_id):
-        premium = False
+    # Проверяем актуальный статус Premium
+    has_premium = get_premium_status(user_id)
     
+    # Определяем статус
     if user_id == OWNER_ID:
         status = "👑 ВЛАДЕЛЕЦ"
-        limit_text = "♾️ Безлимит"
+        limit_text = "♾️ БЕЗЛИМИТНО"
     elif is_admin(user_id):
         status = "👑 АДМИН"
-        limit_text = "♾️ Безлимит"
-    elif premium:
+        limit_text = "♾️ БЕЗЛИМИТНО"
+    elif has_premium:
         if expires and expires != "None":
             expires_formatted = format_date(expires)
             status = f"💎 PREMIUM (до {expires_formatted})"
         else:
             status = "💎 PREMIUM"
-        limit_text = "♾️ Безлимит"
+        limit_text = "♾️ БЕЗЛИМИТНО"
     else:
         remaining = FREE_LIMIT - messages
         if remaining < 0:
@@ -1970,6 +1977,7 @@ def profile_cmd(m):
     
     username = m.from_user.username
     user_link = f"@{username}" if username else "Не указан"
+    
     text = (
         f"👤 ТВОЙ ПРОФИЛЬ\n\n"
         f"🆔 ID: <code>{user_id}</code>\n"
@@ -1989,6 +1997,7 @@ def stats_cmd(m):
     delete_previous_messages(chat_id, user_id)
     
     if user_id == OWNER_ID or is_admin(user_id):
+        # Статистика сервера
         if use_supabase:
             try:
                 response = supabase.table('users').select('*').execute()
@@ -2019,18 +2028,19 @@ def stats_cmd(m):
         
         text = (
             "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
-            f"👥 Всего: {total_users}\n"
+            f"👥 Всего пользователей: {total_users}\n"
             f"👑 Админов: {admin_users}\n"
             f"💎 Premium: {premium_users}\n"
             f"🔓 Бесплатных: {total_users - premium_users - admin_users}"
         )
     else:
+        # Личная статистика
         user_data = get_db_user(user_id)
         if user_data:
             messages_today = user_data.get('messages_today', 0)
-            premium = get_premium_status(user_id)
+            has_premium = get_premium_status(user_id)
             
-            if premium:
+            if has_premium:
                 status = "💎 PREMIUM"
                 limit_text = "♾️ Безлимит"
             else:
@@ -2059,7 +2069,7 @@ def stats_cmd(m):
                 f"👤 Статус: {status}\n"
                 f"📨 Лимит: {limit_text}\n"
                 f"✉️ Сегодня: {messages_today}\n"
-                f"📊 Всего: {total}"
+                f"📊 Всего сообщений: {total}"
             )
         else:
             text = "❌ Не удалось получить данные."
@@ -2174,7 +2184,7 @@ def admin_panel(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ (ГЛАВНЫЙ)
+# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ
 # ============================================================
 @bot.message_handler(func=lambda m: True)
 def handle_all_messages(m):
@@ -2306,7 +2316,7 @@ def handle_all_messages(m):
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В handle_all_messages: {e}")
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК (сокращен для экономии места - полная версия)
+# ОБРАБОТЧИК КНОПОК
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -2321,6 +2331,7 @@ def handle_callback(call):
         
         ensure_user(user_id, call.from_user.username or "unknown")
         
+        # Кнопки главного меню
         if call.data == "status":
             status_cmd(call.message)
             return
