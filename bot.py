@@ -36,11 +36,13 @@ import speech_recognition as sr
 from telebot import types
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!", flush=True)
 
 # ============================================================
-# НАСТРОЙКА
+# МАКСИМАЛЬНО БЫСТРАЯ НАСТРОЙКА
 # ============================================================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
@@ -52,217 +54,350 @@ if not YANDEX_API_KEY:
 
 FOLDER_ID = os.getenv("FOLDER_ID", "b1g4aq87c7j61c6g3i5l")
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
-OWNER_ID = 6652898792  # ВЛАДЕЛЕЦ
+OWNER_ID = 6652898792
 
 FREE_LIMIT = 20
 PREMIUM_LIMIT = 999999999
 
-# ТАЙМАУТЫ
-GIGACHAT_TIMEOUT = 2
-YANDEXGPT_TIMEOUT = 4
-SEARCH_TIMEOUT = 2
-WEATHER_TIMEOUT = 2
+# МАКСИМАЛЬНО БЫСТРЫЕ ТАЙМАУТЫ
+GIGACHAT_TIMEOUT = 2   # 2 секунды
+YANDEXGPT_TIMEOUT = 3  # 3 секунды
+SEARCH_TIMEOUT = 1     # 1 секунда
+WEATHER_TIMEOUT = 1    # 1 секунда
+
+# Пул потоков для параллельных запросов
+executor = ThreadPoolExecutor(max_workers=5)
 
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
-# SUPABASE НАСТРОЙКА
+# БЫСТРЫЙ КЭШ
 # ============================================================
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
+CACHE = {}
+CACHE_TTL = 300  # 5 минут
 
-use_supabase = True
-try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Supabase подключен!", flush=True)
+def get_cache(key):
+    if key in CACHE:
+        data, timestamp = CACHE[key]
+        if time.time() - timestamp < CACHE_TTL:
+            return data
+        del CACHE[key]
+    return None
+
+def set_cache(key, data):
+    CACHE[key] = (data, time.time())
+
+# ============================================================
+# БЫСТРЫЙ ПОИСК (ПАРАЛЛЕЛЬНЫЙ)
+# ============================================================
+def search_google_fast(query):
     try:
-        test = supabase.table('users').select('*').limit(1).execute()
-        print(f"✅ Таблица users найдена! Записей: {len(test.data)}", flush=True)
-    except Exception as e:
-        print(f"❌ Ошибка доступа к таблице users: {e}", flush=True)
-        use_supabase = False
-except Exception as e:
-    print(f"❌ Ошибка подключения к Supabase: {e}", flush=True)
-    use_supabase = False
-
-def get_db_user(user_id):
-    if use_supabase:
-        try:
-            response = supabase.table('users').select('*').eq('user_id', user_id).execute()
-            if response.data:
-                return response.data[0]
-            return None
-        except:
-            return None
-    else:
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        c.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-        result = c.fetchone()
-        conn.close()
-        if result:
-            columns = ['user_id', 'username', 'premium', 'messages_today', 'last_reset', 'premium_expires', 'is_admin', 'test_used', 'joined_at', 'is_owner']
-            return dict(zip(columns, result))
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for result in soup.select('div.g')[:2]:
+                title_elem = result.select_one('h3')
+                snippet_elem = result.select_one('div.VwiC3b')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title:
+                        results.append(f"🔹 {title}\n📝 {snippet[:100]}")
+            if results:
+                return "\n".join(results)
+        return None
+    except:
         return None
 
-def update_db_user(user_id, data):
-    if use_supabase:
-        try:
-            supabase.table('users').update(data).eq('user_id', user_id).execute()
-            return True
-        except:
-            return False
-    else:
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        set_clause = ', '.join([f"{k} = ?" for k in data.keys()])
-        values = list(data.values()) + [user_id]
-        c.execute(f'UPDATE users SET {set_clause} WHERE user_id = ?', values)
-        conn.commit()
-        conn.close()
-        return True
+def search_wikipedia_fast(query):
+    try:
+        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('query', {}).get('search', [])
+            if results:
+                text = ""
+                for item in results[:2]:
+                    title = item.get('title', '')
+                    snippet = re.sub(r'<[^>]+>', '', item.get('snippet', ''))[:100]
+                    text += f"🔹 {title}\n📝 {snippet}\n\n"
+                return text
+        return None
+    except:
+        return None
 
-def init_db():
-    if use_supabase:
-        try:
-            try:
-                supabase.table('users').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        user_id BIGINT PRIMARY KEY,
-                        username TEXT,
-                        premium INTEGER DEFAULT 0,
-                        messages_today INTEGER DEFAULT 0,
-                        last_reset TEXT,
-                        premium_expires TEXT,
-                        is_admin INTEGER DEFAULT 0,
-                        test_used INTEGER DEFAULT 0,
-                        joined_at TEXT,
-                        is_owner INTEGER DEFAULT 0
-                    )
-                """).execute()
-            
-            try:
-                supabase.table('banned').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS banned (
-                        user_id BIGINT PRIMARY KEY
-                    )
-                """).execute()
-            
-            try:
-                supabase.table('muted').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS muted (
-                        user_id BIGINT PRIMARY KEY
-                    )
-                """).execute()
-            
-            try:
-                supabase.table('total_stats').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS total_stats (
-                        user_id BIGINT PRIMARY KEY,
-                        total_messages INTEGER DEFAULT 0
-                    )
-                """).execute()
-            
-            try:
-                supabase.table('premium_orders').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS premium_orders (
-                        order_id SERIAL PRIMARY KEY,
-                        user_id BIGINT,
-                        status TEXT DEFAULT 'pending',
-                        created_at TEXT
-                    )
-                """).execute()
-            
-            try:
-                supabase.table('support_requests').select('*').limit(1).execute()
-            except:
-                supabase.sql("""
-                    CREATE TABLE IF NOT EXISTS support_requests (
-                        request_id SERIAL PRIMARY KEY,
-                        user_id BIGINT,
-                        username TEXT,
-                        text TEXT,
-                        status TEXT DEFAULT 'pending',
-                        created_at TEXT
-                    )
-                """).execute()
-            
-            print("✅ Supabase таблицы готовы")
-        except Exception as e:
-            print(f"⚠️ Ошибка Supabase: {e}")
-        return
+def search_all_fast(query):
+    """Параллельный поиск во всех источниках"""
+    cache_key = f"search_{hash(query)}_{int(time.time()/300)}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
     
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (user_id INTEGER PRIMARY KEY,
-                  username TEXT,
-                  premium INTEGER DEFAULT 0,
-                  messages_today INTEGER DEFAULT 0,
-                  last_reset TEXT,
-                  premium_expires TEXT,
-                  is_admin INTEGER DEFAULT 0,
-                  test_used INTEGER DEFAULT 0,
-                  joined_at TEXT,
-                  is_owner INTEGER DEFAULT 0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS banned (user_id INTEGER PRIMARY KEY)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS muted (user_id INTEGER PRIMARY KEY)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS total_stats
-                 (user_id INTEGER PRIMARY KEY, total_messages INTEGER DEFAULT 0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS premium_orders
-                 (order_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  status TEXT DEFAULT 'pending',
-                  created_at TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS support_requests
-                 (request_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  username TEXT,
-                  text TEXT,
-                  status TEXT DEFAULT 'pending',
-                  created_at TEXT)''')
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN test_used INTEGER DEFAULT 0')
-    except:
-        pass
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN joined_at TEXT')
-    except:
-        pass
-    try:
-        c.execute('ALTER TABLE users ADD COLUMN is_owner INTEGER DEFAULT 0')
-    except:
-        pass
-    conn.commit()
-    conn.close()
-    print("✅ Локальная SQLite база данных создана")
+    results = []
+    
+    # Параллельные запросы
+    futures = []
+    futures.append(executor.submit(search_google_fast, query))
+    futures.append(executor.submit(search_wikipedia_fast, query))
+    
+    for future in futures:
+        try:
+            result = future.result(timeout=SEARCH_TIMEOUT + 0.5)
+            if result:
+                results.append(result)
+        except:
+            pass
+    
+    if results:
+        final = "\n\n---\n\n".join(results)
+        set_cache(cache_key, final)
+        return final
+    
+    return None
 
-def init_memory_db():
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS memory
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  topic TEXT,
-                  fact TEXT,
-                  timestamp TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS personality
-                 (user_id INTEGER PRIMARY KEY,
-                  style TEXT,
-                  mood TEXT,
-                  last_interaction TEXT)''')
-    conn.commit()
-    conn.close()
+# ============================================================
+# БЫСТРЫЙ GIGACHAT
+# ============================================================
+gigachat_token_cache = None
+gigachat_token_time = 0
+
+def get_gigachat_token_fast():
+    global gigachat_token_cache, gigachat_token_time
+    if gigachat_token_cache and time.time() - gigachat_token_time < 300:
+        return gigachat_token_cache
+    
+    if not GIGACHAT_AUTH_KEY:
+        return None
+    try:
+        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "RqUID": "00000000-0000-0000-0000-000000000000",
+            "Authorization": f"Basic {GIGACHAT_AUTH_KEY}"
+        }
+        data = {"scope": "GIGACHAT_API_PERS", "grant_type": "client_credentials"}
+        response = requests.post(url, headers=headers, data=data, timeout=3, verify=False)
+        if response.status_code == 200:
+            gigachat_token_cache = response.json().get("access_token")
+            gigachat_token_time = time.time()
+            return gigachat_token_cache
+        return None
+    except:
+        return None
+
+def generate_with_gigachat_fast(user_text, system_prompt):
+    try:
+        token = get_gigachat_token_fast()
+        if not token:
+            return None
+        
+        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        data = {
+            "model": "GigaChat-Pro",
+            "messages": [
+                {"role": "system", "content": system_prompt[:1000]},
+                {"role": "user", "content": user_text}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 300  # МАКСИМАЛЬНО БЫСТРО
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        return None
+    except:
+        return None
+
+# ============================================================
+# БЫСТРЫЙ YANDEXGPT
+# ============================================================
+def generate_with_yandexgpt_fast(user_text, system_prompt):
+    try:
+        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
+        data = {
+            "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
+            "completionOptions": {"temperature": 0.7, "maxTokens": 200},
+            "messages": [
+                {"role": "system", "text": system_prompt[:1000]},
+                {"role": "user", "text": user_text}
+            ]
+        }
+        response = requests.post(url, headers=headers, json=data, timeout=YANDEXGPT_TIMEOUT)
+        if response.status_code == 200:
+            return response.json()["result"]["alternatives"][0]["message"]["text"]
+        return None
+    except:
+        return None
+
+# ============================================================
+# БЫСТРЫЙ ОТВЕТ (ПАРАЛЛЕЛЬНЫЙ ЗАПУСК GIGACHAT И YANDEXGPT)
+# ============================================================
+def generate_ai_response_fast(user_id, user_text, search_result=None):
+    try:
+        current_date = get_current_date()
+        current_time = get_moscow_time().strftime('%H:%M')
+        system_prompt = SUPER_SYSTEM_PROMPT.format(
+            current_date=current_date,
+            current_time=current_time
+        )
+        
+        if get_premium_status(user_id):
+            system_prompt += "\n\n💎 PREMIUM статус."
+        if search_result:
+            system_prompt += f"\n\n🌐 Информация: {search_result[:500]}"
+        
+        # Параллельный запуск GigaChat и YandexGPT
+        results = []
+        futures = []
+        
+        if GIGACHAT_AUTH_KEY:
+            futures.append(executor.submit(generate_with_gigachat_fast, user_text, system_prompt))
+        futures.append(executor.submit(generate_with_yandexgpt_fast, user_text, system_prompt))
+        
+        for future in futures:
+            try:
+                result = future.result(timeout=GIGACHAT_TIMEOUT + 1)
+                if result and len(result) > 10:
+                    results.append(result)
+            except:
+                pass
+        
+        if results:
+            return results[0]  # Берем первый успешный ответ
+        
+        # Fallback
+        return generate_fallback_response(user_text, search_result)
+        
+    except Exception as e:
+        print(f"[GPT] Ошибка: {e}")
+        return "⚠️ Ошибка. Попробуй ещё раз! 🤖"
+
+# ============================================================
+# БЫСТРАЯ ОБРАБОТКА СООБЩЕНИЙ
+# ============================================================
+def process_message_fast(user_id, user_text, image_description=None):
+    text_lower = user_text.lower().strip()
+    
+    # КЭШ ДЛЯ ЧАСТЫХ ЗАПРОСОВ
+    cache_key = f"msg_{hash(user_text)}_{int(time.time()/300)}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+    
+    # ПРАЗДНИКИ
+    if any(kw in text_lower for kw in ['праздник', 'праздники', 'какой сегодня праздник', 'сегодня праздник']):
+        today = get_current_date()
+        # Быстрый поиск праздников
+        search_result = search_all_fast(f"праздники {today} Россия")
+        if search_result:
+            response = f"📅 *{today} (МСК)*\n\n{search_result}"
+            set_cache(cache_key, response)
+            return response
+        else:
+            response = f"📅 *{today} (МСК)*\n\nПраздников не найдено."
+            set_cache(cache_key, response)
+            return response
+    
+    # ПОГОДА
+    if any(kw in text_lower for kw in ['погода', 'weather', 'температура', 'градус', 'дождь']):
+        city_match = re.search(r'(в|в городе)\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
+        if city_match:
+            city = city_match.group(2).strip()
+            # Быстрый поиск погоды
+            weather = get_weather_fast(city)
+            if weather:
+                set_cache(cache_key, weather)
+                return weather
+        return "🌐 Напиши: погода в [город]"
+    
+    # КУРСЫ
+    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
+        response = get_exchange_rates_fast()
+        if response:
+            set_cache(cache_key, response)
+            return response
+        return "💵 Не удалось получить курс."
+    
+    # ПОИСК В ИНТЕРНЕТЕ
+    if len(user_text) > 3:
+        search_result = search_all_fast(user_text)
+        if search_result:
+            response = f"🔍 *Поиск:* {user_text}\n\n{search_result}"
+            set_cache(cache_key, response)
+            return response
+    
+    # НЕЙРОСЕТЬ (ПАРАЛЛЕЛЬНО)
+    response = generate_ai_response_fast(user_id, user_text, None)
+    if response and len(response) > 10:
+        set_cache(cache_key, response)
+        return response
+    
+    # FALLBACK
+    response = generate_fallback_response(user_text, None)
+    set_cache(cache_key, response)
+    return response
+
+# ============================================================
+# БЫСТРАЯ ПОГОДА
+# ============================================================
+def get_weather_fast(city):
+    cache_key = f"weather_{city}_{int(time.time()/1800)}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+    
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={urllib.parse.quote(city)}&appid=4c8f5c0b8a9f2c5d6e7f8g9h0i1j2k3l&units=metric&lang=ru"
+        response = requests.get(url, timeout=WEATHER_TIMEOUT)
+        if response.status_code == 200:
+            data = response.json()
+            temp = data['main']['temp']
+            description = data['weather'][0]['description']
+            wind = data['wind']['speed']
+            humidity = data['main']['humidity']
+            result = f"🌤 {city}: {round(temp)}°C, {description}\n💨 {wind} м/с, 💧 {humidity}%"
+            set_cache(cache_key, result)
+            return result
+    except:
+        pass
+    return None
+
+# ============================================================
+# БЫСТРЫЙ КУРС
+# ============================================================
+def get_exchange_rates_fast():
+    cache_key = f"rates_{int(time.time()/600)}"
+    cached = get_cache(cache_key)
+    if cached:
+        return cached
+    
+    try:
+        url = "https://api.exchangerate-api.com/v4/latest/USD"
+        response = requests.get(url, timeout=SEARCH_TIMEOUT)
+        if response.status_code == 200:
+            data = response.json()
+            rates = data.get('rates', {})
+            usd_rub = rates.get('RUB', '?')
+            eur_usd = rates.get('EUR', 1)
+            eur_rub = usd_rub / eur_usd if eur_usd else '?'
+            result = f"💵 USD → RUB: {round(usd_rub, 2)}₽\nEUR → RUB: {round(eur_rub, 2)}₽"
+            set_cache(cache_key, result)
+            return result
+    except:
+        pass
+    return None
 
 # ============================================================
 # ВРЕМЯ (МОСКОВСКОЕ)
@@ -315,7 +450,7 @@ user_last_message = {}
 def check_spam(user_id):
     now = time.time()
     if user_id in user_last_message:
-        if now - user_last_message[user_id] < 1.0:
+        if now - user_last_message[user_id] < 0.3:  # 300 мс
             return True
     user_last_message[user_id] = now
     return False
@@ -434,7 +569,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🔥🔥🔥"""
 
 # ============================================================
-# ФУНКЦИИ БАЗЫ ДАННЫХ
+# ФУНКЦИИ БАЗЫ ДАННЫХ (из твоего кода)
 # ============================================================
 def ensure_user(user_id, username):
     if use_supabase:
@@ -873,423 +1008,24 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# ПОИСК ПО ИНТЕРНЕТУ
-# ============================================================
-def get_coordinates(city):
-    try:
-        city_lower = city.lower().strip()
-        if "ростов" in city_lower and ("дон" in city_lower or "на дону" in city_lower):
-            city = "Ростов-на-Дону"
-        elif "спб" in city_lower or "питер" in city_lower:
-            city = "Санкт-Петербург"
-        elif "мск" in city_lower:
-            city = "Москва"
-        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city)}&format=json&limit=1&accept-language=ru"
-        headers = {"User-Agent": "AwesomeAI/1.0"}
-        response = requests.get(url, headers=headers, timeout=WEATHER_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                lat = data[0].get('lat')
-                lon = data[0].get('lon')
-                display_name = data[0].get('display_name', city)
-                if len(display_name) > 50:
-                    parts = display_name.split(',')
-                    display_name = parts[0] if parts else city
-                return float(lat), float(lon), display_name
-        return None, None, city
-    except:
-        return None, None, city
-
-def get_weather(city):
-    try:
-        lat, lon, display_name = get_coordinates(city)
-        if lat is None:
-            return None
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&forecast_days=7"
-        response = requests.get(url, timeout=WEATHER_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            current = data.get('current_weather', {})
-            daily = data.get('daily', {})
-            temp = current.get('temperature')
-            weathercode = current.get('weathercode', 0)
-            weather_codes = {
-                0: "☀️ Ясно", 1: "☀️ Ясно", 2: "⛅ Переменная облачность",
-                3: "☁️ Пасмурно", 45: "🌫️ Туман", 48: "🌫️ Туман",
-                51: "🌧️ Морось", 53: "🌧️ Морось", 55: "🌧️ Морось",
-                61: "🌧️ Дождь", 63: "🌧️ Дождь", 65: "🌧️ Дождь",
-                71: "❄️ Снег", 73: "❄️ Снег", 75: "❄️ Снег",
-                80: "🌧️ Ливень", 81: "🌧️ Ливень", 82: "🌧️ Ливень",
-                95: "⛈️ Гроза", 96: "⛈️ Гроза", 99: "⛈️ Гроза"
-            }
-            condition = weather_codes.get(weathercode, "☁️ Облачно")
-            forecast = ""
-            if daily.get('time'):
-                times = daily['time']
-                max_temps = daily.get('temperature_2m_max', [])
-                min_temps = daily.get('temperature_2m_min', [])
-                weather_codes_daily = daily.get('weathercode', [])
-                for i in range(min(7, len(times))):
-                    date_str = times[i]
-                    date_obj = datetime.fromisoformat(date_str)
-                    date_formatted = date_obj.strftime('%d.%m')
-                    max_t = round(max_temps[i]) if i < len(max_temps) else "?"
-                    min_t = round(min_temps[i]) if i < len(min_temps) else "?"
-                    code = weather_codes_daily[i] if i < len(weather_codes_daily) else 0
-                    emoji = "🌧️" if code in [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99] else "☀️"
-                    forecast += f"\n📅 {date_formatted}: {emoji} {min_t}°C → {max_t}°C"
-            result = f"🌤 *Погода в {display_name}*\n"
-            result += f"☀️ Сейчас: {condition}, {round(temp)}°C\n"
-            result += f"📊 *Прогноз на неделю:*{forecast}"
-            return result
-        return None
-    except:
-        return None
-
-def extract_city_from_query(text):
-    text_lower = text.lower()
-    known_cities = ["москва", "санкт-петербург", "ростов-на-дону", "ростов", "новосибирск", "екатеринбург", "казань", "нижний новгород", "краснодар", "сочи", "владивосток", "вологда", "волгодонск"]
-    for city in known_cities:
-        if city in text_lower:
-            return city
-    match = re.search(r'в\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
-    if match:
-        city = match.group(1).strip()
-        for word in ['завтра', 'сегодня', 'на', 'дону', 'дон']:
-            city = city.replace(word, '').strip()
-        if city:
-            return city
-    return None
-
-def search_google(query):
-    try:
-        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            for result in soup.select('div.g')[:2]:
-                title_elem = result.select_one('h3')
-                snippet_elem = result.select_one('div.VwiC3b')
-                if title_elem:
-                    title = title_elem.get_text(strip=True)
-                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                    if title:
-                        results.append(f"🔹 *{title}*\n📝 {snippet}\n")
-            if results:
-                return "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_wikipedia(query):
-    try:
-        url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
-        response = requests.get(url, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get('query', {}).get('search', [])
-            if results:
-                text = ""
-                for item in results[:2]:
-                    title = item.get('title', '')
-                    snippet = item.get('snippet', '').replace('<span class="searchmatch">', '**').replace('</span>', '**')
-                    snippet = re.sub(r'<[^>]+>', '', snippet)
-                    text += f"🔹 *{title}*\n📝 {snippet}\n\n"
-                return text
-        return None
-    except:
-        return None
-
-def search_news(query):
-    try:
-        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
-        response = requests.get(url, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'xml')
-            items = soup.find_all('item')[:2]
-            if items:
-                text = ""
-                for item in items:
-                    title = item.find('title')
-                    link = item.find('link')
-                    pub_date = item.find('pubDate')
-                    if title and link:
-                        date = pub_date.text[:16] if pub_date else ""
-                        text += f"📰 *{title.text}*\n🔗 {link.text}\n📅 {date}\n\n"
-                return text
-        return None
-    except:
-        return None
-
-def search_youtube(query):
-    try:
-        url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl=ru"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            for video in soup.select('ytd-video-renderer')[:2]:
-                title_elem = video.select_one('yt-formatted-string#video-title')
-                channel_elem = video.select_one('ytd-channel-name a')
-                views_elem = video.select_one('span#view-count')
-                if title_elem:
-                    title = title_elem.get_text(strip=True)
-                    channel = channel_elem.get_text(strip=True) if channel_elem else "Неизвестный канал"
-                    views = views_elem.get_text(strip=True) if views_elem else ""
-                    results.append(f"🎬 *{title}*\n📺 {channel} | {views}\n")
-            if results:
-                return "📹 *YouTube:*\n" + "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_telegram(query):
-    try:
-        url = f"https://tgstat.ru/search?query={urllib.parse.quote(query)}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            for channel in soup.select('div.channel-item')[:2]:
-                name_elem = channel.select_one('div.channel-name')
-                desc_elem = channel.select_one('div.channel-description')
-                if name_elem:
-                    name = name_elem.get_text(strip=True)
-                    desc = desc_elem.get_text(strip=True) if desc_elem else ""
-                    results.append(f"📢 *{name}*\n📝 {desc}\n")
-            if results:
-                return "📱 *Telegram (каналы):*\n" + "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_vk(query):
-    try:
-        url = f"https://vk.com/search?c[q]={urllib.parse.quote(query)}&c[section]=communities"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            for group in soup.select('div.group_row')[:2]:
-                name_elem = group.select_one('div.group_name')
-                if name_elem:
-                    name = name_elem.get_text(strip=True)
-                    results.append(f"📌 *{name}*\n")
-            if results:
-                return "📱 *ВКонтакте (сообщества):*\n" + "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_twitch(query):
-    try:
-        url = f"https://www.twitch.tv/search?term={urllib.parse.quote(query)}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            results = []
-            for stream in soup.select('div.tw-card')[:2]:
-                title_elem = stream.select_one('h3.tw-core-text')
-                if title_elem:
-                    title = title_elem.get_text(strip=True)
-                    results.append(f"🎮 *{title}*\n")
-            if results:
-                return "🎮 *Twitch:*\n" + "\n".join(results)
-        return None
-    except:
-        return None
-
-def search_all_internet(query):
-    results = []
-    
-    google_result = search_google(query)
-    if google_result:
-        results.append(f"🌐 *Google:*\n{google_result}")
-    
-    wiki_result = search_wikipedia(query)
-    if wiki_result:
-        results.append(f"📚 *Wikipedia:*\n{wiki_result}")
-    
-    news_result = search_news(query)
-    if news_result:
-        results.append(f"📰 *Новости:*\n{news_result}")
-    
-    youtube_result = search_youtube(query)
-    if youtube_result:
-        results.append(f"{youtube_result}")
-    
-    tg_result = search_telegram(query)
-    if tg_result:
-        results.append(f"{tg_result}")
-    
-    vk_result = search_vk(query)
-    if vk_result:
-        results.append(f"{vk_result}")
-    
-    twitch_result = search_twitch(query)
-    if twitch_result:
-        results.append(f"{twitch_result}")
-    
-    if results:
-        return "\n\n---\n\n".join(results)
-    return None
-
-# ============================================================
-# GIGACHAT
-# ============================================================
-def get_gigachat_token():
-    if not GIGACHAT_AUTH_KEY:
-        print("❌ GIGACHAT_AUTH_KEY не настроен!")
-        return None
-    try:
-        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-            "RqUID": "00000000-0000-0000-0000-000000000000",
-            "Authorization": f"Basic {GIGACHAT_AUTH_KEY}"
-        }
-        data = {
-            "scope": "GIGACHAT_API_PERS",
-            "grant_type": "client_credentials"
-        }
-        response = requests.post(url, headers=headers, data=data, timeout=10, verify=False)
-        if response.status_code == 200:
-            token = response.json().get("access_token")
-            print("✅ GigaChat токен получен!")
-            return token
-        print(f"❌ GigaChat ошибка: {response.status_code} - {response.text[:200]}")
-        return None
-    except Exception as e:
-        print(f"❌ GigaChat токен ошибка: {e}")
-        return None
-
-def generate_with_gigachat(user_text, system_prompt):
-    try:
-        token = get_gigachat_token()
-        if not token:
-            print("❌ Нет токена GigaChat")
-            return None
-        
-        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-        data = {
-            "model": "GigaChat-Pro",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text}
-            ],
-            "temperature": 0.85,
-            "max_tokens": 800
-        }
-        
-        print(f"🔄 GigaChat запрос (таймаут {GIGACHAT_TIMEOUT}с)...")
-        response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
-        
-        print(f"📊 GigaChat ответ: {response.status_code}")
-        if response.status_code == 200:
-            result = response.json()["choices"][0]["message"]["content"]
-            print(f"✅ GigaChat ответил! Длина: {len(result)}")
-            return result
-        else:
-            print(f"❌ GigaChat ошибка: {response.text[:300]}")
-            return None
-    except requests.exceptions.Timeout:
-        print(f"⏰ GigaChat таймаут ({GIGACHAT_TIMEOUT}с)")
-        return None
-    except Exception as e:
-        print(f"❌ GigaChat исключение: {e}")
-        return None
-
-# ============================================================
-# YANDEXGPT
-# ============================================================
-def generate_with_yandexgpt(user_text, system_prompt):
-    try:
-        url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-        headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-        data = {
-            "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.85, "maxTokens": 600},
-            "messages": [
-                {"role": "system", "text": system_prompt},
-                {"role": "user", "text": user_text}
-            ]
-        }
-        print(f"🔄 YandexGPT запрос (таймаут {YANDEXGPT_TIMEOUT}с)...")
-        response = requests.post(url, headers=headers, json=data, timeout=YANDEXGPT_TIMEOUT)
-        if response.status_code == 200:
-            result = response.json()["result"]["alternatives"][0]["message"]["text"]
-            print("✅ YandexGPT ответил!")
-            return result
-        return None
-    except requests.exceptions.Timeout:
-        print(f"⏰ YandexGPT таймаут ({YANDEXGPT_TIMEOUT}с)")
-        return None
-    except Exception as e:
-        print(f"❌ YandexGPT ошибка: {e}")
-        return None
-
-# ============================================================
 # FALLBACK
 # ============================================================
 def generate_fallback_response(user_text, search_result=None):
     try:
         if search_result:
-            return f"🔍 *Нашёл в интернете:*\n\n{search_result[:800]}\n\n💡 *Подсказка:* Попробуй уточнить вопрос! 🤖"
+            return f"🔍 *Нашёл:*\n\n{search_result[:500]}"
         
         text_lower = user_text.lower()
         if "привет" in text_lower:
-            return "👋 Привет! Я AWESOME AI. Нейросети временно перегружены, но я всё ещё с тобой! Спроси что-нибудь ещё, или попробуй позже. 🚀"
+            return "👋 Привет! Я AWESOME AI. Чем могу помочь?"
         elif "погода" in text_lower:
-            return "🌤 Попробуй написать *погода в Москве* — я поищу! А пока нейросети отдыхают, можешь попробовать другие команды."
+            return "🌤 Напиши: погода в [город]"
         elif "как дела" in text_lower:
-            return "😊 У меня всё отлично! Нейросети немного устали, но я работаю. Задай вопрос, и я постараюсь помочь! 💪"
+            return "😊 Всё отлично! А у тебя?"
         else:
-            return "🤖 AWESOME AI на связи! Нейросети временно недоступны, но я работаю над этим. Попробуй позже или задай другой вопрос. Спасибо за понимание! ❤️"
+            return "🤖 AWESOME AI на связи! Задай вопрос!"
     except:
-        return "⚠️ AWESOME AI временно недоступен. Попробуй позже! 🔄"
-
-# ============================================================
-# КУРС ВАЛЮТ
-# ============================================================
-def get_exchange_rates():
-    try:
-        url = "https://api.exchangerate-api.com/v4/latest/USD"
-        response = requests.get(url, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            rates = data.get('rates', {})
-            usd_to_rub = rates.get('RUB', '?')
-            eur_to_rub = rates.get('RUB', '?') * (1 / rates.get('EUR', 1)) if rates.get('EUR') else '?'
-            return f"💵 *Курс валют:*\n🇺🇸 USD → RUB: {round(usd_to_rub, 2)}₽\n🇪🇺 EUR → RUB: {round(eur_to_rub, 2)}₽"
-        return None
-    except:
-        return None
-
-def get_crypto_rates():
-    try:
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
-        response = requests.get(url, timeout=SEARCH_TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            btc = data.get('bitcoin', {}).get('usd', '?')
-            eth = data.get('ethereum', {}).get('usd', '?')
-            return f"🪙 *Криптовалюты:*\n₿ BTC: ${btc}\n⟠ ETH: ${eth}"
-        return None
-    except:
-        return None
+        return "⚠️ Ошибка. Попробуй позже! 🔄"
 
 # ============================================================
 # МАТЕМАТИКА
@@ -1306,7 +1042,7 @@ def solve_math(text):
         c = int(equation_match.group(3))
         if a != 0:
             x = (c - b) / a
-            return f"🧮 *Решение:* {a}x + {b} = {c}\n➜ x = {x}"
+            return f"🧮 {a}x + {b} = {c}\n➜ x = {x}"
     clean_for_math = text_lower
     for word in ['сколько', 'будет', 'сколько будет', 'посчитай', 'реши', 'пример']:
         clean_for_math = clean_for_math.replace(word, '').strip()
@@ -1325,98 +1061,37 @@ def solve_math(text):
         if expr and len(expr) > 1:
             result = eval(expr)
             if result == int(result):
-                return f"🧮 *Результат:* {expr} = **{int(result)}**"
+                return f"🧮 {expr} = **{int(result)}**"
             else:
-                return f"🧮 *Результат:* {expr} = **{result}**"
+                return f"🧮 {expr} = **{result}**"
     except:
         pass
     return None
 
+# ============================================================
+# КОДИНГ
+# ============================================================
 def get_coding_help(query):
     if 'python' in query.lower():
-        return "🐍 *Python:*\n" + random.choice([
-            "Совет: используй list comprehensions для упрощения кода.",
-            "Не забывай про try-except для обработки ошибок.",
-            "Используй f-строки для форматирования текста."
+        return "🐍 Python: " + random.choice([
+            "используй list comprehensions",
+            "try-except для ошибок",
+            "f-строки для форматирования"
         ])
     elif 'javascript' in query.lower() or 'js' in query.lower():
-        return "🟡 *JavaScript:*\n" + random.choice([
-            "Совет: используй async/await для работы с асинхронным кодом.",
-            "Не забывай про const и let вместо var.",
-            "Используй стрелочные функции для краткости."
+        return "🟡 JS: " + random.choice([
+            "async/await для асинхронности",
+            "const и let вместо var",
+            "стрелочные функции"
         ])
     elif 'html' in query.lower():
-        return "🌐 *HTML:*\n" + random.choice([
-            "Совет: используй семантические теги (header, main, section).",
-            "Не забывай про атрибут alt для изображений.",
-            "Используй валидный HTML-код."
+        return "🌐 HTML: " + random.choice([
+            "семантические теги",
+            "атрибут alt для картинок",
+            "валидный HTML"
         ])
     else:
         return None
-
-# ============================================================
-# АНАЛИЗ НАСТРОЕНИЯ
-# ============================================================
-def analyze_mood(text):
-    mood_keywords = {
-        'happy': ['рад', 'счастлив', 'отлично', 'хорошо', 'круто', 'супер', 'класс', 'ого', 'вау'],
-        'sad': ['грустно', 'плохо', 'тоска', 'уныло', 'печально', 'жаль', 'обидно'],
-        'angry': ['злой', 'бесит', 'раздражает', 'нервирует', 'бешеный', 'в ярости'],
-        'calm': ['спокойно', 'нормально', 'тихо', 'мирно', 'ровно', 'уравновешенно'],
-        'curious': ['интересно', 'любопытно', 'хочу узнать', 'расскажи', 'объясни'],
-        'grateful': ['спасибо', 'благодарю', 'приятно', 'ценю', 'спасибо большое'],
-    }
-    text_lower = text.lower()
-    detected_moods = []
-    for mood, keywords in mood_keywords.items():
-        if any(kw in text_lower for kw in keywords):
-            detected_moods.append(mood)
-    if not detected_moods:
-        return 'neutral'
-    return detected_moods[0]
-
-# ============================================================
-# АНАЛИЗ ИЗОБРАЖЕНИЙ
-# ============================================================
-def analyze_image_from_file(file_content):
-    try:
-        img = Image.open(io.BytesIO(file_content))
-        width, height = img.size
-        format_img = img.format or "Unknown"
-        description = f"📸 *Анализ:* {width}×{height}, {format_img}\n"
-        try:
-            url = "https://vision.api.cloud.yandex.net/vision/v1/batchAnalyze"
-            headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
-            img_enhanced = ImageEnhance.Contrast(img).enhance(2.0)
-            img_enhanced = ImageEnhance.Sharpness(img_enhanced).enhance(2.0)
-            img_enhanced = img_enhanced.convert('L')
-            buf = io.BytesIO()
-            img_enhanced.save(buf, format='JPEG', quality=95)
-            enhanced_data = buf.getvalue()
-            payload = {
-                "folderId": FOLDER_ID,
-                "analyze_specs": [{
-                    "content": base64.b64encode(enhanced_data).decode('utf-8'),
-                    "features": [{"type": "TEXT_DETECTION"}]
-                }]
-            }
-            response = requests.post(url, headers=headers, json=payload, timeout=10)
-            if response.status_code == 200:
-                result = response.json()
-                pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
-                all_text = []
-                for page in pages:
-                    text = page.get("text", "")
-                    if text:
-                        all_text.append(text)
-                if all_text:
-                    recognized_text = " ".join(all_text).strip()
-                    description += f"\n📝 Текст: {recognized_text[:300]}"
-        except:
-            pass
-        return description
-    except:
-        return "⚠️ Не удалось проанализировать."
 
 # ============================================================
 # ГЕНЕРАЦИЯ КАРТИНОК
@@ -1448,182 +1123,9 @@ def fix_title(prompt):
         return "Картинка"
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
-# ============================================================
-# ПАМЯТЬ
-# ============================================================
-def remember(user_id, topic, fact):
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO memory (user_id, topic, fact, timestamp) VALUES (?, ?, ?, ?)',
-              (user_id, topic.lower(), fact, get_moscow_time().isoformat()))
-    conn.commit()
-    conn.close()
-
-def recall(user_id, topic):
-    conn = sqlite3.connect('memory.db')
-    c = conn.cursor()
-    c.execute('SELECT fact FROM memory WHERE user_id = ? AND topic LIKE ? ORDER BY timestamp DESC LIMIT 3',
-              (user_id, f'%{topic.lower()}%'))
-    results = c.fetchall()
-    conn.close()
-    if results:
-        return [f"🧠 {r[0]}" for r in results]
-    return []
-
-# ============================================================
-# ОСНОВНАЯ ОБРАБОТКА
-# ============================================================
-user_histories = {}
-
-def get_user_history(user_id):
-    if user_id not in user_histories:
-        user_histories[user_id] = []
-    return user_histories[user_id]
-
 def is_image_generation(text):
     image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
     return any(kw in text.lower() for kw in image_keywords)
-
-def generate_ai_response(user_id, user_text, search_result=None, image_description=None):
-    try:
-        memories = recall(user_id, user_text)
-        mood = analyze_mood(user_text)
-        mood_emoji = {
-            'happy': '😊', 'sad': '😢', 'angry': '😡',
-            'calm': '😌', 'curious': '🤔', 'grateful': '🙏',
-            'neutral': '😐'
-        }
-        
-        current_date = get_current_date()
-        current_time = get_moscow_time().strftime('%H:%M')
-        system_prompt = SUPER_SYSTEM_PROMPT.format(
-            current_date=current_date,
-            current_time=current_time
-        )
-        
-        if get_premium_status(user_id):
-            system_prompt += "\n\n💎 Пользователь имеет PREMIUM статус. Включи режим максимальной проработки!"
-        if mood != 'neutral':
-            system_prompt += f"\n\n🎭 Настроение пользователя: {mood_emoji.get(mood, '😐')}"
-        if image_description:
-            system_prompt += f"\n\n📸 На изображении: {image_description}"
-        if search_result:
-            system_prompt += f"\n\n🌐 Информация из интернета: {search_result}"
-        if memories:
-            memory_text = "\n".join(memories[:2])
-            system_prompt += f"\n\n🧠 Что я помню об этом: {memory_text}"
-        
-        history = get_user_history(user_id)
-        
-        # ПРОБУЕМ GIGACHAT (5 СЕКУНД)
-        if GIGACHAT_AUTH_KEY:
-            try:
-                print("🔄 Пробую GigaChat...")
-                start_time = time.time()
-                response = generate_with_gigachat(user_text, system_prompt)
-                elapsed = time.time() - start_time
-                print(f"⏱️ GigaChat ответ за {elapsed:.2f}с")
-                if response and len(response) > 10:
-                    history.append({"role": "user", "text": user_text})
-                    history.append({"role": "assistant", "text": response})
-                    return response
-            except Exception as e:
-                print(f"❌ GigaChat упал: {e}")
-        
-        # ПРОБУЕМ YANDEXGPT (10 СЕКУНД)
-        try:
-            print("🔄 Пробую YandexGPT...")
-            start_time = time.time()
-            response = generate_with_yandexgpt(user_text, system_prompt)
-            elapsed = time.time() - start_time
-            print(f"⏱️ YandexGPT ответ за {elapsed:.2f}с")
-            if response and len(response) > 10:
-                history.append({"role": "user", "text": user_text})
-                history.append({"role": "assistant", "text": response})
-                return response
-        except Exception as e:
-            print(f"❌ YandexGPT упал: {e}")
-        
-        # FALLBACK
-        fallback = generate_fallback_response(user_text, search_result)
-        history.append({"role": "user", "text": user_text})
-        history.append({"role": "assistant", "text": fallback})
-        return fallback
-        
-    except Exception as e:
-        print(f"[GPT] Ошибка: {e}")
-        return "⚠️ Ошибка при генерации ответа. Попробуй ещё раз! 🤖"
-
-# ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
-# ============================================================
-def process_message(user_id, user_text, image_description=None):
-    text_lower = user_text.lower().strip()
-    
-    info_keywords = ['праздник', 'событие', 'новость', 'кто', 'что', 'где', 'когда', 'почему', 'зачем', 'как', 'сколько', 'какой']
-    is_info_question = any(kw in text_lower for kw in info_keywords)
-    
-    if any(kw in text_lower for kw in ['праздник', 'сегодня', 'дата', 'какой сегодня', 'что сегодня']):
-        today = get_moscow_time().strftime('%d.%m.%Y')
-        search_result = search_all_internet(f"праздники {today} Россия")
-        if search_result:
-            return f"📅 *Сегодня {today} (МСК)*\n\n{search_result}"
-    
-    if is_info_question and len(user_text) > 3:
-        search_result = search_all_internet(user_text)
-        if search_result:
-            today = get_moscow_time().strftime('%d.%m.%Y')
-            return f"📅 *{today} (МСК)*\n\n{search_result}"
-    
-    if image_description:
-        return generate_ai_response(user_id, user_text, None, image_description)
-    
-    weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
-    if any(kw in text_lower for kw in weather_keywords):
-        city = extract_city_from_query(user_text)
-        if city:
-            weather_info = get_weather(city)
-            if weather_info:
-                return weather_info
-            else:
-                return f"🌐 Не нашёл город '{city}'. Попробуй ещё."
-        else:
-            return "🌐 В каком городе? Напиши: погода в [город]"
-    
-    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
-        rates = get_exchange_rates()
-        if rates:
-            return rates
-        else:
-            return "💵 Не удалось получить курс валют."
-    
-    if any(kw in text_lower for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
-        crypto = get_crypto_rates()
-        if crypto:
-            return crypto
-        else:
-            return "🪙 Не удалось получить курс криптовалют."
-    
-    if any(kw in text_lower for kw in ['python', 'javascript', 'html', 'код', 'программа']):
-        coding_help = get_coding_help(user_text)
-        if coding_help:
-            return coding_help
-    
-    if is_image_generation(user_text):
-        return None
-    
-    math_result = solve_math(user_text)
-    if math_result is not None:
-        return math_result
-    
-    search_result = None
-    if len(user_text) > 5:
-        search_result = search_all_internet(user_text)
-    
-    if len(user_text) > 20:
-        remember(user_id, "интересное", user_text[:100])
-    
-    return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
 # ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
@@ -1703,7 +1205,7 @@ def start(m):
         pass
     ensure_user(user_id, m.from_user.username or "unknown")
     text = (
-        "✨ <b>ДОБРО ПОЖАЛОВАТЬ В AWESOME AI!</b> ✨\n\n"
+        "✨ <b>AWESOME AI — СУПЕР-БЫСТРЫЙ!</b> ✨\n\n"
         f"🌸 <b>Привет, {m.from_user.first_name}!</b>\n\n"
         "🧠 <b>Меня создал гениальный AWESOME</b>\n\n"
         "🌐 <b>ЧТО Я УМЕЮ:</b>\n"
@@ -1766,7 +1268,7 @@ def test_gpt_cmd(m):
     
     # Пробуем GigaChat
     try:
-        response = generate_with_gigachat("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
+        response = generate_with_gigachat_fast("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
             bot.edit_message_text(f"✅ GigaChat работает!\n\n{response[:200]}", chat_id, msg.message_id)
             return
@@ -1775,7 +1277,7 @@ def test_gpt_cmd(m):
     
     # Пробуем YandexGPT
     try:
-        response = generate_with_yandexgpt("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
+        response = generate_with_yandexgpt_fast("Привет! Как дела? Ответь коротко.", "Ты - тестовый бот. Ответь коротко.")
         if response:
             bot.edit_message_text(f"✅ YandexGPT работает!\n\n{response[:200]}", chat_id, msg.message_id)
             return
@@ -1789,25 +1291,21 @@ def status_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
-    
-    # Получаем данные пользователя
-    user_data = get_db_user(user_id)
-    if user_data:
-        messages = user_data.get('messages_today', 0)
-        expires = user_data.get('premium_expires')
-        premium = user_data.get('premium', 0) == 1
-    else:
-        messages = 0
-        expires = None
-        premium = False
-    
-    # Проверяем актуальный статус
     if user_id == OWNER_ID:
         status_text = "👑 ВЛАДЕЛЕЦ — ♾️ БЕЗЛИМИТ!"
     elif is_admin(user_id):
         status_text = "👑 АДМИН — ♾️ БЕЗЛИМИТ!"
     else:
-        if get_premium_status(user_id):
+        premium = get_premium_status(user_id)
+        user_data = get_db_user(user_id)
+        if user_data:
+            messages = user_data.get('messages_today', 0)
+            expires = user_data.get('premium_expires')
+        else:
+            messages = 0
+            expires = None
+        
+        if premium:
             if expires and expires != "None":
                 expires_formatted = format_date(expires)
                 status_text = f"💎 PREMIUM (до {expires_formatted})"
@@ -1937,8 +1435,6 @@ def profile_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
     delete_previous_messages(chat_id, user_id)
-    
-    # Получаем данные пользователя
     user_data = get_db_user(user_id)
     if user_data:
         messages = user_data.get('messages_today', 0)
@@ -1951,23 +1447,22 @@ def profile_cmd(m):
         premium = False
         joined_at = "Неизвестно"
     
-    # Проверяем актуальный статус Premium
-    has_premium = get_premium_status(user_id)
+    if not get_premium_status(user_id):
+        premium = False
     
-    # Определяем статус
     if user_id == OWNER_ID:
         status = "👑 ВЛАДЕЛЕЦ"
-        limit_text = "♾️ БЕЗЛИМИТНО"
+        limit_text = "♾️ Безлимит"
     elif is_admin(user_id):
         status = "👑 АДМИН"
-        limit_text = "♾️ БЕЗЛИМИТНО"
-    elif has_premium:
+        limit_text = "♾️ Безлимит"
+    elif premium:
         if expires and expires != "None":
             expires_formatted = format_date(expires)
             status = f"💎 PREMIUM (до {expires_formatted})"
         else:
             status = "💎 PREMIUM"
-        limit_text = "♾️ БЕЗЛИМИТНО"
+        limit_text = "♾️ Безлимит"
     else:
         remaining = FREE_LIMIT - messages
         if remaining < 0:
@@ -1977,7 +1472,6 @@ def profile_cmd(m):
     
     username = m.from_user.username
     user_link = f"@{username}" if username else "Не указан"
-    
     text = (
         f"👤 ТВОЙ ПРОФИЛЬ\n\n"
         f"🆔 ID: <code>{user_id}</code>\n"
@@ -1997,7 +1491,6 @@ def stats_cmd(m):
     delete_previous_messages(chat_id, user_id)
     
     if user_id == OWNER_ID or is_admin(user_id):
-        # Статистика сервера
         if use_supabase:
             try:
                 response = supabase.table('users').select('*').execute()
@@ -2028,19 +1521,18 @@ def stats_cmd(m):
         
         text = (
             "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
-            f"👥 Всего пользователей: {total_users}\n"
+            f"👥 Всего: {total_users}\n"
             f"👑 Админов: {admin_users}\n"
             f"💎 Premium: {premium_users}\n"
             f"🔓 Бесплатных: {total_users - premium_users - admin_users}"
         )
     else:
-        # Личная статистика
         user_data = get_db_user(user_id)
         if user_data:
             messages_today = user_data.get('messages_today', 0)
-            has_premium = get_premium_status(user_id)
+            premium = get_premium_status(user_id)
             
-            if has_premium:
+            if premium:
                 status = "💎 PREMIUM"
                 limit_text = "♾️ Безлимит"
             else:
@@ -2069,7 +1561,7 @@ def stats_cmd(m):
                 f"👤 Статус: {status}\n"
                 f"📨 Лимит: {limit_text}\n"
                 f"✉️ Сегодня: {messages_today}\n"
-                f"📊 Всего сообщений: {total}"
+                f"📊 Всего: {total}"
             )
         else:
             text = "❌ Не удалось получить данные."
@@ -2184,8 +1676,10 @@ def admin_panel(m):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ
+# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ (ГЛАВНЫЙ - БЫСТРЫЙ)
 # ============================================================
+user_histories = {}
+
 @bot.message_handler(func=lambda m: True)
 def handle_all_messages(m):
     try:
@@ -2193,7 +1687,7 @@ def handle_all_messages(m):
         user_id = m.from_user.id
         text = m.text.strip() if m.text else ""
         
-        print(f"📩 Получено сообщение от {user_id}: {text[:50] if text else '...'}...")
+        print(f"📩 Получено сообщение от {user_id}: {text[:30] if text else '...'}...")
         
         if text.startswith('/'):
             return
@@ -2222,7 +1716,7 @@ def handle_all_messages(m):
                 remaining = 0
             bot.send_message(
                 chat_id,
-                f"🔴 Лимит исчерпан! Осталось: {remaining}/{FREE_LIMIT}\n💎 Купи Premium: /premium",
+                f"🔴 Лимит! Осталось: {remaining}/{FREE_LIMIT}\n💎 /premium",
                 reply_markup=premium_menu(user_id),
                 parse_mode='HTML'
             )
@@ -2235,12 +1729,12 @@ def handle_all_messages(m):
                 file_info = bot.get_file(file_id)
                 file_content = bot.download_file(file_info.file_path)
                 img_desc = analyze_image_from_file(file_content)
-                response = process_message(user_id, text or "Что на картинке?", img_desc)
+                response = process_message_fast(user_id, text or "Что на картинке?", img_desc)
                 increment_messages(user_id)
                 bot.send_message(chat_id, response, reply_markup=back_to_menu(), parse_mode='HTML')
             except Exception as e:
                 print(f"❌ Ошибка фото: {e}")
-                bot.send_message(chat_id, f"⚠️ Ошибка обработки фото: {e}")
+                bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
             return
         
         # ОБРАБОТКА ГОЛОСА
@@ -2259,11 +1753,11 @@ def handle_all_messages(m):
                     audio = r.record(source)
                 try:
                     voice_text = r.recognize_google(audio, language='ru-RU')
-                    response = process_message(user_id, voice_text)
+                    response = process_message_fast(user_id, voice_text)
                     increment_messages(user_id)
-                    bot.send_message(chat_id, f"🎤 Распознано: {voice_text}\n\n{response}", reply_markup=back_to_menu(), parse_mode='HTML')
+                    bot.send_message(chat_id, f"🎤 {voice_text}\n\n{response}", reply_markup=back_to_menu(), parse_mode='HTML')
                 except sr.UnknownValueError:
-                    bot.send_message(chat_id, "🎤 Не удалось распознать речь.")
+                    bot.send_message(chat_id, "🎤 Не удалось распознать.")
                 except Exception as e:
                     bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
                 finally:
@@ -2278,7 +1772,7 @@ def handle_all_messages(m):
         
         # ОБРАБОТКА ТЕКСТА
         if text:
-            print(f"📝 Обрабатываю текст: {text[:50]}...")
+            print(f"📝 Обрабатываю текст...")
             
             if is_image_generation(text):
                 draw_cmd(m)
@@ -2287,7 +1781,7 @@ def handle_all_messages(m):
             bot.send_chat_action(chat_id, 'typing')
             
             try:
-                response = process_message(user_id, text)
+                response = process_message_fast(user_id, text)
                 if response:
                     increment_messages(user_id)
                     bot.send_message(
@@ -2296,16 +1790,16 @@ def handle_all_messages(m):
                         reply_markup=back_to_menu(),
                         parse_mode='HTML'
                     )
-                    print(f"✅ Ответ отправлен для {user_id}")
+                    print(f"✅ Ответ отправлен за {time.time() - user_last_message.get(user_id, time.time()):.2f}с")
                 else:
                     bot.send_message(
                         chat_id,
-                        "❌ Не удалось обработать запрос.",
+                        "❌ Не удалось обработать.",
                         reply_markup=back_to_menu(),
                         parse_mode='HTML'
                     )
             except Exception as e:
-                print(f"❌ Ошибка обработки: {e}")
+                print(f"❌ Ошибка: {e}")
                 bot.send_message(
                     chat_id,
                     f"⚠️ Ошибка: {e}",
@@ -2313,7 +1807,7 @@ def handle_all_messages(m):
                     parse_mode='HTML'
                 )
     except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В handle_all_messages: {e}")
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
 
 # ============================================================
 # ОБРАБОТЧИК КНОПОК
@@ -2331,7 +1825,6 @@ def handle_callback(call):
         
         ensure_user(user_id, call.from_user.username or "unknown")
         
-        # Кнопки главного меню
         if call.data == "status":
             status_cmd(call.message)
             return
@@ -2361,12 +1854,12 @@ def handle_callback(call):
             return
         
         if call.data == "support":
-            msg = bot.send_message(chat_id, "📩 Напиши: /support [текст]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "📩 /support [текст]", parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         
         if call.data == "draw":
-            msg = bot.send_message(chat_id, "🎨 Напиши: /draw [описание]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🎨 /draw [описание]", parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         
@@ -2380,7 +1873,7 @@ def handle_callback(call):
         
         if call.data == "premium_features":
             if not get_premium_status(user_id) and not is_admin(user_id) and user_id != OWNER_ID:
-                msg = bot.send_message(chat_id, "❌ Эта информация доступна только Premium пользователям!", reply_markup=back_to_menu(), parse_mode='HTML')
+                msg = bot.send_message(chat_id, "❌ Только для Premium!", reply_markup=back_to_menu(), parse_mode='HTML')
                 user_message_ids[user_id].append(msg.message_id)
                 return
             text = (
@@ -2422,7 +1915,7 @@ def handle_callback(call):
                     response = supabase.table('premium_orders').select('order_id').eq('user_id', user_id).order('order_id', desc=True).limit(1).execute()
                     order_id = response.data[0]['order_id'] if response.data else None
                 except Exception as e:
-                    print(f"❌ Ошибка создания заказа: {e}")
+                    print(f"❌ Ошибка: {e}")
                     order_id = None
             else:
                 conn = sqlite3.connect('users.db')
@@ -2439,10 +1932,10 @@ def handle_callback(call):
             
             msg = bot.send_message(chat_id, 
                 f"✅ ЗАКАЗ ОТПРАВЛЕН!\n\n"
-                f"🆔 Номер заказа: #{order_id}\n"
-                f"📌 Тип: {order_type}\n"
-                f"⏳ Текущий статус: {expires_text}\n"
-                f"⏳ Ожидай подтверждения от админа.", 
+                f"🆔 #{order_id}\n"
+                f"📌 {order_type}\n"
+                f"⏳ {expires_text}\n"
+                f"⏳ Ожидай подтверждения.", 
                 reply_markup=back_to_menu(),
                 parse_mode='HTML'
             )
@@ -2456,12 +1949,12 @@ def handle_callback(call):
             try:
                 bot.send_message(
                     OWNER_ID, 
-                    f"💳 НОВЫЙ ЗАКАЗ PREMIUM!\n\n"
-                    f"🆔 Заказ: #{order_id}\n"
+                    f"💳 НОВЫЙ ЗАКАЗ!\n\n"
+                    f"🆔 #{order_id}\n"
                     f"👤 @{call.from_user.username or 'Не указан'}\n"
                     f"💰 100₽\n"
-                    f"📌 Тип: {order_type}\n"
-                    f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)", 
+                    f"📌 {order_type}\n"
+                    f"📅 {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)", 
                     reply_markup=keyboard, 
                     parse_mode='HTML'
                 )
@@ -2514,7 +2007,7 @@ def handle_callback(call):
                     msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
                     user_message_ids[user_id].append(msg.message_id)
                 except:
-                    msg = bot.send_message(chat_id, "❌ Ошибка получения списка пользователей")
+                    msg = bot.send_message(chat_id, "❌ Ошибка")
                     user_message_ids[user_id].append(msg.message_id)
             else:
                 conn = sqlite3.connect('users.db')
@@ -2578,7 +2071,7 @@ def handle_callback(call):
             user_message_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_close":
-            msg = bot.send_message(chat_id, "❌ Панель закрыта", reply_markup=back_to_menu(), parse_mode='HTML')
+            msg = bot.send_message(chat_id, "❌ Закрыто", reply_markup=back_to_menu(), parse_mode='HTML')
             user_message_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_orders":
@@ -2639,7 +2132,7 @@ def handle_callback(call):
                     pass
                 
                 expires_formatted = format_date(new_expires)
-                msg_text = f"🎉 PREMIUM АКТИВИРОВАН!\n\n✅ Заказ #{order_id} подтверждён!\n💎 Premium активен на 1 месяц!\n⏳ Действует до: {expires_formatted}"
+                msg_text = f"🎉 PREMIUM АКТИВИРОВАН!\n\n✅ Заказ #{order_id} подтверждён!\n💎 Premium на 1 месяц!\n⏳ До: {expires_formatted}"
                 try:
                     bot.send_message(target_user, msg_text, parse_mode='HTML')
                 except:
@@ -2723,7 +2216,7 @@ def handle_callback(call):
                     time.sleep(0.05)
                 except:
                     failed += 1
-            bot.send_message(chat_id, f"✅ Рассылка завершена!\n\n📤 Отправлено: {sent}\n❌ Ошибок: {failed}", parse_mode='HTML')
+            bot.send_message(chat_id, f"✅ Рассылка!\n\n📤 {sent}\n❌ {failed}", parse_mode='HTML')
             try:
                 bot.delete_message(chat_id, call.message.message_id)
             except:
@@ -2759,9 +2252,9 @@ def admin_orders_cmd(message, user_id):
         orders = c.fetchall()
         conn.close()
     if not orders:
-        text = "💳 ЗАКАЗЫ PREMIUM\n\nНет активных заказов."
+        text = "💳 ЗАКАЗЫ\n\nНет заказов."
     else:
-        text = f"💳 ЗАКАЗЫ PREMIUM\n\nВсего: {len(orders)}\n\n"
+        text = f"💳 ЗАКАЗЫ\n\nВсего: {len(orders)}\n\n"
         for order in orders:
             if isinstance(order, dict):
                 text += f"🆔 #{order['order_id']} | 👤 {order['user_id']} | 📅 {order['created_at']}\n"
@@ -2785,7 +2278,7 @@ def admin_support_cmd(message, user_id):
         requests = c.fetchall()
         conn.close()
     if not requests:
-        text = "📩 ОБРАЩЕНИЯ\n\nНет активных обращений."
+        text = "📩 ОБРАЩЕНИЯ\n\nНет обращений."
     else:
         text = f"📩 ОБРАЩЕНИЯ\n\nВсего: {len(requests)}\n\n"
         for req in requests:
@@ -2797,13 +2290,56 @@ def admin_support_cmd(message, user_id):
     user_message_ids[user_id].append(msg.message_id)
 
 # ============================================================
+# АНАЛИЗ ИЗОБРАЖЕНИЙ
+# ============================================================
+def analyze_image_from_file(file_content):
+    try:
+        img = Image.open(io.BytesIO(file_content))
+        width, height = img.size
+        format_img = img.format or "Unknown"
+        description = f"📸 *Анализ:* {width}×{height}, {format_img}\n"
+        try:
+            url = "https://vision.api.cloud.yandex.net/vision/v1/batchAnalyze"
+            headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
+            img_enhanced = ImageEnhance.Contrast(img).enhance(2.0)
+            img_enhanced = ImageEnhance.Sharpness(img_enhanced).enhance(2.0)
+            img_enhanced = img_enhanced.convert('L')
+            buf = io.BytesIO()
+            img_enhanced.save(buf, format='JPEG', quality=95)
+            enhanced_data = buf.getvalue()
+            payload = {
+                "folderId": FOLDER_ID,
+                "analyze_specs": [{
+                    "content": base64.b64encode(enhanced_data).decode('utf-8'),
+                    "features": [{"type": "TEXT_DETECTION"}]
+                }]
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            if response.status_code == 200:
+                result = response.json()
+                pages = result.get("results", [{}])[0].get("results", [{}])[0].get("textDetection", {}).get("pages", [])
+                all_text = []
+                for page in pages:
+                    text = page.get("text", "")
+                    if text:
+                        all_text.append(text)
+                if all_text:
+                    recognized_text = " ".join(all_text).strip()
+                    description += f"\n📝 Текст: {recognized_text[:300]}"
+        except:
+            pass
+        return description
+    except:
+        return "⚠️ Не удалось проанализировать."
+
+# ============================================================
 # ЗАПУСК
 # ============================================================
 init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — С GIGACHAT + YANDEXGPT + МЕГА-ПОИСК!")
+print("🧠 AWESOME AI — СУПЕР-БЫСТРЫЙ!")
 print("=" * 60)
 print(f"⏱️ ТАЙМАУТЫ:")
 print(f"   GigaChat: {GIGACHAT_TIMEOUT} сек")
@@ -2811,47 +2347,25 @@ print(f"   YandexGPT: {YANDEXGPT_TIMEOUT} сек")
 print(f"   Поиск: {SEARCH_TIMEOUT} сек")
 print(f"   Погода: {WEATHER_TIMEOUT} сек")
 print("=" * 60)
+print("🚀 ПАРАЛЛЕЛЬНЫЕ ЗАПРОСЫ ВКЛЮЧЕНЫ")
+print("💾 КЭШ ВКЛЮЧЕН (5 минут)")
+print("=" * 60)
 try:
     print(f"🤖 Бот: @{bot.get_me().username}")
 except:
     print("🤖 Бот: @unknown")
 if use_supabase:
-    print("☁️ База данных: SUPABASE (облачная) ✅")
+    print("☁️ База: SUPABASE ✅")
 else:
-    print("💾 База данных: ЛОКАЛЬНАЯ (SQLite)")
-print(f"📊 Лимиты: Бесплатный: {FREE_LIMIT}/день | Премиум: ♾️ БЕЗЛИМИТНО")
-print(f"🕐 Часовой пояс: МСК (UTC+3)")
-print("=" * 60)
-print("🌐 ПОИСК ПО ВСЕМУ ИНТЕРНЕТУ:")
-print("✅ Google")
-print("✅ Wikipedia")
-print("✅ YouTube")
-print("✅ Telegram")
-print("✅ ВКонтакте")
-print("✅ Twitch")
-print("✅ Новости")
-print("=" * 60)
-print("🧠 НЕЙРОСЕТИ:")
-print("✅ GigaChat (ОСНОВНАЯ) — 5 сек таймаут")
-print("✅ YandexGPT (ЗАПАСНАЯ) — 10 сек таймаут")
-print("=" * 60)
-
-if use_supabase:
-    try:
-        test = supabase.table('users').select('*').limit(1).execute()
-        print("✅ Supabase доступен! Таблицы существуют.")
-    except Exception as e:
-        print(f"❌ Ошибка доступа к Supabase: {e}")
-else:
-    print("⚠️ Используется локальная БД")
+    print("💾 База: SQLite")
+print(f"📊 Лимиты: Бесплатный: {FREE_LIMIT}/день | Премиум: ♾️")
 print("=" * 60)
 
 print("✅ БОТ ЗАПУЩЕН!")
-print("=" * 60)
 
 while True:
     try:
         bot.polling(none_stop=True, timeout=60)
     except Exception as e:
-        print(f"⚠️ Ошибка: {e}. Перезапуск через 5 секунд...")
+        print(f"⚠️ Ошибка: {e}. Перезапуск...")
         time.sleep(5)
