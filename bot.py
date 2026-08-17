@@ -2091,7 +2091,7 @@ def giveprem_cmd(m):
         try:
             bot.send_message(target_id, f"🎉 Ты получил Premium AWESOME AI!\n\n⏳ Срок: {duration}\n⏳ Действует до: {expires_formatted}\n\n🔥 Наслаждайся безлимитными возможностями!")
         except:
-        pass
+            pass
     else:
         msg = bot.send_message(chat_id, "❌ Неверный срок. Используй: 1m, 1h, 1d, 1mes, 1y")
         user_message_ids[user_id].append(msg.message_id)
