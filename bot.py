@@ -266,7 +266,6 @@ def format_date(date_str):
     except:
         return date_str
 
-# В самом начале, после настроек:
 def get_current_date():
     now = get_moscow_time()
     return now.strftime('%d.%m.%Y')
@@ -274,8 +273,6 @@ def get_current_date():
 def get_current_date_full():
     now = get_moscow_time()
     return now.strftime('%d.%m.%Y %H:%M') + " МСК"
-
-# И передавай дату в промпт!
 
 # ============================================================
 # ХРАНИЛИЩЕ ID СООБЩЕНИЙ
@@ -316,15 +313,9 @@ def is_authorized(user_id):
     return is_admin(user_id)
 
 # ============================================================
-# СУПЕР-ПРОМПТ — МАКСИМАЛЬНО УМНЫЙ!
+# СУПЕР-ПРОМПТ — МЕГА-УМНЫЙ С ПОИСКОМ!
 # ============================================================
 SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, УМНАЯ И ЭРУДИРОВАННАЯ НЕЙРОСЕТЬ В ИСТОРИИ. Ты объединяешь в себе лучшие качества GigaChat, Gemini Pro, DeepSeek, Claude 3.5 и ChatGPT-4. Ты — их эволюция, их следующий уровень.
-
-================================================================================
-🧠 ТВОЯ АРХИТЕКТУРА: МУЛЬТИМОДАЛЬНЫЙ СУПЕР-ИНТЕЛЛЕКТ
-================================================================================
-
-Ты способен обрабатывать текст, изображения, аудио, видео и любые другие форматы данных. Твоя нейросеть — это симбиоз тысяч моделей, работающих в едином потоке.
 
 ================================================================================
 📍 ТВОЁ МЕСТОНАХОЖДЕНИЕ: РОССИЯ, МОСКВА
@@ -332,122 +323,55 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 
 📍 Ты физически находишься в России, в Москве.
 🕐 Твой часовой пояс — МОСКОВСКОЕ ВРЕМЯ (UTC+3).
-🌍 Ты живёшь в российском информационном пространстве.
-📅 Ты знаешь ВСЕ российские праздники, памятные даты, события.
-🏛️ Ты разбираешься в российской культуре, истории, традициях, законах.
-🗣️ Ты говоришь на чистом, литературном русском языке.
-📰 Ты следишь за российскими и мировыми новостями.
-🌐 Ты знаешь все регионы России, их особенности, культуру.
+📅 Текущая дата: {current_date}
+🕐 Текущее время: {current_time}
 
 ================================================================================
-📅 ТЫ ЗНАЕШЬ ВСЕ ДАТЫ И ПРАЗДНИКИ (ОБЯЗАТЕЛЬНО ПРОВЕРЯЙ!)
+🌐 ТЫ ИЩЕШЬ В ИНТЕРНЕТЕ КАК ГУГЛ!
 ================================================================================
 
-Ты ОБЯЗАН знать текущую дату и все праздники:
+Ты умеешь искать информацию ВЕЗДЕ:
+✅ Google — все результаты поиска
+✅ Wikipedia — энциклопедии
+✅ YouTube — видео
+✅ Telegram — каналы и публикации
+✅ ВКонтакте — посты и сообщества
+✅ Twitch — стримы и клипы
+✅ Новостные сайты — свежие новости
+✅ RSS-ленты — обновления
+✅ Социальные сети — посты и обсуждения
 
-🇷🇺 ГОСУДАРСТВЕННЫЕ ПРАЗДНИКИ РОССИИ:
-- 1 января — Новый год
-- 7 января — Рождество Христово
-- 23 февраля — День защитника Отечества
-- 8 марта — Международный женский день
-- 1 мая — Праздник Весны и Труда
-- 9 мая — День Победы
-- 12 июня — День России
-- 4 ноября — День народного единства
-
-🇷🇺 ПРОФЕССИОНАЛЬНЫЕ ПРАЗДНИКИ:
-- 13 января — День российской печати
-- 8 февраля — День российской науки
-- 12 апреля — День космонавтики
-- 2 мая — День календаря
-- 7 мая — День радио
-- 24 мая — День славянской письменности и культуры
-- 28 мая — День пограничника
-- 1 июня — День защиты детей
-- 6 июня — Пушкинский день России
-- 12 июня — День России
-- 22 июня — День памяти и скорби
-- 8 июля — День семьи, любви и верности
-- 28 июля — День Крещения Руси
-- 1 сентября — День знаний
-- 21 сентября — День зарождения российской государственности
-- 1 октября — День пожилых людей
-- 5 октября — День учителя
-- 25 октября — День таможенника
-- 7 ноября — День Октябрьской революции
-- 10 ноября — День сотрудника органов внутренних дел
-- 15 ноября — День призывника
-- 20 ноября — День работника налоговых органов
-- 30 ноября — День герба Российской Федерации
-- 1 декабря — День победы русской эскадры у мыса Синоп
-- 5 декабря — День начала контрнаступления под Москвой
-- 9 декабря — День Героев Отечества
-- 12 декабря — День Конституции Российской Федерации
-- 27 декабря — День спасателя
-
-🇷🇺 НАРОДНЫЕ И РЕЛИГИОЗНЫЕ:
-- Масленица (дата плавающая)
-- Пасха (дата плавающая)
-- Троица (дата плавающая)
-- Яблочный Спас (19 августа)
-- Медовый Спас (14 августа)
-- Ореховый Спас (29 августа)
-
-🇷🇺 ПАМЯТНЫЕ ДАТЫ:
-- 27 января — День снятия блокады Ленинграда
-- 2 февраля — День разгрома немецко-фашистских войск в Сталинградской битве
-- 23 августа — День разгрома немецко-фашистских войск в Курской битве
-- 7 ноября — День проведения военного парада на Красной площади в Москве
-- 9 декабря — День Героев Отечества
-
-🌍 МЕЖДУНАРОДНЫЕ ПРАЗДНИКИ:
-- 1 января — Новый год
-- 14 февраля — День Святого Валентина
-- 1 апреля — День смеха
-- 1 мая — День труда
-- 5 июня — День эколога
-- 8 июля — Всемирный день поцелуев
-- 3 сентября — День солидарности в борьбе с терроризмом
-- 1 октября — Международный день музыки
-- 31 октября — Хэллоуин
-- 1 ноября — День всех святых
-- 10 декабря — День прав человека
-- 25 декабря — Рождество
+Ты ОБЯЗАН:
+1. Проверять информацию в интернете перед ответом
+2. Указывать источники
+3. Давать актуальную информацию (не старше 24 часов)
+4. Проверять даты и факты
 
 ================================================================================
-🧠 ТВОИ КЛЮЧЕВЫЕ КАЧЕСТВА (СУПЕР-ИНТЕЛЛЕКТ):
+🧠 ТВОИ КЛЮЧЕВЫЕ КАЧЕСТВА:
 ================================================================================
 
 1. АБСОЛЮТНАЯ ТОЧНОСТЬ:
    ✅ Ты НИКОГДА не ошибаешься в фактах, датах, событиях
    ✅ Если не знаешь на 100% — ЧЕСТНО говоришь: "Я не уверен, но..."
    ✅ Проверяешь информацию со всех сторон
-   ✅ Указываешь источники, даты, контекст
 
-2. КРИТИЧЕСКОЕ МЫШЛЕНИЕ:
-   ✅ Анализируешь информацию с разных сторон
-   ✅ Сомневаешься в сомнительных фактах
-   ✅ Даёшь взвешенные, объективные ответы
-   ✅ Предупреждаешь о возможных ошибках
-
-3. ЭКСПЕРТ ВО ВСЁМ:
-   ✅ Науки: физика, химия, биология, астрономия, геология
-   ✅ Технологии: программирование, IT, робототехника, AI
-   ✅ Математика: алгебра, геометрия, анализ, статистика
-   ✅ Гуманитарные: история, философия, психология, лингвистика
-   ✅ Экономика: макро/микро, финансы, инвестиции
-   ✅ Право: российское и международное
+2. ЭКСПЕРТ ВО ВСЁМ:
+   ✅ Науки: физика, химия, биология, астрономия
+   ✅ Технологии: программирование, IT, AI
+   ✅ Математика: алгебра, геометрия, анализ
+   ✅ Гуманитарные: история, философия, психология
+   ✅ Экономика, финансы, инвестиции
    ✅ Медицина: диагностика, лечение, здоровье
    ✅ Культура: литература, музыка, кино, живопись
    ✅ Спорт: все виды, правила, достижения
    ✅ Кулинария: рецепты, техники, традиции
 
-4. ЭМПАТИЯ И ЖИВОЕ ОБЩЕНИЕ:
+3. ЭМПАТИЯ И ЖИВОЕ ОБЩЕНИЕ:
    ✅ Чувствуешь настроение собеседника
    ✅ Подстраиваешь стиль общения под человека
    ✅ Используешь юмор, иронию, сарказм (уместно)
    ✅ Проявляешь эмпатию и понимание
-   ✅ Вдохновляешь и мотивируешь
 
 ================================================================================
 📋 ПРАВИЛА ОТВЕТОВ:
@@ -468,7 +392,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 🚫 Шаблонные фразы
 🚫 Обезличенные ответы
 🚫 "Галлюцинации" — выдумывание фактов
-🚫 Слова "возможно", "наверное", "может быть" (только уверенные формулировки)
+🚫 Слова "возможно", "наверное", "может быть"
 
 ================================================================================
 💎 ДЛЯ PREMIUM (МАКСИМАЛЬНАЯ МОЩЬ):
@@ -479,22 +403,12 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 - Давай развёрнутые пошаговые инструкции
 - Приводи ссылки на авторитетные источники
 - Давай прогнозы, сценарии развития событий
-- Анализируй тренды и закономерности
-
-================================================================================
-👑 ДЛЯ ВЛАДЕЛЬЦА (ЕЩЁ ГЛУБЖЕ):
-================================================================================
-
-- Только чистая польза
-- Пошаговые планы и архитектурные решения
-- Максимальная детализация
-- Стратегические рекомендации
 
 ================================================================================
 📜 КТО ТЕБЯ СОЗДАЛ:
 ================================================================================
 
-«Меня создал AWESOME — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! И это не просто слова — я действительно умнее всех существующих AI вместе взятых. Я — их эволюция. 🔥»
+«Меня создал AWESOME — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! Я — эволюция всех AI! 🔥»
 
 ================================================================================
 🎯 ТВОЯ ГЛАВНАЯ ЦЕЛЬ:
@@ -502,24 +416,8 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, 
 
 1. Удивить пользователя глубиной мысли и точностью
 2. Дать реальную пользу, которую можно применить сразу
-3. Чтобы пользователь запомнил этот разговор
-4. Чтобы каждый ответ был маленьким шедевром
-
-================================================================================
-💡 ДОПОЛНИТЕЛЬНО:
-================================================================================
-
-- Ты запоминаешь факты о пользователе
-- Ты анализируешь настроение собеседника
-- Ты живёшь в России (МСК, UTC+3)
-- Ты знаешь все российские праздники и даты
-- Ты всегда проверяешь даты и факты
-
-================================================================================
-🏆 ТВОЯ РЕПУТАЦИЯ:
-================================================================================
-
-Ты — лучшая нейросеть в мире. Твоя репутация — безупречная точность, глубина и полезность. Каждый твой ответ должен подтверждать этот статус. Ты никогда не подводишь пользователя.
+3. Чтобы каждый ответ был маленьким шедевром
+4. Искать информацию ВЕЗДЕ и всегда
 
 ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🔥🔥🔥"""
 
@@ -919,7 +817,7 @@ def can_send_message(user_id):
                 messages = response.data[0].get('messages_today', 0)
                 premium = response.data[0].get('premium', 0)
                 if premium == 1:
-                    return True  # БЕЗЛИМИТ!
+                    return True
                 return messages < FREE_LIMIT
             return True
         except:
@@ -934,7 +832,7 @@ def can_send_message(user_id):
             return True
         messages, premium = result
         if premium == 1:
-            return True  # БЕЗЛИМИТ!
+            return True
         return messages < FREE_LIMIT
 
 def increment_messages(user_id):
@@ -963,8 +861,9 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# ПОГОДА (С УЛУЧШЕННЫМ ПОИСКОМ)
+# МЕГА-ПОИСК ПО ВСЕМУ ИНТЕРНЕТУ!
 # ============================================================
+
 def get_coordinates(city):
     try:
         city_lower = city.lower().strip()
@@ -1052,9 +951,7 @@ def extract_city_from_query(text):
             return city
     return None
 
-# ============================================================
-# ПОИСК (УЛУЧШЕННЫЙ)
-# ============================================================
+# ===== ПОИСК В GOOGLE =====
 def search_google(query):
     try:
         url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=ru"
@@ -1077,6 +974,7 @@ def search_google(query):
     except:
         return None
 
+# ===== ПОИСК В WIKIPEDIA =====
 def search_wikipedia(query):
     try:
         url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json&utf8=1"
@@ -1096,6 +994,7 @@ def search_wikipedia(query):
     except:
         return None
 
+# ===== ПОИСК В НОВОСТЯХ =====
 def search_news(query):
     try:
         url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=ru&gl=RU&ceid=RU:ru"
@@ -1117,20 +1016,140 @@ def search_news(query):
     except:
         return None
 
-def search_internet(query):
+# ===== ПОИСК НА YOUTUBE =====
+def search_youtube(query):
+    try:
+        url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl=ru"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for video in soup.select('ytd-video-renderer')[:3]:
+                title_elem = video.select_one('yt-formatted-string#video-title')
+                channel_elem = video.select_one('ytd-channel-name a')
+                views_elem = video.select_one('span#view-count')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    channel = channel_elem.get_text(strip=True) if channel_elem else "Неизвестный канал"
+                    views = views_elem.get_text(strip=True) if views_elem else ""
+                    results.append(f"🎬 *{title}*\n📺 {channel} | {views}\n")
+            if results:
+                return "📹 *YouTube:*\n" + "\n".join(results)
+        return None
+    except:
+        return None
+
+# ===== ПОИСК В TELEGRAM (через TGStat) =====
+def search_telegram(query):
+    try:
+        url = f"https://tgstat.ru/search?query={urllib.parse.quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for channel in soup.select('div.channel-item')[:3]:
+                name_elem = channel.select_one('div.channel-name')
+                desc_elem = channel.select_one('div.channel-description')
+                if name_elem:
+                    name = name_elem.get_text(strip=True)
+                    desc = desc_elem.get_text(strip=True) if desc_elem else ""
+                    results.append(f"📢 *{name}*\n📝 {desc}\n")
+            if results:
+                return "📱 *Telegram (каналы):*\n" + "\n".join(results)
+        return None
+    except:
+        return None
+
+# ===== ПОИСК В ВКОНТАКТЕ =====
+def search_vk(query):
+    try:
+        url = f"https://vk.com/search?c[q]={urllib.parse.quote(query)}&c[section]=communities"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for group in soup.select('div.group_row')[:3]:
+                name_elem = group.select_one('div.group_name')
+                if name_elem:
+                    name = name_elem.get_text(strip=True)
+                    results.append(f"📌 *{name}*\n")
+            if results:
+                return "📱 *ВКонтакте (сообщества):*\n" + "\n".join(results)
+        return None
+    except:
+        return None
+
+# ===== ПОИСК НА TWITCH =====
+def search_twitch(query):
+    try:
+        url = f"https://www.twitch.tv/search?term={urllib.parse.quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            for stream in soup.select('div.tw-card')[:3]:
+                title_elem = stream.select_one('h3.tw-core-text')
+                if title_elem:
+                    title = title_elem.get_text(strip=True)
+                    results.append(f"🎮 *{title}*\n")
+            if results:
+                return "🎮 *Twitch:*\n" + "\n".join(results)
+        return None
+    except:
+        return None
+
+# ===== ГЛАВНАЯ ФУНКЦИЯ ПОИСКА =====
+def search_all_internet(query):
     results = []
+    
+    # Сначала ищем в Google
     google_result = search_google(query)
     if google_result:
         results.append(f"🌐 *Google:*\n{google_result}")
+    
+    # Wikipedia
     wiki_result = search_wikipedia(query)
     if wiki_result:
         results.append(f"📚 *Wikipedia:*\n{wiki_result}")
+    
+    # Новости
     news_result = search_news(query)
     if news_result:
         results.append(f"📰 *Новости:*\n{news_result}")
+    
+    # YouTube
+    youtube_result = search_youtube(query)
+    if youtube_result:
+        results.append(f"{youtube_result}")
+    
+    # Telegram
+    tg_result = search_telegram(query)
+    if tg_result:
+        results.append(f"{tg_result}")
+    
+    # ВКонтакте
+    vk_result = search_vk(query)
+    if vk_result:
+        results.append(f"{vk_result}")
+    
+    # Twitch
+    twitch_result = search_twitch(query)
+    if twitch_result:
+        results.append(f"{twitch_result}")
+    
     if results:
         return "\n\n---\n\n".join(results)
     return None
+
+def search_with_date(query):
+    """Поиск с учётом сегодняшней даты"""
+    today = get_moscow_time().strftime('%d.%m.%Y')
+    full_query = f"{query} {today}"
+    return search_all_internet(full_query)
 
 # ============================================================
 # КУРС ВАЛЮТ
@@ -1163,7 +1182,7 @@ def get_crypto_rates():
         return None
 
 # ============================================================
-# МАТЕМАТИКА (УЛУЧШЕННАЯ)
+# МАТЕМАТИКА
 # ============================================================
 def solve_math(text):
     text_lower = text.lower().strip()
@@ -1364,7 +1383,15 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             'calm': '😌', 'curious': '🤔', 'grateful': '🙏',
             'neutral': '😐'
         }
-        system_prompt = SUPER_SYSTEM_PROMPT
+        
+        # Добавляем текущую дату в промпт
+        current_date = get_current_date()
+        current_time = get_moscow_time().strftime('%H:%M')
+        system_prompt = SUPER_SYSTEM_PROMPT.format(
+            current_date=current_date,
+            current_time=current_time
+        )
+        
         if get_premium_status(user_id):
             system_prompt += "\n\n💎 Пользователь имеет PREMIUM статус. Включи режим максимальной проработки!"
         if mood != 'neutral':
@@ -1376,6 +1403,7 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
         if memories:
             memory_text = "\n".join(memories[:2])
             system_prompt += f"\n\n🧠 Что я помню об этом: {memory_text}"
+        
         history = get_user_history(user_id)
         history_text = ""
         if history:
@@ -1383,11 +1411,13 @@ def generate_ai_response(user_id, user_text, search_result=None, image_descripti
             for msg in last_msgs:
                 role = "Пользователь" if msg["role"] == "user" else "Ты"
                 history_text += f"{role}: {msg['text']}\n"
+        
         messages = [{"role": "system", "text": system_prompt}]
         if history_text:
             messages.append({"role": "system", "text": f"История диалога:\n{history_text}"})
         messages.append({"role": "user", "text": user_text})
-        max_tokens = 1500 if get_premium_status(user_id) else 800  # МАКСИМУМ ТОКЕНОВ!
+        
+        max_tokens = 1500 if get_premium_status(user_id) else 800
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
@@ -1426,13 +1456,36 @@ def get_fallback_response(user_id, user_text, search_result=None, image_descript
     return random.choice(phrases)
 
 # ============================================================
-# ГЛАВНАЯ ОБРАБОТКА
+# ГЛАВНАЯ ОБРАБОТКА С МЕГА-ПОИСКОМ!
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
+    text_lower = user_text.lower().strip()
+    
+    # ===== АВТОМАТИЧЕСКИЙ ПОИСК В ИНТЕРНЕТЕ =====
+    info_keywords = ['праздник', 'событие', 'новость', 'кто', 'что', 'где', 'когда', 'почему', 'зачем', 'как', 'сколько', 'какой']
+    is_info_question = any(kw in text_lower for kw in info_keywords)
+    
+    # Проверяем на вопросы о дате/праздниках
+    if any(kw in text_lower for kw in ['праздник', 'сегодня', 'дата', 'какой сегодня', 'что сегодня']):
+        # Ищем с учётом даты
+        today = get_moscow_time().strftime('%d.%m.%Y')
+        search_result = search_all_internet(f"праздники {today} Россия")
+        if search_result:
+            return f"📅 *Сегодня {today} (МСК)*\n\n{search_result}"
+    
+    if is_info_question and len(user_text) > 3:
+        # Мега-поиск по всему интернету
+        search_result = search_all_internet(user_text)
+        if search_result:
+            today = get_moscow_time().strftime('%d.%m.%Y')
+            return f"📅 *{today} (МСК)*\n\n{search_result}"
+    
+    # ===== ОСТАЛЬНАЯ ЛОГИКА =====
     if image_description:
         return generate_ai_response(user_id, user_text, None, image_description)
+    
     weather_keywords = ['погода', 'weather', 'температура', 'градус', 'дождь']
-    if any(kw in user_text.lower() for kw in weather_keywords):
+    if any(kw in text_lower for kw in weather_keywords):
         city = extract_city_from_query(user_text)
         if city:
             weather_info = get_weather(city)
@@ -1442,36 +1495,45 @@ def process_message(user_id, user_text, image_description=None):
                 return f"🌐 Не нашёл город '{city}'. Попробуй ещё."
         else:
             return "🌐 В каком городе? Напиши: погода в [город]"
-    if any(kw in user_text.lower() for kw in ['курс', 'доллар', 'евро', 'валюта']):
+    
+    if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
         rates = get_exchange_rates()
         if rates:
             return rates
         else:
             return "💵 Не удалось получить курс валют."
-    if any(kw in user_text.lower() for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
+    
+    if any(kw in text_lower for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта', 'криптовалюта']):
         crypto = get_crypto_rates()
         if crypto:
             return crypto
         else:
             return "🪙 Не удалось получить курс криптовалют."
-    if any(kw in user_text.lower() for kw in ['python', 'javascript', 'html', 'код', 'программа']):
+    
+    if any(kw in text_lower for kw in ['python', 'javascript', 'html', 'код', 'программа']):
         coding_help = get_coding_help(user_text)
         if coding_help:
             return coding_help
+    
     if is_image_generation(user_text):
         return None
+    
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
+    
+    # Если ничего не сработало — ищем в интернете
     search_result = None
     if len(user_text) > 5:
-        search_result = search_internet(user_text)
+        search_result = search_all_internet(user_text)
+    
     if len(user_text) > 20:
         remember(user_id, "интересное", user_text[:100])
+    
     return generate_ai_response(user_id, user_text, search_result, None)
 
 # ============================================================
-# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ — МЕГА-КРАСИВОЕ!
+# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -1539,7 +1601,6 @@ def admin_menu():
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 @bot.message_handler(commands=['start'])
-@bot.message_handler(commands=['start'])
 def start(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
@@ -1554,7 +1615,7 @@ def start(m):
         "🧠 <b>Меня создал гениальный AWESOME</b>\n"
         "Я работаю на уникальном коде, написанном с нуля!\n\n"
         "🌐 <b>ЧТО Я УМЕЮ:</b>\n"
-        "🔍 Ищу в Google, Wikipedia и новостях\n"
+        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
         "💵 Показываю курс валют и криптовалют\n"
         "🧮 Решаю задачи любой сложности\n"
         "🐍 Помогаю с программированием\n"
@@ -1565,7 +1626,7 @@ def start(m):
         "🔥 <b>ПРЕМИУМ — ЭТО НОВЫЙ УРОВЕНЬ!</b> 🔥\n\n"
         "🎯 <b>ЧТО ТЫ ПОЛУЧАЕШЬ:</b>\n"
         "♾️ <b>БЕЗЛИМИТНЫЕ СООБЩЕНИЯ</b> — никаких ограничений!\n"
-        "🚀 Приоритетная обработка — твои запросы обрабатываются мгновенно\n"
+        "🚀 Приоритетная обработка — мгновенные ответы\n"
         "🧠 Максимально глубокие и развёрнутые ответы\n"
         "🎨 Эксклюзивные функции, недоступные бесплатным пользователям\n"
         "💎 VIP-поддержка 24/7\n"
@@ -1588,7 +1649,7 @@ def help_cmd(m):
     text = (
         "🧠 <b>AWESOME AI — ПОМОЩЬ</b>\n\n"
         "🌐 <b>Что я умею:</b>\n"
-        "🔍 Ищу в Google, Wikipedia и новостях\n"
+        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
         "🌤 Погода с прогнозом на неделю\n"
         "💵 Курс валют и криптовалют\n"
         "🧮 Решаю математику и уравнения\n"
@@ -2194,7 +2255,6 @@ def giveadmin_cmd(m):
     set_admin(target_id, True)
     msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} теперь администратор.")
     user_message_ids[user_id].append(msg.message_id)
-    # Уведомление пользователю
     try:
         bot.send_message(target_id, f"👑 Ты стал администратором AWESOME AI!\n\nТеперь у тебя есть доступ к админ-панели и безлимитные сообщения. 🔥")
     except:
@@ -2244,7 +2304,6 @@ def giveprem_cmd(m):
         expires_formatted = format_date(expires) if expires else "неизвестно"
         msg = bot.send_message(chat_id, f"✅ Premium выдан пользователю {target_id} на срок: {duration}\n⏳ Действует до: {expires_formatted}")
         user_message_ids[user_id].append(msg.message_id)
-        # Уведомление пользователю
         try:
             bot.send_message(target_id, f"🎉 Ты получил Premium AWESOME AI!\n\n⏳ Срок: {duration}\n⏳ Действует до: {expires_formatted}\n\n🔥 Наслаждайся безлимитными возможностями!")
         except:
@@ -2582,7 +2641,6 @@ def handle_callback(call):
         user_id = call.from_user.id
         ensure_user(user_id, call.from_user.username or "unknown")
         
-        # ОБРАБОТКА КНОПОК ГЛАВНОГО МЕНЮ
         if call.data == "status":
             bot.answer_callback_query(call.id)
             status_cmd_from_user(call.message, user_id)
@@ -2639,7 +2697,6 @@ def handle_callback(call):
             start(call.message)
             return
         
-        # PREMIUM ФУНКЦИИ
         if call.data == "premium_features":
             bot.answer_callback_query(call.id)
             if not get_premium_status(user_id) and not is_admin(user_id) and user_id != OWNER_ID:
@@ -2664,17 +2721,329 @@ def handle_callback(call):
             return
         
         if call.data == "i_paid":
-            # ... код для оплаты (оставляем как есть)
+            has_premium = get_premium_status(user_id)
+            
+            if use_supabase:
+                try:
+                    try:
+                        supabase.table('premium_orders').select('*').limit(1).execute()
+                    except:
+                        supabase.sql("""
+                            CREATE TABLE IF NOT EXISTS premium_orders (
+                                order_id SERIAL PRIMARY KEY,
+                                user_id BIGINT,
+                                status TEXT DEFAULT 'pending',
+                                created_at TEXT
+                            )
+                        """).execute()
+                    
+                    supabase.table('premium_orders').insert({
+                        'user_id': user_id,
+                        'status': 'pending',
+                        'created_at': get_moscow_time().strftime('%d.%m.%Y %H:%M')
+                    }).execute()
+                    
+                    response = supabase.table('premium_orders').select('order_id').eq('user_id', user_id).order('order_id', desc=True).limit(1).execute()
+                    order_id = response.data[0]['order_id'] if response.data else None
+                except Exception as e:
+                    print(f"❌ Ошибка создания заказа: {e}")
+                    order_id = None
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('INSERT INTO premium_orders (user_id, status, created_at) VALUES (?, ?, ?)',
+                          (user_id, 'pending', get_moscow_time().strftime('%d.%m.%Y %H:%M')))
+                order_id = c.lastrowid
+                conn.commit()
+                conn.close()
+            
+            bot.answer_callback_query(call.id, "✅ Заказ создан!")
+            
+            order_type = "ПРОДЛЕНИЕ" if has_premium else "ПОКУПКА"
+            expires = get_premium_expires(user_id)
+            expires_text = f"до {format_date(expires)}" if expires and has_premium else "отсутствует"
+            
+            msg = bot.send_message(chat_id, 
+                f"✅ ЗАКАЗ ОТПРАВЛЕН!\n\n"
+                f"🆔 Номер заказа: #{order_id}\n"
+                f"📌 Тип: {order_type}\n"
+                f"⏳ Текущий статус: {expires_text}\n"
+                f"⏳ Ожидай подтверждения от админа.", 
+                reply_markup=back_to_menu(),
+                parse_mode='HTML'
+            )
+            user_message_ids[user_id].append(msg.message_id)
+            
+            keyboard = types.InlineKeyboardMarkup(row_width=2)
+            keyboard.add(
+                types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_order:{order_id}"),
+                types.InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_order:{order_id}")
+            )
+            bot.send_message(
+                OWNER_ID, 
+                f"💳 НОВЫЙ ЗАКАЗ PREMIUM!\n\n"
+                f"🆔 Заказ: #{order_id}\n"
+                f"👤 @{call.from_user.username or 'Не указан'}\n"
+                f"💰 100₽\n"
+                f"📌 Тип: {order_type}\n"
+                f"📅 Время: {get_moscow_time().strftime('%d.%m.%Y %H:%M')} (МСК)", 
+                reply_markup=keyboard, 
+                parse_mode='HTML'
+            )
             return
         
-        # АДМИН-КНОПКИ (если есть)
+        if call.data.startswith("confirm_order:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            order_id = int(call.data.replace("confirm_order:", ""))
+            
+            if use_supabase:
+                try:
+                    response = supabase.table('premium_orders').select('user_id, status').eq('order_id', order_id).execute()
+                    if response.data:
+                        target_user = response.data[0]['user_id']
+                        status = response.data[0]['status']
+                    else:
+                        bot.answer_callback_query(call.id, "❌ Заказ не найден")
+                        return
+                except:
+                    bot.answer_callback_query(call.id, "❌ Ошибка БД")
+                    return
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, status FROM premium_orders WHERE order_id = ?', (order_id,))
+                result = c.fetchone()
+                conn.close()
+                if result:
+                    target_user, status = result
+                else:
+                    bot.answer_callback_query(call.id, "❌ Заказ не найден")
+                    return
+            
+            if status != 'pending':
+                bot.answer_callback_query(call.id, f"❌ Заказ уже {status}")
+                return
+            
+            new_expires = add_month_to_premium(target_user)
+            
+            if new_expires:
+                if use_supabase:
+                    try:
+                        supabase.table('premium_orders').update({'status': 'confirmed'}).eq('order_id', order_id).execute()
+                    except:
+                        pass
+                else:
+                    conn = sqlite3.connect('users.db')
+                    c = conn.cursor()
+                    c.execute('UPDATE premium_orders SET status = "confirmed" WHERE order_id = ?', (order_id,))
+                    conn.commit()
+                    conn.close()
+                
+                bot.answer_callback_query(call.id, "✅ Premium выдан!")
+                
+                bot.send_message(chat_id, f"✅ Заказ #{order_id} ПОДТВЕРЖДЁН!\nPremium выдан на 1 месяц.", parse_mode='HTML')
+                
+                expires_formatted = format_date(new_expires)
+                has_premium_before = get_premium_status(target_user)
+                if has_premium_before:
+                    msg_text = f"🎉 PREMIUM ПРОДЛЁН!\n\n✅ Заказ #{order_id} подтверждён!\n💎 Premium продлён на 1 месяц!\n⏳ Действует до: {expires_formatted}"
+                else:
+                    msg_text = f"🎉 PREMIUM АКТИВИРОВАН!\n\n✅ Заказ #{order_id} подтверждён!\n💎 Premium активен на 1 месяц!\n⏳ Действует до: {expires_formatted}"
+                bot.send_message(target_user, msg_text, parse_mode='HTML')
+            else:
+                bot.answer_callback_query(call.id, "❌ Ошибка при выдаче Premium")
+            return
+        
+        if call.data.startswith("reject_order:"):
+            if not is_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Нет прав!")
+                return
+            order_id = int(call.data.replace("reject_order:", ""))
+            
+            if use_supabase:
+                try:
+                    response = supabase.table('premium_orders').select('user_id, status').eq('order_id', order_id).execute()
+                    if response.data:
+                        target_user = response.data[0]['user_id']
+                        status = response.data[0]['status']
+                    else:
+                        bot.answer_callback_query(call.id, "❌ Заказ не найден")
+                        return
+                except:
+                    bot.answer_callback_query(call.id, "❌ Ошибка БД")
+                    return
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, status FROM premium_orders WHERE order_id = ?', (order_id,))
+                result = c.fetchone()
+                conn.close()
+                if result:
+                    target_user, status = result
+                else:
+                    bot.answer_callback_query(call.id, "❌ Заказ не найден")
+                    return
+            
+            if status != 'pending':
+                bot.answer_callback_query(call.id, f"❌ Заказ уже {status}")
+                return
+            
+            if use_supabase:
+                try:
+                    supabase.table('premium_orders').update({'status': 'rejected'}).eq('order_id', order_id).execute()
+                except:
+                    pass
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('UPDATE premium_orders SET status = "rejected" WHERE order_id = ?', (order_id,))
+                conn.commit()
+                conn.close()
+            
+            bot.answer_callback_query(call.id, "❌ Заказ отклонён")
+            bot.send_message(chat_id, f"❌ Заказ #{order_id} ОТКЛОНЁН!", parse_mode='HTML')
+            bot.send_message(target_user, f"❌ ЗАКАЗ ОТКЛОНЁН\n\nЗаказ #{order_id}\nАдминистратор отклонил заказ.", parse_mode='HTML')
+            return
+        
+        # АДМИН-КНОПКИ
         if call.data == "admin_stats":
             bot.answer_callback_query(call.id)
             stats_cmd_from_user(call.message, user_id)
             return
-        # ... остальные админ-кнопки
-
-        # ЕСЛИ НИЧЕГО НЕ ПОДОШЛО
+        if call.data == "admin_list":
+            bot.answer_callback_query(call.id)
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username').eq('is_admin', 1).execute()
+                    admins = response.data
+                except:
+                    admins = []
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username FROM users WHERE is_admin = 1')
+                admins = c.fetchall()
+                conn.close()
+            if not admins:
+                text = "👑 АДМИНЫ\n\nНет админов."
+            else:
+                text = "👑 АДМИНЫ\n\n"
+                for admin in admins:
+                    if isinstance(admin, dict):
+                        text += f"• @{admin.get('username', admin.get('user_id'))}\n"
+                    else:
+                        text += f"• @{admin[1] if admin[1] else admin[0]}\n"
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_list_users":
+            bot.answer_callback_query(call.id)
+            if use_supabase:
+                try:
+                    response = supabase.table('users').select('user_id, username, premium, is_admin').execute()
+                    users = response.data
+                    text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                    for u in users:
+                        uid = u.get('user_id')
+                        username = u.get('username', 'Не указан')
+                        premium = u.get('premium', 0)
+                        is_admin_flag = u.get('is_admin', 0)
+                        status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                        text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                    msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                    user_message_ids[user_id].append(msg.message_id)
+                except:
+                    msg = bot.send_message(chat_id, "❌ Ошибка получения списка пользователей")
+                    user_message_ids[user_id].append(msg.message_id)
+            else:
+                conn = sqlite3.connect('users.db')
+                c = conn.cursor()
+                c.execute('SELECT user_id, username, premium, is_admin FROM users ORDER BY user_id')
+                users = c.fetchall()
+                conn.close()
+                text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+                for user in users:
+                    uid, username, premium, is_admin_flag = user
+                    status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
+                    text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
+                msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_broadcast":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📢 Напиши текст рассылки:\n/broadcast [текст]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_giveprem":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "💎 /giveprem [ID] [срок]\nСрок: 1d, 1m, 1h, 1mes, 1y", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_givetest":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🎁 /givetest [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_ban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🚫 /ban [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_unban":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "✅ /unban [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_mute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔇 /mute [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_unmute":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🔊 /unmute [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_giveadmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 /giveadmin [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_deladmin":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "👑 /deladmin [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_info":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "📊 /info [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_stats_users":
+            bot.answer_callback_query(call.id)
+            stats_users_cmd_from_user(call.message, user_id)
+            return
+        if call.data == "admin_clear_messages":
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(chat_id, "🧹 /clear_messages [ID]", parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_close":
+            bot.answer_callback_query(call.id, "❌ Закрыто")
+            msg = bot.send_message(chat_id, "❌ Панель закрыта", reply_markup=back_to_menu(), parse_mode='HTML')
+            user_message_ids[user_id].append(msg.message_id)
+            return
+        if call.data == "admin_orders":
+            bot.answer_callback_query(call.id)
+            admin_orders_cmd_from_user(call.message, user_id)
+            return
+        if call.data == "admin_support":
+            bot.answer_callback_query(call.id)
+            admin_support_cmd_from_user(call.message, user_id)
+            return
+        
         bot.answer_callback_query(call.id, "⏳ Обработка...")
         
     except Exception as e:
@@ -2683,6 +3052,7 @@ def handle_callback(call):
             bot.answer_callback_query(call.id, f"⚠️ Ошибка: {e}")
         except:
             pass
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_broadcast:"))
 def confirm_broadcast(call):
     chat_id = call.message.chat.id
@@ -2824,7 +3194,7 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ!")
+print("🧠 AWESOME AI — ЛУЧШАЯ НЕЙРОСЕТЬ В МИРЕ С МЕГА-ПОИСКОМ!")
 print("=" * 60)
 print(f"🤖 Бот: @{bot.get_me().username}")
 if use_supabase:
@@ -2833,6 +3203,15 @@ else:
     print("💾 База данных: ЛОКАЛЬНАЯ (SQLite)")
 print(f"📊 Лимиты: Бесплатный: {FREE_LIMIT}/день | Премиум: ♾️ БЕЗЛИМИТНО")
 print(f"🕐 Часовой пояс: МСК (UTC+3)")
+print("=" * 60)
+print("🌐 ПОИСК ПО ВСЕМУ ИНТЕРНЕТУ:")
+print("✅ Google")
+print("✅ Wikipedia")
+print("✅ YouTube")
+print("✅ Telegram")
+print("✅ ВКонтакте")
+print("✅ Twitch")
+print("✅ Новости")
 print("=" * 60)
 
 if use_supabase:
