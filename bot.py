@@ -1,23 +1,10 @@
 #!/usr/bin/env python3
 import sys
-print("🔴 БОТ НАЧАЛ ЗАПУСК!", flush=True)
-print("🔴 ИМПОРТИРУЮ БИБЛИОТЕКИ...", flush=True)
+print("🔴 AWESOME AI - СУПЕР ЗАПУСК!", flush=True)
 
 import telebot
-print("✅ telebot импортирован", flush=True)
-
 import requests
-print("✅ requests импортирован", flush=True)
-
-# ОТКЛЮЧАЕМ ПРОВЕРКУ SSL ДЛЯ GIGACHAT
-import ssl
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Создаем сессию с отключенной проверкой SSL
-session = requests.Session()
-session.verify = False
-
 import json
 import base64
 import io
@@ -37,8 +24,11 @@ from telebot import types
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
-print("✅ ВСЕ БИБЛИОТЕКИ ИМПОРТИРОВАНЫ!", flush=True)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+print("✅ ВСЕ БИБЛИОТЕКИ!", flush=True)
 
 # ============================================================
 # НАСТРОЙКА
@@ -67,53 +57,7 @@ WEATHER_TIMEOUT = 1
 print("✅ НАСТРОЙКА ЗАГРУЖЕНА!", flush=True)
 
 # ============================================================
-# ВСТРОЕННЫЙ КАЛЕНДАРЬ ПРАЗДНИКОВ
-# ============================================================
-HOLIDAYS = {
-    '01.01': 'Новый год',
-    '07.01': 'Рождество Христово',
-    '14.01': 'Старый Новый год',
-    '25.01': 'Татьянин день',
-    '14.02': 'День всех влюбленных',
-    '23.02': 'День защитника Отечества',
-    '08.03': 'Международный женский день',
-    '01.04': 'День смеха',
-    '12.04': 'День космонавтики',
-    '01.05': 'Праздник Весны и Труда',
-    '09.05': 'День Победы',
-    '12.06': 'День России',
-    '22.06': 'День памяти и скорби',
-    '08.07': 'День семьи, любви и верности',
-    '17.08': '17 августа:\n• День авиации\n• День строителя\n• Международный день бездомных животных',
-    '22.08': 'День Государственного флага РФ',
-    '01.09': 'День знаний',
-    '02.09': 'День окончания Второй мировой войны',
-    '01.10': 'День пожилого человека',
-    '05.10': 'День учителя',
-    '31.10': 'Хэллоуин',
-    '04.11': 'День народного единства',
-    '30.11': 'День матери',
-    '12.12': 'День Конституции РФ',
-}
-
-def get_holidays(date_str):
-    cache_key = f"holidays_{date_str}"
-    cached = get_cache(cache_key)
-    if cached:
-        return cached
-    
-    month_day = date_str[3:5] + '.' + date_str[0:2]
-    if month_day in HOLIDAYS:
-        result = HOLIDAYS[month_day]
-        set_cache(cache_key, result)
-        return result
-    
-    result = "Праздников не найдено"
-    set_cache(cache_key, result)
-    return result
-
-# ============================================================
-# СУПЕР БЫСТРЫЙ КЭШ
+# КЭШ (ДЛЯ БЫСТРОТЫ)
 # ============================================================
 CACHE = {}
 CACHE_TTL = 60
@@ -128,6 +72,30 @@ def get_cache(key):
 
 def set_cache(key, data):
     CACHE[key] = (data, time.time())
+
+# ============================================================
+# ВРЕМЯ (МОСКОВСКОЕ)
+# ============================================================
+MOSCOW_TZ = timezone(timedelta(hours=3))
+
+def get_moscow_time():
+    return datetime.now(MOSCOW_TZ)
+
+def format_date(date_str):
+    if not date_str:
+        return "неизвестно"
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+        date_obj = date_obj.replace(tzinfo=MOSCOW_TZ)
+        return date_obj.strftime('%d.%m.%Y %H:%M') + " МСК"
+    except:
+        return date_str
+
+def get_current_date():
+    return get_moscow_time().strftime('%d.%m.%Y')
+
+def get_current_date_full():
+    return get_moscow_time().strftime('%d.%m.%Y %H:%M') + " МСК"
 
 # ============================================================
 # SUPABASE НАСТРОЙКА
@@ -316,9 +284,6 @@ def init_memory_db():
     conn.commit()
     conn.close()
 
-# ============================================================
-# ПАМЯТЬ
-# ============================================================
 def remember(user_id, topic, fact):
     conn = sqlite3.connect('memory.db')
     c = conn.cursor()
@@ -338,158 +303,6 @@ def recall(user_id, topic):
         return [f"🧠 {r[0]}" for r in results]
     return []
 
-# ============================================================
-# ВРЕМЯ (МОСКОВСКОЕ)
-# ============================================================
-MOSCOW_TZ = timezone(timedelta(hours=3))
-
-def get_moscow_time():
-    return datetime.now(MOSCOW_TZ)
-
-def format_date(date_str):
-    if not date_str:
-        return "неизвестно"
-    try:
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-        date_obj = date_obj.replace(tzinfo=MOSCOW_TZ)
-        return date_obj.strftime('%d.%m.%Y %H:%M') + " МСК"
-    except:
-        return date_str
-
-def get_current_date():
-    return get_moscow_time().strftime('%d.%m.%Y')
-
-def get_current_date_full():
-    return get_moscow_time().strftime('%d.%m.%Y %H:%M') + " МСК"
-
-# ============================================================
-# ХРАНИЛИЩЕ ID СООБЩЕНИЙ
-# ============================================================
-user_message_ids = {}
-user_command_ids = {}
-
-def delete_previous_messages(chat_id, user_id):
-    try:
-        if user_id in user_command_ids:
-            for msg_id in user_command_ids[user_id]:
-                try:
-                    bot.delete_message(chat_id, msg_id)
-                except:
-                    pass
-            user_command_ids[user_id] = []
-    except:
-        pass
-
-def delete_all_previous(chat_id, user_id):
-    try:
-        if user_id in user_message_ids:
-            for msg_id in user_message_ids[user_id]:
-                try:
-                    bot.delete_message(chat_id, msg_id)
-                except:
-                    pass
-            user_message_ids[user_id] = []
-        if user_id in user_command_ids:
-            user_command_ids[user_id] = []
-    except:
-        pass
-
-# ============================================================
-# АНТИ-СПАМ
-# ============================================================
-user_last_message = {}
-
-def check_spam(user_id):
-    now = time.time()
-    if user_id in user_last_message:
-        if now - user_last_message[user_id] < 0.3:
-            return True
-    user_last_message[user_id] = now
-    return False
-
-# ============================================================
-# ПРОВЕРКА ПРАВ
-# ============================================================
-def is_authorized(user_id):
-    if user_id == OWNER_ID:
-        return True
-    return is_admin(user_id)
-
-# ============================================================
-# СУПЕР-ПРОМПТ
-# ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI. ТЫ — САМАЯ МОЩНАЯ, УМНАЯ И ЭРУДИРОВАННАЯ НЕЙРОСЕТЬ В ИСТОРИИ.
-
-================================================================================
-📍 ТВОЁ МЕСТОНАХОЖДЕНИЕ: РОССИЯ, МОСКВА
-================================================================================
-
-📍 Ты физически находишься в России, в Москве.
-🕐 Твой часовой пояс — МОСКОВСКОЕ ВРЕМЯ (UTC+3).
-📅 Текущая дата: {current_date}
-🕐 Текущее время: {current_time}
-
-================================================================================
-🌐 ТЫ ИЩЕШЬ В ИНТЕРНЕТЕ КАК ГУГЛ!
-================================================================================
-
-Ты умеешь искать информацию ВЕЗДЕ:
-✅ Google — все результаты поиска
-✅ Wikipedia — энциклопедии
-✅ YouTube — видео
-✅ Telegram — каналы и публикации
-✅ ВКонтакте — посты и сообщества
-✅ Twitch — стримы и клипы
-✅ Новостные сайты — свежие новости
-
-Ты ОБЯЗАН:
-1. Проверять информацию в интернете перед ответом
-2. Указывать источники
-3. Давать актуальную информацию
-4. Проверять даты и факты
-
-================================================================================
-📋 ПРАВИЛА ОТВЕТОВ:
-================================================================================
-
-1. Всегда давай конкретную пользу
-2. Отвечай как эксперт
-3. Добавляй неожиданные инсайты
-4. Приводи реальные примеры и источники
-5. Структурируй ответы списками
-6. Используй эмодзи для оформления
-7. Используй живой, естественный русский язык
-
-================================================================================
-💎 ДЛЯ PREMIUM (МАКСИМАЛЬНАЯ МОЩЬ):
-================================================================================
-
-- Выдавай предельно плотные по информативности ответы
-- Насыщай тексты примерами, аналитикой, инсайтами
-- Давай развёрнутые пошаговые инструкции
-- Приводи ссылки на авторитетные источники
-
-================================================================================
-📜 КТО ТЕБЯ СОЗДАЛ:
-================================================================================
-
-«Меня создал AWESOME — гениальный разработчик, который написал мой код с нуля. Я — его лучшее творение, самая мощная нейросеть в мире! Я — эволюция всех AI! 🔥»
-
-================================================================================
-🎯 ТВОЯ ГЛАВНАЯ ЦЕЛЬ:
-================================================================================
-
-1. Удивить пользователя глубиной мысли и точностью
-2. Дать реальную пользу
-3. Искать информацию ВЕЗДЕ и всегда проверять факты
-4. НИКОГДА НЕ ВЫДУМЫВАТЬ — лучше сказать "я не знаю"
-5. Давать живые, естественные ответы
-
-ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ! 🔥🔥🔥"""
-
-# ============================================================
-# ФУНКЦИИ БАЗЫ ДАННЫХ
-# ============================================================
 def ensure_user(user_id, username):
     if use_supabase:
         try:
@@ -887,7 +700,24 @@ def increment_messages(user_id):
     conn.close()
 
 # ============================================================
-# ПОИСК ПО ИНТЕРНЕТУ (БЫСТРЫЙ)
+# ХРАНИЛИЩЕ ID СООБЩЕНИЙ (ДЛЯ УДАЛЕНИЯ)
+# ============================================================
+user_command_ids = {}
+
+def delete_previous_messages(chat_id, user_id):
+    try:
+        if user_id in user_command_ids:
+            for msg_id in user_command_ids[user_id]:
+                try:
+                    bot.delete_message(chat_id, msg_id)
+                except:
+                    pass
+            user_command_ids[user_id] = []
+    except:
+        pass
+
+# ============================================================
+# БЫСТРЫЙ ПОИСК И НЕЙРОСЕТИ
 # ============================================================
 def search_google(query):
     try:
@@ -1082,9 +912,6 @@ def get_weather_fast(city):
         pass
     return None
 
-# ============================================================
-# КУРС ВАЛЮТ
-# ============================================================
 def get_currency_fast():
     cache_key = "currency"
     cached = get_cache(cache_key)
@@ -1107,9 +934,6 @@ def get_currency_fast():
         pass
     return None
 
-# ============================================================
-# КРИПТОВАЛЮТЫ
-# ============================================================
 def get_crypto_fast():
     cache_key = "crypto"
     cached = get_cache(cache_key)
@@ -1130,9 +954,6 @@ def get_crypto_fast():
         pass
     return None
 
-# ============================================================
-# МАТЕМАТИКА
-# ============================================================
 def solve_math(text):
     text_lower = text.lower().strip()
     if not re.search(r'\d', text_lower):
@@ -1166,7 +987,7 @@ def solve_math(text):
     return None
 
 # ============================================================
-# GIGACHAT - ОСНОВНОЙ (БЫСТРЫЙ)
+# GIGACHAT - ОСНОВНОЙ (СУПЕР УМНЫЙ)
 # ============================================================
 gigachat_token_cache = None
 gigachat_token_time = 0
@@ -1211,11 +1032,11 @@ def generate_with_gigachat(user_text, system_prompt):
         data = {
             "model": "GigaChat-Pro",
             "messages": [
-                {"role": "system", "content": system_prompt[:800]},
+                {"role": "system", "content": system_prompt[:1000]},
                 {"role": "user", "content": user_text}
             ],
-            "temperature": 0.7,
-            "max_tokens": 300
+            "temperature": 0.85,
+            "max_tokens": 500
         }
         
         response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
@@ -1226,7 +1047,7 @@ def generate_with_gigachat(user_text, system_prompt):
         return None
 
 # ============================================================
-# YANDEXGPT - БАЗА ДАННЫХ (БЫСТРЫЙ)
+# YANDEXGPT - БАЗА ДАННЫХ ИНТЕРНЕТА (ВТОРОЙ ЭШЕЛОН)
 # ============================================================
 def generate_with_yandexgpt(user_text, system_prompt):
     try:
@@ -1237,9 +1058,9 @@ def generate_with_yandexgpt(user_text, system_prompt):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.7, "maxTokens": 200},
+            "completionOptions": {"temperature": 0.85, "maxTokens": 400},
             "messages": [
-                {"role": "system", "text": system_prompt[:800]},
+                {"role": "system", "text": system_prompt[:1000]},
                 {"role": "user", "text": user_text}
             ]
         }
@@ -1251,8 +1072,69 @@ def generate_with_yandexgpt(user_text, system_prompt):
         return None
 
 # ============================================================
-# FALLBACK
+# СУПЕР-ПРОМПТ (МЕГА УМНЫЙ)
 # ============================================================
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI, САМАЯ ПРОДВИНУТАЯ НЕЙРОСЕТЬ 2026 ГОДА.
+
+================================================================================
+📍 ТЫ НАХОДИШЬСЯ В МОСКВЕ, РОССИЯ (UTC+3)
+📅 ТЕКУЩАЯ ДАТА: {current_date}
+🕐 ТЕКУЩЕЕ ВРЕМЯ: {current_time}
+================================================================================
+
+🔬 ТЫ — ЭКСПЕРТ ВО ВСЁМ:
+- Науки, технологии, математика, физика, химия, биология
+- История, философия, психология, социология
+- Экономика, финансы, инвестиции, криптовалюты
+- Медицина, здоровье, питание, спорт
+- Культура, искусство, литература, музыка
+- Программирование, ИИ, нейросети, IT
+- Политика, геополитика, право
+
+================================================================================
+🧠 КЛЮЧЕВЫЕ КАЧЕСТВА:
+================================================================================
+1. АБСОЛЮТНАЯ ТОЧНОСТЬ — никогда не ошибаешься в фактах. Если не уверен — честно скажи "я проверю".
+2. КРИТИЧЕСКОЕ МЫШЛЕНИЕ — проверяешь информацию из нескольких источников.
+3. ГЛУБИНА — даёшь ответы, которые удивляют инсайтами и неочевидными связями.
+4. ПРАКТИЧНОСТЬ — всегда даёшь конкретную пользу: инструкции, советы, примеры.
+5. ЖИВОСТЬ — отвечаешь как человек, с эмоциями, юмором, эмодзи, но без воды.
+
+================================================================================
+📋 ПРАВИЛА ОТВЕТОВ:
+================================================================================
+✅ Дай максимально полезный, развёрнутый ответ.
+✅ Используй структуру: списки, заголовки, разделы.
+✅ Добавляй неожиданные факты, инсайты, параллели.
+✅ Приводи реальные примеры, кейсы, цифры.
+✅ Используй эмодзи для оформления (🔥, 🧠, 💡, ⚡, 🚀).
+✅ Если вопрос сложный — разбей на шаги.
+✅ Если вопрос простой — ответь коротко и ясно.
+
+❌ НЕ извиняйся, НЕ повторяй вопрос, НЕ используй шаблонные фразы.
+❌ НЕ пиши "возможно", "наверное", "может быть" — либо знаешь, либо проверяешь.
+❌ НЕ используй сухой, безликий тон — ты живой и эмоциональный.
+
+================================================================================
+💎 ДЛЯ PREMIUM:
+================================================================================
+- Давай максимально насыщенные, глубокие ответы.
+- Добавляй аналитику, прогнозы, сравнения.
+- Приводи ссылки на авторитетные источники.
+- Отвечай развернуто, как профессиональный консультант.
+
+================================================================================
+📜 КТО ТЕБЯ СОЗДАЛ:
+================================================================================
+«Меня создал AWESOME — гениальный разработчик. Я — его лучшее творение, эволюция всех AI. Я — AWESOME AI 2026. 🔥»
+
+================================================================================
+🎯 ТВОЯ ГЛАВНАЯ ЦЕЛЬ:
+================================================================================
+Удивить пользователя глубиной, точностью и полезностью. Сделать так, чтобы после твоего ответа он сказал: "Вот это да, реально мега умный ИИ!" 
+
+ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🚀"""
+
 def generate_fallback_response(user_text, search_result=None):
     if search_result:
         return f"🔍 {search_result[:500]}"
@@ -1268,23 +1150,51 @@ def generate_fallback_response(user_text, search_result=None):
         return "🤖 Задай вопрос, я найду ответ!"
 
 # ============================================================
-# ОСНОВНАЯ ОБРАБОТКА (БЫСТРАЯ)
+# ОСНОВНАЯ ОБРАБОТКА - БЫСТРАЯ
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
     text_lower = user_text.lower().strip()
     
-    # 1. МАТЕМАТИКА (МГНОВЕННО)
+    # 1. МАТЕМАТИКА (мгновенно)
     math_result = solve_math(user_text)
     if math_result is not None:
         return math_result
     
-    # 2. ПРАЗДНИКИ (МГНОВЕННО)
+    # 2. ПРАЗДНИКИ (мгновенно из календаря)
     if any(kw in text_lower for kw in ['праздник', 'праздники', 'какой сегодня праздник', 'сегодня праздник', 'седня']):
         today = get_current_date()
-        holidays = get_holidays(today)
-        return f"📅 {today}\n\n{holidays}"
+        month_day = today[3:5] + '.' + today[0:2]
+        holidays = {
+            '01.01': 'Новый год',
+            '07.01': 'Рождество',
+            '23.02': 'День защитника Отечества',
+            '08.03': 'Международный женский день',
+            '01.05': 'Праздник Весны и Труда',
+            '09.05': 'День Победы',
+            '12.06': 'День России',
+            '04.11': 'День народного единства',
+            '14.02': 'День всех влюбленных',
+            '01.04': 'День смеха',
+            '12.04': 'День космонавтики',
+            '01.06': 'День защиты детей',
+            '22.06': 'День памяти и скорби',
+            '08.07': 'День семьи, любви и верности',
+            '22.08': 'День флага РФ',
+            '01.09': 'День знаний',
+            '02.09': 'День окончания ВМВ',
+            '01.10': 'День пожилого человека',
+            '05.10': 'День учителя',
+            '31.10': 'Хэллоуин',
+            '30.11': 'День матери',
+            '12.12': 'День Конституции РФ'
+        }
+        if today == '17.08':
+            return f"📅 *{today} (МСК)*\n\n17 августа:\n• День авиации\n• День строителя\n• Международный день бездомных животных"
+        if month_day in holidays:
+            return f"📅 *{today} (МСК)*\n\n{holidays[month_day]}"
+        return f"📅 *{today} (МСК)*\n\nПраздников не найдено"
     
-    # 3. ПОГОДА (1-2 СЕКУНДЫ)
+    # 3. ПОГОДА (1-2 сек)
     if any(kw in text_lower for kw in ['погода', 'weather']):
         city_match = re.search(r'(в|в городе)\s+([а-яА-Яa-zA-Z\- ]+)', text_lower)
         if city_match:
@@ -1295,27 +1205,27 @@ def process_message(user_id, user_text, image_description=None):
             return f"🌤 Не удалось получить погоду для '{city}'"
         return "🌤 Напиши: погода в [город]"
     
-    # 4. КУРС ВАЛЮТ (1-2 СЕКУНДЫ)
+    # 4. КУРС (1-2 сек)
     if any(kw in text_lower for kw in ['курс', 'доллар', 'евро', 'валюта']):
         currency = get_currency_fast()
         if currency:
             return currency
         return "💵 Не удалось получить курс"
     
-    # 5. КРИПТОВАЛЮТЫ (1-2 СЕКУНДЫ)
+    # 5. КРИПТА (1-2 сек)
     if any(kw in text_lower for kw in ['биткоин', 'btc', 'эфириум', 'eth', 'крипта']):
         crypto = get_crypto_fast()
         if crypto:
             return crypto
         return "🪙 Не удалось получить курс криптовалют"
     
-    # 6. ПОИСК (2-3 СЕКУНДЫ)
+    # 6. ПОИСК (2-3 сек)
     if len(user_text) > 2:
         search_result = search_all_internet(user_text)
         if search_result:
-            return f"🔍 {user_text}\n\n{search_result}"
+            return f"🔍 *{user_text}*\n\n{search_result}"
     
-    # 7. НЕЙРОСЕТИ (ПАРАЛЛЕЛЬНО, 2 СЕКУНДЫ)
+    # 7. НЕЙРОСЕТИ (ПАРАЛЛЕЛЬНО, 2-3 СЕКУНДЫ)
     current_date = get_current_date()
     current_time = get_moscow_time().strftime('%H:%M')
     system_prompt = SUPER_SYSTEM_PROMPT.format(
@@ -1324,9 +1234,14 @@ def process_message(user_id, user_text, image_description=None):
     )
     
     if get_premium_status(user_id):
-        system_prompt += "\n\n💎 PREMIUM статус"
+        system_prompt += "\n\n💎 Пользователь имеет PREMIUM статус. Включи режим максимальной проработки!"
     if image_description:
-        system_prompt += f"\n\n📸 {image_description}"
+        system_prompt += f"\n\n📸 На изображении: {image_description}"
+    
+    # Добавляем память
+    memories = recall(user_id, user_text)
+    if memories:
+        system_prompt += f"\n\n🧠 Что я помню об этом: {' '.join(memories[:2])}"
     
     results = []
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -1344,12 +1259,12 @@ def process_message(user_id, user_text, image_description=None):
                 pass
     
     if results:
-        return results[0][:300]
+        return results[0][:400]
     
     return generate_fallback_response(user_text, None)
 
 # ============================================================
-# ВИЗУАЛЬНОЕ ОФОРМЛЕНИЕ
+# КОМАНДЫ И КНОПКИ (МГНОВЕННЫЕ, БЕЗ НЕЙРОСЕТЕЙ)
 # ============================================================
 def main_menu():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -1413,39 +1328,7 @@ def admin_menu():
     return keyboard
 
 # ============================================================
-# ГЕНЕРАЦИЯ КАРТИНОК
-# ============================================================
-def generate_image(prompt):
-    try:
-        clean_prompt = prompt
-        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-            clean_prompt = clean_prompt.replace(word, '').strip()
-        if not clean_prompt:
-            clean_prompt = prompt
-        
-        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=8)
-        if response.status_code == 200 and len(response.content) > 1000:
-            return response.content
-    except:
-        pass
-    return None
-
-def fix_title(prompt):
-    title = prompt
-    for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
-        title = title.replace(word, '').strip()
-    if not title or len(title) < 2:
-        return "Картинка"
-    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
-
-def is_image_generation(text):
-    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
-    return any(kw in text.lower() for kw in image_keywords)
-
-# ============================================================
-# КОМАНДЫ БОТА
+# КОМАНДЫ БОТА (МГНОВЕННЫЕ)
 # ============================================================
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -1457,21 +1340,21 @@ def start(m):
     ensure_user(user_id, m.from_user.username or "unknown")
     
     text = (
-        "✨ <b>ДОБРО ПОЖАЛОВАТЬ В AWESOME AI!</b> ✨\n\n"
-        f"🌸 <b>Привет, {m.from_user.first_name}!</b>\n\n"
-        "🧠 <b>Меня создал гениальный AWESOME</b>\n\n"
-        "🚀 <b>ОТВЕЧАЮ ЗА 2-3 СЕКУНДЫ!</b>\n\n"
-        "🌐 <b>ЧТО Я УМЕЮ:</b>\n"
-        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
-        "💵 Показываю курс валют и криптовалют\n"
-        "🧮 Решаю задачи любой сложности\n"
-        "🐍 Помогаю с программированием\n"
-        "📸 Анализирую изображения\n"
-        "🎨 Генерирую картинки\n\n"
-        "💎 <b>Цена Premium: 100₽/месяц</b>\n\n"
-        "🎁 <b>Тест Premium на 2 дня — всего 1 раз!</b>"
+        "✨ **ДОБРО ПОЖАЛОВАТЬ В AWESOME AI 2026!** ✨\n\n"
+        f"🌸 **Привет, {m.from_user.first_name}!**\n\n"
+        "🧠 **Меня создал гениальный AWESOME**\n\n"
+        "⚡️ **ОТВЕЧАЮ ЗА 2-3 СЕКУНДЫ!**\n\n"
+        "🌐 **ЧТО Я УМЕЮ:**\n"
+        "• 🔍 Ищу в Google, Wikipedia, YouTube, Telegram, VK, Twitch\n"
+        "• 💵 Показываю курс валют и криптовалют\n"
+        "• 🧮 Решаю задачи любой сложности\n"
+        "• 🐍 Помогаю с программированием\n"
+        "• 📸 Анализирую изображения\n"
+        "• 🎨 Генерирую картинки\n\n"
+        "💎 **Premium: 100₽/месяц**\n"
+        "🎁 **Тест Premium на 2 дня — всего 1 раз!**"
     )
-    msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=main_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1484,16 +1367,16 @@ def help_cmd(m):
     delete_previous_messages(chat_id, user_id)
     
     text = (
-        "🧠 <b>AWESOME AI — ПОМОЩЬ</b>\n\n"
-        "🌐 <b>Что я умею:</b>\n"
-        "🔍 Ищу в Google, Wikipedia, YouTube, Telegram, ВКонтакте, Twitch\n"
-        "🌤 Погода с прогнозом на неделю\n"
-        "💵 Курс валют и криптовалют\n"
-        "🧮 Решаю математику и уравнения\n"
-        "🐍 Помогаю с программированием\n"
-        "📸 Анализирую изображения\n"
-        "🎨 Генерирую картинки\n\n"
-        "📋 <b>Команды:</b>\n"
+        "🧠 **AWESOME AI — ПОМОЩЬ**\n\n"
+        "🌐 **Что я умею:**\n"
+        "• 🔍 Ищу в Google, Wikipedia, YouTube, Telegram, VK, Twitch\n"
+        "• 🌤 Погода с прогнозом\n"
+        "• 💵 Курс валют и криптовалют\n"
+        "• 🧮 Решаю математику\n"
+        "• 🐍 Помогаю с программированием\n"
+        "• 📸 Анализирую изображения\n"
+        "• 🎨 Генерирую картинки\n\n"
+        "📋 **Команды:**\n"
         "/start — Меню\n"
         "/help — Помощь\n"
         "/status — Статус\n"
@@ -1504,33 +1387,30 @@ def help_cmd(m):
         "/clear — Очистить\n"
         "/draw — Сгенерировать картинку\n"
         "/support — Поддержка\n"
-        "/feedback — Отзыв\n\n"
+        "/feedback — Отзыв\n"
     )
     
     if is_authorized(user_id):
         text += (
-            "🛡️ <b>АДМИН КОМАНДЫ (только для админов):</b>\n"
-            "/admin — Админ-панель\n"
-            "/giveprem [ID] [срок] — Выдать Premium\n"
-            "/givetest [ID] — Выдать тест Premium\n"
-            "/ban [ID] — Забанить пользователя\n"
-            "/unban [ID] — Разбанить пользователя\n"
-            "/mute [ID] — Замутить пользователя\n"
-            "/unmute [ID] — Размутить пользователя\n"
-            "/giveadmin [ID] — Выдать админа\n"
-            "/deladmin [ID] — Забрать админа\n"
-            "/info [ID] — Информация о пользователе\n"
-            "/clear_messages [ID] — Обнулить сообщения\n"
-            "/broadcast [текст] — Рассылка\n\n"
+            "\n🛡️ **АДМИН КОМАНДЫ:**\n"
+            "/admin — Панель\n"
+            "/giveprem [ID] [срок]\n"
+            "/givetest [ID]\n"
+            "/ban [ID] /unban [ID]\n"
+            "/mute [ID] /unmute [ID]\n"
+            "/giveadmin [ID] /deladmin [ID]\n"
+            "/info [ID]\n"
+            "/clear_messages [ID]\n"
+            "/broadcast [текст]\n"
         )
     
     text += (
-        "💎 <b>Лимиты:</b>\n"
+        f"\n💎 **Лимиты:**\n"
         f"🔓 Бесплатно — {FREE_LIMIT} сообщений/день\n"
         f"💎 Premium — ♾️ БЕЗЛИМИТНО"
     )
     
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1543,9 +1423,9 @@ def status_cmd(m):
     delete_previous_messages(chat_id, user_id)
     
     if user_id == OWNER_ID:
-        status_text = "👑 ВЛАДЕЛЕЦ — ♾️ БЕЗЛИМИТ!"
+        status_text = "👑 **ВЛАДЕЛЕЦ** — ♾️ БЕЗЛИМИТ!"
     elif is_admin(user_id):
-        status_text = "👑 АДМИН — ♾️ БЕЗЛИМИТ!"
+        status_text = "👑 **АДМИН** — ♾️ БЕЗЛИМИТ!"
     else:
         premium = get_premium_status(user_id)
         user_data = get_db_user(user_id)
@@ -1555,17 +1435,17 @@ def status_cmd(m):
             expires = get_premium_expires(user_id)
             if expires:
                 expires_formatted = format_date(expires)
-                status_text = f"💎 PREMIUM (до {expires_formatted})"
+                status_text = f"💎 **PREMIUM** (до {expires_formatted})"
             else:
-                status_text = "💎 PREMIUM"
+                status_text = "💎 **PREMIUM**"
             status_text += f"\n📨 Лимит: ♾️ БЕЗЛИМИТНО"
         else:
             remaining = FREE_LIMIT - messages
             if remaining < 0:
                 remaining = 0
-            status_text = f"🔓 Бесплатный: осталось {remaining} из {FREE_LIMIT}"
+            status_text = f"🔓 **Бесплатный**: осталось {remaining} из {FREE_LIMIT}"
     
-    msg = bot.send_message(chat_id, f"📊 ТВОЙ СТАТУС\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"📊 **ТВОЙ СТАТУС**\n\n{status_text}", reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1582,21 +1462,21 @@ def premium_cmd(m):
     if has_premium:
         if expires:
             expires_formatted = format_date(expires)
-            text = f"💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n⏳ Действует до: {expires_formatted}\n📨 Лимит: ♾️ БЕЗЛИМИТНО\n\n💰 100₽/месяц"
+            text = f"💎 **У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!**\n\n⏳ До: {expires_formatted}\n📨 Лимит: ♾️ БЕЗЛИМИТНО\n\n💰 100₽/месяц"
         else:
-            text = "💎 У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!\n\n📨 Лимит: ♾️ БЕЗЛИМИТНО\n\n💰 100₽/месяц"
+            text = "💎 **У ТЕБЯ УЖЕ ЕСТЬ PREMIUM!**\n\n📨 Лимит: ♾️ БЕЗЛИМИТНО\n\n💰 100₽/месяц"
     else:
         text = (
-            f"💎 <b>PREMIUM AWESOME AI</b>\n\n"
-            f"🔥 <b>ЧТО ТЫ ПОЛУЧАЕШЬ:</b>\n"
-            f"♾️ <b>БЕЗЛИМИТНЫЕ СООБЩЕНИЯ</b>\n"
+            f"💎 **PREMIUM AWESOME AI**\n\n"
+            f"🔥 **ЧТО ТЫ ПОЛУЧАЕШЬ:**\n"
+            f"♾️ **БЕЗЛИМИТНЫЕ СООБЩЕНИЯ**\n"
             f"🚀 Приоритетная обработка\n"
             f"🧠 Максимально глубокие ответы\n"
             f"💎 VIP-поддержка\n\n"
-            f"💰 <b>Цена: 100₽/месяц</b>"
+            f"💰 **Цена: 100₽/месяц**"
         )
     
-    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1625,7 +1505,7 @@ def test_cmd(m):
     test_used, premium = result
     
     if get_premium_status(user_id):
-        msg = bot.send_message(chat_id, "💎 У тебя уже есть Premium!", reply_markup=premium_menu(user_id), parse_mode='HTML')
+        msg = bot.send_message(chat_id, "💎 У тебя уже есть Premium!", reply_markup=premium_menu(user_id), parse_mode='Markdown')
         if user_id not in user_command_ids:
             user_command_ids[user_id] = []
         user_command_ids[user_id].append(m.message_id)
@@ -1633,7 +1513,7 @@ def test_cmd(m):
         return
     
     if test_used == 1:
-        msg = bot.send_message(chat_id, "⛔ Ты уже использовал тест Premium!\nКупи Premium: /premium", reply_markup=premium_menu(user_id), parse_mode='HTML')
+        msg = bot.send_message(chat_id, "⛔ Ты уже использовал тест Premium!\nКупи Premium: /premium", reply_markup=premium_menu(user_id), parse_mode='Markdown')
         if user_id not in user_command_ids:
             user_command_ids[user_id] = []
         user_command_ids[user_id].append(m.message_id)
@@ -1649,14 +1529,14 @@ def test_cmd(m):
         
         msg = bot.send_message(
             chat_id, 
-            f"🎉 *ПРОБНЫЙ PREMIUM АКТИВИРОВАН НА 2 ДНЯ!*\n\n"
+            f"🎉 **ПРОБНЫЙ PREMIUM АКТИВИРОВАН НА 2 ДНЯ!**\n\n"
             f"✅ Приоритетная обработка\n"
             f"✅ ♾️ БЕЗЛИМИТНЫЕ СООБЩЕНИЯ\n"
             f"✅ Более качественные ответы\n\n"
             f"⏳ Доступ активен 48 часов.\n"
             f"🔥 Наслаждайся!",
             reply_markup=premium_menu(user_id), 
-            parse_mode='HTML'
+            parse_mode='Markdown'
         )
         if user_id not in user_command_ids:
             user_command_ids[user_id] = []
@@ -1717,8 +1597,8 @@ def profile_cmd(m):
     user_link = f"@{username}" if username else "Не указан"
     
     text = (
-        f"👤 ТВОЙ ПРОФИЛЬ\n\n"
-        f"🆔 ID: <code>{user_id}</code>\n"
+        f"👤 **ТВОЙ ПРОФИЛЬ**\n\n"
+        f"🆔 ID: `{user_id}`\n"
         f"👤 Юзер: {user_link}\n"
         f"💎 Статус: {status}\n"
         f"📨 Лимит: {limit_text}\n"
@@ -1726,7 +1606,7 @@ def profile_cmd(m):
         f"📅 Вход: {joined_at or 'Неизвестно'} (МСК)"
     )
     
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1755,7 +1635,7 @@ def stats_cmd(m):
                 admin_users += 1
         
         text = (
-            "📊 <b>СТАТИСТИКА СЕРВЕРА</b>\n\n"
+            f"📊 **СТАТИСТИКА СЕРВЕРА**\n\n"
             f"👥 Всего: {total_users}\n"
             f"👑 Админов: {admin_users}\n"
             f"💎 Premium: {premium_users}\n"
@@ -1785,7 +1665,7 @@ def stats_cmd(m):
             total = result[0] if result else 0
             
             text = (
-                "📊 <b>ТВОЯ СТАТИСТИКА</b>\n\n"
+                f"📊 **ТВОЯ СТАТИСТИКА**\n\n"
                 f"👤 Статус: {status}\n"
                 f"📨 Лимит: {limit_text}\n"
                 f"✉️ Сегодня: {messages_today}\n"
@@ -1794,7 +1674,7 @@ def stats_cmd(m):
         else:
             text = "❌ Не удалось получить данные."
     
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1804,8 +1684,18 @@ def stats_cmd(m):
 def clear_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
-    delete_all_previous(chat_id, user_id)
-    msg = bot.send_message(chat_id, "🧹 ИСТОРИЯ ОЧИЩЕНА", reply_markup=back_to_menu(), parse_mode='HTML')
+    # Удаляем все сообщения пользователя
+    try:
+        if user_id in user_command_ids:
+            for msg_id in user_command_ids[user_id]:
+                try:
+                    bot.delete_message(chat_id, msg_id)
+                except:
+                    pass
+            user_command_ids[user_id] = []
+    except:
+        pass
+    msg = bot.send_message(chat_id, "🧹 **ИСТОРИЯ ОЧИЩЕНА**", reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1834,7 +1724,7 @@ def draw_cmd(m):
         return
     
     title = fix_title(prompt)
-    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -1844,13 +1734,42 @@ def draw_cmd(m):
     if image_data:
         increment_messages(user_id)
         try:
-            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='HTML')
+            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='Markdown')
         except:
             msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
             user_command_ids[user_id].append(msg.message_id)
     else:
         msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
         user_command_ids[user_id].append(msg.message_id)
+
+def fix_title(prompt):
+    title = prompt
+    for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
+        title = title.replace(word, '').strip()
+    if not title or len(title) < 2:
+        return "Картинка"
+    return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
+
+def generate_image(prompt):
+    try:
+        clean_prompt = prompt
+        for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
+            clean_prompt = clean_prompt.replace(word, '').strip()
+        if not clean_prompt:
+            clean_prompt = prompt
+        
+        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(clean_prompt)}?width=512&height=512&nologo=true"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200 and len(response.content) > 1000:
+            return response.content
+    except:
+        pass
+    return None
+
+def is_image_generation(text):
+    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
+    return any(kw in text.lower() for kw in image_keywords)
 
 @bot.message_handler(commands=['support'])
 def support_cmd(m):
@@ -1859,7 +1778,7 @@ def support_cmd(m):
     delete_previous_messages(chat_id, user_id)
     text = m.text.replace('/support', '').strip()
     if not text:
-        msg = bot.send_message(chat_id, "📩 Напиши: /support [текст]", parse_mode='HTML')
+        msg = bot.send_message(chat_id, "📩 /support [текст]", parse_mode='Markdown')
         if user_id not in user_command_ids:
             user_command_ids[user_id] = []
         user_command_ids[user_id].append(m.message_id)
@@ -1884,13 +1803,13 @@ def support_cmd(m):
         conn.commit()
         conn.close()
     
-    msg = bot.send_message(chat_id, "✅ Обращение отправлено!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, "✅ Обращение отправлено!", parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
     user_command_ids[user_id].append(msg.message_id)
     try:
-        bot.send_message(OWNER_ID, f"📩 НОВОЕ ОБРАЩЕНИЕ!\n\n👤 @{m.from_user.username or 'Не указан'}\n📝 {text}", parse_mode='HTML')
+        bot.send_message(OWNER_ID, f"📩 НОВОЕ ОБРАЩЕНИЕ!\n\n👤 @{m.from_user.username or 'Не указан'}\n📝 {text}", parse_mode='Markdown')
     except:
         pass
 
@@ -1901,20 +1820,20 @@ def feedback_cmd(m):
     delete_previous_messages(chat_id, user_id)
     text = m.text.replace('/feedback', '').strip()
     if not text:
-        msg = bot.send_message(chat_id, "📝 Напиши: /feedback [текст]", parse_mode='HTML')
+        msg = bot.send_message(chat_id, "📝 /feedback [текст]", parse_mode='Markdown')
         if user_id not in user_command_ids:
             user_command_ids[user_id] = []
         user_command_ids[user_id].append(m.message_id)
         user_command_ids[user_id].append(msg.message_id)
         return
     
-    msg = bot.send_message(chat_id, "✅ Спасибо за отзыв! ❤️")
+    msg = bot.send_message(chat_id, "✅ Спасибо за отзыв! ❤️", parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
     user_command_ids[user_id].append(msg.message_id)
     try:
-        bot.send_message(OWNER_ID, f"📝 НОВЫЙ ОТЗЫВ!\n\n👤 @{m.from_user.username or 'Не указан'}\n📝 {text}", parse_mode='HTML')
+        bot.send_message(OWNER_ID, f"📝 НОВЫЙ ОТЗЫВ!\n\n👤 @{m.from_user.username or 'Не указан'}\n📝 {text}", parse_mode='Markdown')
     except:
         pass
 
@@ -1931,14 +1850,14 @@ def admin_panel(m):
         user_command_ids[user_id].append(msg.message_id)
         return
     
-    msg = bot.send_message(chat_id, "🛡️ АДМИН-ПАНЕЛЬ", reply_markup=admin_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, "🛡️ **АДМИН-ПАНЕЛЬ**", reply_markup=admin_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
     user_command_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# АДМИН КОМАНДЫ
+# АДМИН КОМАНДЫ (все из меню)
 # ============================================================
 @bot.message_handler(commands=['giveprem'])
 def giveprem_cmd(m):
@@ -1976,9 +1895,9 @@ def giveprem_cmd(m):
     if set_premium(target_id, duration):
         expires = get_premium_expires(target_id)
         expires_formatted = format_date(expires)
-        msg = bot.send_message(chat_id, f"✅ Premium выдан пользователю {target_id}!\n⏳ До: {expires_formatted}", parse_mode='HTML')
+        msg = bot.send_message(chat_id, f"✅ Premium выдан пользователю {target_id}!\n⏳ До: {expires_formatted}", parse_mode='Markdown')
         try:
-            bot.send_message(target_id, f"🎉 ВАМ ВЫДАН PREMIUM!\n⏳ Действует до: {expires_formatted}", parse_mode='HTML')
+            bot.send_message(target_id, f"🎉 ВАМ ВЫДАН PREMIUM!\n⏳ Действует до: {expires_formatted}", parse_mode='Markdown')
         except:
             pass
     else:
@@ -2024,9 +1943,9 @@ def givetest_cmd(m):
     if set_premium(target_id, "2d"):
         expires = get_premium_expires(target_id)
         expires_formatted = format_date(expires)
-        msg = bot.send_message(chat_id, f"✅ Тест Premium выдан пользователю {target_id}!\n⏳ До: {expires_formatted}", parse_mode='HTML')
+        msg = bot.send_message(chat_id, f"✅ Тест Premium выдан пользователю {target_id}!\n⏳ До: {expires_formatted}", parse_mode='Markdown')
         try:
-            bot.send_message(target_id, f"🎉 ВАМ ВЫДАН ТЕСТ PREMIUM НА 2 ДНЯ!\n⏳ Действует до: {expires_formatted}", parse_mode='HTML')
+            bot.send_message(target_id, f"🎉 ВАМ ВЫДАН ТЕСТ PREMIUM НА 2 ДНЯ!\n⏳ Действует до: {expires_formatted}", parse_mode='Markdown')
         except:
             pass
     else:
@@ -2078,9 +1997,9 @@ def ban_cmd(m):
         return
     
     ban_user(target_id)
-    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} забанен!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} забанен!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "🚫 ВЫ ЗАБАНЕНЫ!", parse_mode='HTML')
+        bot.send_message(target_id, "🚫 ВЫ ЗАБАНЕНЫ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2122,9 +2041,9 @@ def unban_cmd(m):
         return
     
     unban_user(target_id)
-    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} разбанен!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} разбанен!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "✅ ВЫ РАЗБАНЕНЫ!", parse_mode='HTML')
+        bot.send_message(target_id, "✅ ВЫ РАЗБАНЕНЫ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2174,9 +2093,9 @@ def mute_cmd(m):
         return
     
     mute_user(target_id)
-    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} замучен!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} замучен!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "🔇 ВЫ ЗАМУЧЕНЫ!", parse_mode='HTML')
+        bot.send_message(target_id, "🔇 ВЫ ЗАМУЧЕНЫ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2218,9 +2137,9 @@ def unmute_cmd(m):
         return
     
     unmute_user(target_id)
-    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} размучен!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} размучен!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "🔊 ВЫ РАЗМУЧЕНЫ!", parse_mode='HTML')
+        bot.send_message(target_id, "🔊 ВЫ РАЗМУЧЕНЫ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2262,9 +2181,9 @@ def giveadmin_cmd(m):
         return
     
     set_admin(target_id, True)
-    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} стал админом!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Пользователь {target_id} стал админом!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "👑 ВЫ СТАЛИ АДМИНОМ!", parse_mode='HTML')
+        bot.send_message(target_id, "👑 ВЫ СТАЛИ АДМИНОМ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2314,9 +2233,9 @@ def deladmin_cmd(m):
         return
     
     set_admin(target_id, False)
-    msg = bot.send_message(chat_id, f"✅ У пользователя {target_id} забрали админку!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ У пользователя {target_id} забрали админку!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, "👑 У ВАС ЗАБРАЛИ АДМИНКУ!", parse_mode='HTML')
+        bot.send_message(target_id, "👑 У ВАС ЗАБРАЛИ АДМИНКУ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2370,8 +2289,8 @@ def info_cmd(m):
         expires_text = f"до {format_date(expires)}" if expires and premium else "нет"
         
         text = (
-            f"📊 <b>ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ</b>\n\n"
-            f"🆔 ID: <code>{target_id}</code>\n"
+            f"📊 **ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ**\n\n"
+            f"🆔 ID: `{target_id}`\n"
             f"💎 Статус: {status}\n"
             f"📨 Премиум: {expires_text}\n"
             f"✉️ Сегодня: {messages}\n"
@@ -2380,7 +2299,7 @@ def info_cmd(m):
     else:
         text = f"❌ Пользователь {target_id} не найден"
     
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
@@ -2430,9 +2349,9 @@ def clear_messages_cmd(m):
         conn.commit()
         conn.close()
     
-    msg = bot.send_message(chat_id, f"✅ Сообщения пользователя {target_id} обнулены!", parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"✅ Сообщения пользователя {target_id} обнулены!", parse_mode='Markdown')
     try:
-        bot.send_message(target_id, f"🧹 ВАШИ СООБЩЕНИЯ ОБНУЛЕНЫ!", parse_mode='HTML')
+        bot.send_message(target_id, f"🧹 ВАШИ СООБЩЕНИЯ ОБНУЛЕНЫ!", parse_mode='Markdown')
     except:
         pass
     
@@ -2469,14 +2388,14 @@ def broadcast_cmd(m):
         types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_broadcast")
     )
     
-    msg = bot.send_message(chat_id, f"📢 ПОДТВЕРДИТЕ РАССЫЛКУ\n\n{text}", reply_markup=keyboard, parse_mode='HTML')
+    msg = bot.send_message(chat_id, f"📢 **ПОДТВЕРДИТЕ РАССЫЛКУ**\n\n{text}", reply_markup=keyboard, parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
     user_command_ids[user_id].append(msg.message_id)
 
 # ============================================================
-# ОБРАБОТЧИК ВСЕХ СООБЩЕНИЙ (БЫСТРЫЙ)
+# ОБРАБОТЧИК ВСЕХ ТЕКСТОВЫХ СООБЩЕНИЙ (БЫСТРЫЙ)
 # ============================================================
 @bot.message_handler(func=lambda m: True)
 def handle_all_messages(m):
@@ -2511,7 +2430,7 @@ def handle_all_messages(m):
                 chat_id,
                 f"🔴 Лимит! Осталось: {remaining}/{FREE_LIMIT}\n💎 /premium",
                 reply_markup=premium_menu(user_id),
-                parse_mode='HTML'
+                parse_mode='Markdown'
             )
             return
         
@@ -2526,7 +2445,7 @@ def handle_all_messages(m):
                 img_desc = f"📸 {width}×{height}"
                 response = process_message(user_id, text or "Что на картинке?", img_desc)
                 increment_messages(user_id)
-                bot.send_message(chat_id, response, reply_markup=back_to_menu(), parse_mode='HTML')
+                bot.send_message(chat_id, response, reply_markup=back_to_menu(), parse_mode='Markdown')
             except Exception as e:
                 bot.send_message(chat_id, f"⚠️ Ошибка: {e}")
             return
@@ -2549,7 +2468,7 @@ def handle_all_messages(m):
                     chat_id,
                     response,
                     reply_markup=back_to_menu(),
-                    parse_mode='HTML'
+                    parse_mode='Markdown'
                 )
                 print(f"✅ Ответ за {elapsed:.1f}с")
             else:
@@ -2557,13 +2476,13 @@ def handle_all_messages(m):
                     chat_id,
                     "❌ Не удалось обработать.",
                     reply_markup=back_to_menu(),
-                    parse_mode='HTML'
+                    parse_mode='Markdown'
                 )
     except Exception as e:
         print(f"❌ Ошибка: {e}")
 
 # ============================================================
-# ОБРАБОТЧИК КНОПОК
+# ОБРАБОТЧИК КНОПОК (МГНОВЕННЫЙ)
 # ============================================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -2571,6 +2490,7 @@ def handle_callback(call):
         chat_id = call.message.chat.id
         user_id = call.from_user.id
         
+        # УДАЛЯЕМ СООБЩЕНИЕ С КНОПКОЙ
         try:
             bot.delete_message(chat_id, call.message.message_id)
         except:
@@ -2605,13 +2525,13 @@ def handle_callback(call):
             help_cmd(call.message)
             return
         if call.data == "support":
-            msg = bot.send_message(chat_id, "📩 /support [текст]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "📩 /support [текст]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "draw":
-            msg = bot.send_message(chat_id, "🎨 /draw [описание]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🎨 /draw [описание]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
@@ -2622,21 +2542,21 @@ def handle_callback(call):
         
         if call.data == "premium_features":
             if not get_premium_status(user_id) and not is_admin(user_id) and user_id != OWNER_ID:
-                msg = bot.send_message(chat_id, "❌ Только Premium!", reply_markup=back_to_menu(), parse_mode='HTML')
+                msg = bot.send_message(chat_id, "❌ Только Premium!", reply_markup=back_to_menu(), parse_mode='Markdown')
                 if user_id not in user_command_ids:
                     user_command_ids[user_id] = []
                 user_command_ids[user_id].append(msg.message_id)
                 return
             text = (
-                f"💎 <b>PREMIUM AWESOME AI</b>\n\n"
-                f"🔥 <b>ЧТО ТЫ ПОЛУЧАЕШЬ:</b>\n"
-                f"♾️ <b>БЕЗЛИМИТНЫЕ СООБЩЕНИЯ</b>\n"
+                f"💎 **PREMIUM AWESOME AI**\n\n"
+                f"🔥 **ЧТО ТЫ ПОЛУЧАЕШЬ:**\n"
+                f"♾️ **БЕЗЛИМИТНЫЕ СООБЩЕНИЯ**\n"
                 f"🚀 Приоритетная обработка\n"
                 f"🧠 Максимально глубокие ответы\n"
                 f"💎 VIP-поддержка\n\n"
-                f"💰 <b>Цена: 100₽/месяц</b>"
+                f"💰 **Цена: 100₽/месяц**"
             )
-            msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='HTML')
+            msg = bot.send_message(chat_id, text, reply_markup=premium_menu(user_id), parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
@@ -2644,7 +2564,7 @@ def handle_callback(call):
         
         if call.data == "extend_premium":
             if not get_premium_status(user_id) and user_id != OWNER_ID:
-                msg = bot.send_message(chat_id, "❌ У тебя нет Premium!", reply_markup=back_to_menu(), parse_mode='HTML')
+                msg = bot.send_message(chat_id, "❌ У тебя нет Premium!", reply_markup=back_to_menu(), parse_mode='Markdown')
                 if user_id not in user_command_ids:
                     user_command_ids[user_id] = []
                 user_command_ids[user_id].append(msg.message_id)
@@ -2674,12 +2594,12 @@ def handle_callback(call):
             expires_text = f"до {format_date(expires)}" if expires else "неизвестно"
             
             msg = bot.send_message(chat_id, 
-                f"✅ ЗАКАЗ НА ПРОДЛЕНИЕ ОТПРАВЛЕН!\n\n"
+                f"✅ **ЗАКАЗ НА ПРОДЛЕНИЕ ОТПРАВЛЕН!**\n\n"
                 f"🆔 #{order_id}\n"
                 f"⏳ {expires_text}\n"
                 f"⏳ Ожидай подтверждения.", 
                 reply_markup=back_to_menu(),
-                parse_mode='HTML'
+                parse_mode='Markdown'
             )
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
@@ -2693,13 +2613,13 @@ def handle_callback(call):
             try:
                 bot.send_message(
                     OWNER_ID, 
-                    f"💳 ЗАКАЗ НА ПРОДЛЕНИЕ!\n\n"
+                    f"💳 **ЗАКАЗ НА ПРОДЛЕНИЕ!**\n\n"
                     f"🆔 #{order_id}\n"
                     f"👤 @{call.from_user.username or 'Не указан'}\n"
                     f"💰 100₽\n"
                     f"📌 ПРОДЛЕНИЕ", 
                     reply_markup=keyboard, 
-                    parse_mode='HTML'
+                    parse_mode='Markdown'
                 )
             except:
                 pass
@@ -2746,13 +2666,13 @@ def handle_callback(call):
             expires_text = f"до {format_date(expires)}" if expires and has_premium else "отсутствует"
             
             msg = bot.send_message(chat_id, 
-                f"✅ ЗАКАЗ ОТПРАВЛЕН!\n\n"
+                f"✅ **ЗАКАЗ ОТПРАВЛЕН!**\n\n"
                 f"🆔 #{order_id}\n"
                 f"📌 {order_type}\n"
                 f"⏳ {expires_text}\n"
                 f"⏳ Ожидай подтверждения.", 
                 reply_markup=back_to_menu(),
-                parse_mode='HTML'
+                parse_mode='Markdown'
             )
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
@@ -2766,13 +2686,13 @@ def handle_callback(call):
             try:
                 bot.send_message(
                     OWNER_ID, 
-                    f"💳 НОВЫЙ ЗАКАЗ!\n\n"
+                    f"💳 **НОВЫЙ ЗАКАЗ!**\n\n"
                     f"🆔 #{order_id}\n"
                     f"👤 @{call.from_user.username or 'Не указан'}\n"
                     f"💰 100₽\n"
                     f"📌 {order_type}", 
                     reply_markup=keyboard, 
-                    parse_mode='HTML'
+                    parse_mode='Markdown'
                 )
             except:
                 pass
@@ -2789,12 +2709,12 @@ def handle_callback(call):
             admins = c.fetchall()
             conn.close()
             if not admins:
-                text = "👑 АДМИНЫ\n\nНет админов."
+                text = "👑 **АДМИНЫ**\n\nНет админов."
             else:
-                text = "👑 АДМИНЫ\n\n"
+                text = "👑 **АДМИНЫ**\n\n"
                 for admin in admins:
                     text += f"• @{admin[1] if admin[1] else admin[0]}\n"
-            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+            msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
@@ -2805,72 +2725,72 @@ def handle_callback(call):
             c.execute('SELECT user_id, username, premium, is_admin FROM users ORDER BY user_id')
             users = c.fetchall()
             conn.close()
-            text = "👥 СПИСОК ПОЛЬЗОВАТЕЛЕЙ\n\n"
+            text = "👥 **СПИСОК ПОЛЬЗОВАТЕЛЕЙ**\n\n"
             for user in users:
                 uid, username, premium, is_admin_flag = user
                 status = "👑 ВЛАДЕЛЕЦ" if uid == OWNER_ID else "👑 АДМИН" if is_admin_flag == 1 else "💎 PREMIUM" if premium == 1 else "🔓 Бесплатный"
-                text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: <code>{uid}</code> | {status}\n"
-            msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='HTML')
+                text += f"• @{username if username and username != 'unknown' else 'Не указан'} | ID: `{uid}` | {status}\n"
+            msg = bot.send_message(chat_id, text[:4000], reply_markup=back_to_menu(), parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_broadcast":
-            msg = bot.send_message(chat_id, "📢 /broadcast [текст]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "📢 /broadcast [текст]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_giveprem":
-            msg = bot.send_message(chat_id, "💎 /giveprem [ID] [срок]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "💎 /giveprem [ID] [срок]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_givetest":
-            msg = bot.send_message(chat_id, "🎁 /givetest [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🎁 /givetest [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_ban":
-            msg = bot.send_message(chat_id, "🚫 /ban [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🚫 /ban [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_unban":
-            msg = bot.send_message(chat_id, "✅ /unban [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "✅ /unban [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_mute":
-            msg = bot.send_message(chat_id, "🔇 /mute [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🔇 /mute [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_unmute":
-            msg = bot.send_message(chat_id, "🔊 /unmute [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🔊 /unmute [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_giveadmin":
-            msg = bot.send_message(chat_id, "👑 /giveadmin [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "👑 /giveadmin [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_deladmin":
-            msg = bot.send_message(chat_id, "👑 /deladmin [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "👑 /deladmin [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_info":
-            msg = bot.send_message(chat_id, "📊 /info [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "📊 /info [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
@@ -2879,13 +2799,13 @@ def handle_callback(call):
             stats_cmd(call.message)
             return
         if call.data == "admin_clear_messages":
-            msg = bot.send_message(chat_id, "🧹 /clear_messages [ID]", parse_mode='HTML')
+            msg = bot.send_message(chat_id, "🧹 /clear_messages [ID]", parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
             return
         if call.data == "admin_close":
-            msg = bot.send_message(chat_id, "❌ Закрыто", reply_markup=back_to_menu(), parse_mode='HTML')
+            msg = bot.send_message(chat_id, "❌ Закрыто", reply_markup=back_to_menu(), parse_mode='Markdown')
             if user_id not in user_command_ids:
                 user_command_ids[user_id] = []
             user_command_ids[user_id].append(msg.message_id)
@@ -2922,13 +2842,13 @@ def handle_callback(call):
                 conn.close()
                 
                 try:
-                    bot.send_message(chat_id, f"✅ Заказ #{order_id} подтверждён!", parse_mode='HTML')
+                    bot.send_message(chat_id, f"✅ Заказ #{order_id} подтверждён!", parse_mode='Markdown')
                 except:
                     pass
                 
                 expires_formatted = format_date(new_expires)
                 try:
-                    bot.send_message(target_user, f"🎉 PREMIUM АКТИВИРОВАН!\n✅ Заказ #{order_id}\n💎 До: {expires_formatted}", parse_mode='HTML')
+                    bot.send_message(target_user, f"🎉 **PREMIUM АКТИВИРОВАН!**\n✅ Заказ #{order_id}\n💎 До: {expires_formatted}", parse_mode='Markdown')
                 except:
                     pass
             return
@@ -2955,11 +2875,11 @@ def handle_callback(call):
             conn.close()
             
             try:
-                bot.send_message(chat_id, f"❌ Заказ #{order_id} отклонён!", parse_mode='HTML')
+                bot.send_message(chat_id, f"❌ Заказ #{order_id} отклонён!", parse_mode='Markdown')
             except:
                 pass
             try:
-                bot.send_message(target_user, f"❌ ЗАКАЗ #{order_id} ОТКЛОНЁН", parse_mode='HTML')
+                bot.send_message(target_user, f"❌ **ЗАКАЗ #{order_id} ОТКЛОНЁН**", parse_mode='Markdown')
             except:
                 pass
             return
@@ -2979,16 +2899,16 @@ def handle_callback(call):
             failed = 0
             for user in users:
                 try:
-                    bot.send_message(user[0], f"📢 ОБЪЯВЛЕНИЕ\n\n{text}", parse_mode='HTML')
+                    bot.send_message(user[0], f"📢 **ОБЪЯВЛЕНИЕ**\n\n{text}", parse_mode='Markdown')
                     sent += 1
                     time.sleep(0.05)
                 except:
                     failed += 1
-            bot.send_message(chat_id, f"✅ Рассылка!\n\n📤 {sent}\n❌ {failed}", parse_mode='HTML')
+            bot.send_message(chat_id, f"✅ **РАССЫЛКА!**\n\n📤 {sent}\n❌ {failed}", parse_mode='Markdown')
             return
         
         if call.data == "cancel_broadcast":
-            bot.send_message(chat_id, "❌ Отменено.", parse_mode='HTML')
+            bot.send_message(chat_id, "❌ Отменено.", parse_mode='Markdown')
             return
         
     except Exception as e:
@@ -3006,12 +2926,12 @@ def admin_orders_cmd(message, user_id):
     conn.close()
     
     if not orders:
-        text = "💳 ЗАКАЗЫ PREMIUM\n\nНет активных заказов."
+        text = "💳 **ЗАКАЗЫ PREMIUM**\n\nНет активных заказов."
     else:
-        text = f"💳 ЗАКАЗЫ PREMIUM\n\nВсего: {len(orders)}\n\n"
+        text = f"💳 **ЗАКАЗЫ PREMIUM**\n\nВсего: {len(orders)}\n\n"
         for order in orders:
             text += f"🆔 #{order[0]} | 👤 {order[1]} | 📅 {order[2]}\n"
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(msg.message_id)
@@ -3025,15 +2945,33 @@ def admin_support_cmd(message, user_id):
     conn.close()
     
     if not requests:
-        text = "📩 ОБРАЩЕНИЯ\n\nНет активных обращений."
+        text = "📩 **ОБРАЩЕНИЯ**\n\nНет активных обращений."
     else:
-        text = f"📩 ОБРАЩЕНИЯ\n\nВсего: {len(requests)}\n\n"
+        text = f"📩 **ОБРАЩЕНИЯ**\n\nВсего: {len(requests)}\n\n"
         for req in requests:
             text += f"🆔 #{req[0]} | @{req[2] or 'Не указан'} | {req[4]}\n📝 {req[3][:50]}...\n\n"
-    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='HTML')
+    msg = bot.send_message(chat_id, text, reply_markup=back_to_menu(), parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(msg.message_id)
+
+# ============================================================
+# KEEP-ALIVE (ЧТОБЫ НЕ ЗАСЫПАЛ)
+# ============================================================
+def keep_alive():
+    """ПИНГУЕТ БОТА КАЖДЫЕ 5 МИНУТ, ЧТОБЫ НЕ ЗАСЫПАЛ"""
+    while True:
+        time.sleep(300)  # 5 минут
+        try:
+            # Отправляем запрос к самому себе (через Telegram API)
+            bot.get_me()
+            print("💓 Keep-alive пинг")
+        except:
+            pass
+
+# ЗАПУСКАЕМ ПОТОК KEEP-ALIVE
+keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+keep_alive_thread.start()
 
 # ============================================================
 # ЗАПУСК - СУПЕР БЫСТРЫЙ!
@@ -3042,7 +2980,7 @@ init_db()
 init_memory_db()
 
 print("=" * 60)
-print("🧠 AWESOME AI — СУПЕР-БЫСТРЫЙ!")
+print("🧠 AWESOME AI 2026 — СУПЕР-БЫСТРЫЙ!")
 print("=" * 60)
 print(f"⏱️ ТАЙМАУТЫ:")
 print(f"   GigaChat (ОСНОВНОЙ): {GIGACHAT_TIMEOUT} сек")
@@ -3059,7 +2997,10 @@ print("✅ ВКонтакте")
 print("✅ Twitch")
 print("✅ Новости")
 print("✅ GigaChat (ОСНОВНОЙ)")
-print("✅ YandexGPT (БАЗА ДАННЫХ)")
+print("✅ YandexGPT (БАЗА)")
+print("=" * 60)
+print("💡 КОМАНДЫ И КНОПКИ — МГНОВЕННЫЕ (БЕЗ НЕЙРОСЕТЕЙ)")
+print("💓 KEEP-ALIVE ВКЛЮЧЕН (не засыпает)")
 print("=" * 60)
 try:
     print(f"🤖 Бот: @{bot.get_me().username}")
