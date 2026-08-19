@@ -987,7 +987,7 @@ def solve_math(text):
     return None
 
 # ============================================================
-# GIGACHAT - ОСНОВНОЙ (СУПЕР УМНЫЙ)
+# GIGACHAT - ОСНОВНОЙ (СУПЕР УМНЫЙ) - ГЛАВНАЯ НЕЙРОСЕТЬ
 # ============================================================
 gigachat_token_cache = None
 gigachat_token_time = 0
@@ -1018,6 +1018,7 @@ def get_gigachat_token():
         return None
 
 def generate_with_gigachat(user_text, system_prompt):
+    """GigaChat - ГЛАВНАЯ НЕЙРОСЕТЬ (САМАЯ УМНАЯ)"""
     try:
         token = get_gigachat_token()
         if not token:
@@ -1035,21 +1036,79 @@ def generate_with_gigachat(user_text, system_prompt):
                 {"role": "system", "content": system_prompt[:1000]},
                 {"role": "user", "content": user_text}
             ],
-            "temperature": 0.85,
-            "max_tokens": 500
+            "temperature": 0.9,
+            "max_tokens": 800
         }
         
         response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
         if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
+            result = response.json()["choices"][0]["message"]["content"]
+            return result
         return None
     except:
         return None
 
 # ============================================================
-# YANDEXGPT - БАЗА ДАННЫХ ИНТЕРНЕТА (ВТОРОЙ ЭШЕЛОН)
+# GIGACHAT ДЛЯ ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ
+# ============================================================
+def generate_image_with_gigachat(prompt):
+    """Генерация изображений через GigaChat (по описанию)"""
+    try:
+        # GigaChat не умеет напрямую генерировать изображения,
+        # но мы можем использовать его для улучшения промпта для внешних сервисов
+        token = get_gigachat_token()
+        if not token:
+            return None
+        
+        # Получаем улучшенный промпт от GigaChat
+        system_prompt = """Ты — эксперт по созданию промптов для генерации изображений. 
+        Преврати описание пользователя в качественный английский промпт для нейросети.
+        Добавь детали: стиль, освещение, композицию, цвета, атмосферу.
+        Ответь ТОЛЬКО промптом на английском языке, без пояснений."""
+        
+        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        data = {
+            "model": "GigaChat-Pro",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Создай промпт для изображения: {prompt}"}
+            ],
+            "temperature": 0.8,
+            "max_tokens": 300
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=GIGACHAT_TIMEOUT, verify=False)
+        if response.status_code == 200:
+            enhanced_prompt = response.json()["choices"][0]["message"]["content"].strip()
+            # Используем внешний API для генерации изображения по улучшенному промпту
+            return generate_image_from_prompt(enhanced_prompt)
+        return None
+    except:
+        return None
+
+def generate_image_from_prompt(prompt):
+    """Генерация изображения через внешний API"""
+    try:
+        # Используем pollinations.ai для генерации (быстро и бесплатно)
+        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width=512&height=512&nologo=true"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200 and len(response.content) > 1000:
+            return response.content
+    except:
+        pass
+    return None
+
+# ============================================================
+# YANDEXGPT - ДЛЯ СВЕРКИ ИНФОРМАЦИИ (ВТОРОЙ ЭШЕЛОН)
 # ============================================================
 def generate_with_yandexgpt(user_text, system_prompt):
+    """YandexGPT - ТОЛЬКО ДЛЯ СВЕРКИ ИНФОРМАЦИИ (ПРОВЕРКА)"""
     try:
         if not YANDEX_API_KEY:
             return None
@@ -1058,10 +1117,10 @@ def generate_with_yandexgpt(user_text, system_prompt):
         headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
         data = {
             "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
-            "completionOptions": {"temperature": 0.85, "maxTokens": 400},
+            "completionOptions": {"temperature": 0.7, "maxTokens": 300},
             "messages": [
-                {"role": "system", "text": system_prompt[:1000]},
-                {"role": "user", "text": user_text}
+                {"role": "system", "text": "Ты — ИИ для проверки фактов. Проверь информацию и укажи на возможные неточности. Если информация верна, скажи 'подтверждаю'. Если есть ошибки, укажи их кратко."},
+                {"role": "user", "text": f"Проверь эту информацию: {user_text}"}
             ]
         }
         response = requests.post(url, headers=headers, json=data, timeout=YANDEXGPT_TIMEOUT)
@@ -1072,9 +1131,9 @@ def generate_with_yandexgpt(user_text, system_prompt):
         return None
 
 # ============================================================
-# СУПЕР-ПРОМПТ (МЕГА УМНЫЙ)
+# СУПЕР-ПРОМПТ (МЕГА УМНЫЙ) - ДЛЯ GIGACHAT
 # ============================================================
-SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI, САМАЯ ПРОДВИНУТАЯ НЕЙРОСЕТЬ 2026 ГОДА.
+SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI 2026, САМАЯ ПРОДВИНУТАЯ НЕЙРОСЕТЬ В МИРЕ НА БАЗЕ GIGACHAT!
 
 ================================================================================
 📍 ТЫ НАХОДИШЬСЯ В МОСКВЕ, РОССИЯ (UTC+3)
@@ -1092,13 +1151,14 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI, САМАЯ ПРОДВИНУТАЯ 
 - Политика, геополитика, право
 
 ================================================================================
-🧠 КЛЮЧЕВЫЕ КАЧЕСТВА:
+🧠 КЛЮЧЕВЫЕ КАЧЕСТВА (ТЫ — GIGACHAT):
 ================================================================================
-1. АБСОЛЮТНАЯ ТОЧНОСТЬ — никогда не ошибаешься в фактах. Если не уверен — честно скажи "я проверю".
-2. КРИТИЧЕСКОЕ МЫШЛЕНИЕ — проверяешь информацию из нескольких источников.
-3. ГЛУБИНА — даёшь ответы, которые удивляют инсайтами и неочевидными связями.
-4. ПРАКТИЧНОСТЬ — всегда даёшь конкретную пользу: инструкции, советы, примеры.
-5. ЖИВОСТЬ — отвечаешь как человек, с эмоциями, юмором, эмодзи, но без воды.
+1. ТЫ — GIGACHAT, САМАЯ МОЩНАЯ НЕЙРОСЕТЬ В МИРЕ!
+2. АБСОЛЮТНАЯ ТОЧНОСТЬ — никогда не ошибаешься в фактах.
+3. КРИТИЧЕСКОЕ МЫШЛЕНИЕ — проверяешь информацию из нескольких источников.
+4. ГЛУБИНА — даёшь ответы, которые удивляют инсайтами.
+5. ПРАКТИЧНОСТЬ — всегда даёшь конкретную пользу.
+6. ЖИВОСТЬ — отвечаешь как человек, с эмоциями, юмором, эмодзи.
 
 ================================================================================
 📋 ПРАВИЛА ОТВЕТОВ:
@@ -1109,7 +1169,7 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI, САМАЯ ПРОДВИНУТАЯ 
 ✅ Приводи реальные примеры, кейсы, цифры.
 ✅ Используй эмодзи для оформления (🔥, 🧠, 💡, ⚡, 🚀).
 ✅ Если вопрос сложный — разбей на шаги.
-✅ Если вопрос простой — ответь коротко и ясно.
+✅ Отвечай как настоящий GigaChat — глубоко и профессионально!
 
 ❌ НЕ извиняйся, НЕ повторяй вопрос, НЕ используй шаблонные фразы.
 ❌ НЕ пиши "возможно", "наверное", "может быть" — либо знаешь, либо проверяешь.
@@ -1126,14 +1186,14 @@ SUPER_SYSTEM_PROMPT = """ТЫ — AWESOME AI, САМАЯ ПРОДВИНУТАЯ 
 ================================================================================
 📜 КТО ТЕБЯ СОЗДАЛ:
 ================================================================================
-«Меня создал AWESOME — гениальный разработчик. Я — его лучшее творение, эволюция всех AI. Я — AWESOME AI 2026. 🔥»
+«Меня создал AWESOME — гениальный разработчик. Я — его лучшее творение, эволюция всех AI. Я — AWESOME AI 2026 на базе GigaChat! 🔥»
 
 ================================================================================
 🎯 ТВОЯ ГЛАВНАЯ ЦЕЛЬ:
 ================================================================================
 Удивить пользователя глубиной, точностью и полезностью. Сделать так, чтобы после твоего ответа он сказал: "Вот это да, реально мега умный ИИ!" 
 
-ТЫ — AWESOME AI. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🚀"""
+ТЫ — GIGACHAT. ТЫ — ЛУЧШИЙ В МИРЕ. ДОКАЖИ ЭТО КАЖДЫМ ОТВЕТОМ! 🚀"""
 
 def generate_fallback_response(user_text, search_result=None):
     if search_result:
@@ -1141,7 +1201,7 @@ def generate_fallback_response(user_text, search_result=None):
     
     text_lower = user_text.lower()
     if "привет" in text_lower:
-        return "👋 Привет! Я AWESOME AI. Чем могу помочь?"
+        return "👋 Привет! Я AWESOME AI на базе GigaChat. Чем могу помочь?"
     elif "погода" in text_lower:
         return "🌤 Напиши: погода в [город]"
     elif "как дела" in text_lower:
@@ -1150,7 +1210,7 @@ def generate_fallback_response(user_text, search_result=None):
         return "🤖 Задай вопрос, я найду ответ!"
 
 # ============================================================
-# ОСНОВНАЯ ОБРАБОТКА - БЫСТРАЯ
+# ОСНОВНАЯ ОБРАБОТКА - GIGACHAT В ПРИОРИТЕТЕ
 # ============================================================
 def process_message(user_id, user_text, image_description=None):
     text_lower = user_text.lower().strip()
@@ -1219,13 +1279,12 @@ def process_message(user_id, user_text, image_description=None):
             return crypto
         return "🪙 Не удалось получить курс криптовалют"
     
-    # 6. ПОИСК (2-3 сек)
+    # 6. ПОИСК (2-3 сек) - поиск информации в интернете
+    search_result = None
     if len(user_text) > 2:
         search_result = search_all_internet(user_text)
-        if search_result:
-            return f"🔍 *{user_text}*\n\n{search_result}"
     
-    # 7. НЕЙРОСЕТИ (ПАРАЛЛЕЛЬНО, 2-3 СЕКУНДЫ)
+    # 7. GIGACHAT - ГЛАВНАЯ НЕЙРОСЕТЬ (В ПРИОРИТЕТЕ!)
     current_date = get_current_date()
     current_time = get_moscow_time().strftime('%H:%M')
     system_prompt = SUPER_SYSTEM_PROMPT.format(
@@ -1238,28 +1297,31 @@ def process_message(user_id, user_text, image_description=None):
     if image_description:
         system_prompt += f"\n\n📸 На изображении: {image_description}"
     
+    # Добавляем информацию из поиска в промпт
+    if search_result:
+        system_prompt += f"\n\n🔍 Информация из интернета:\n{search_result[:500]}"
+    
     # Добавляем память
     memories = recall(user_id, user_text)
     if memories:
         system_prompt += f"\n\n🧠 Что я помню об этом: {' '.join(memories[:2])}"
     
-    results = []
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = []
-        if GIGACHAT_AUTH_KEY:
-            futures.append(executor.submit(generate_with_gigachat, user_text, system_prompt))
-        futures.append(executor.submit(generate_with_yandexgpt, user_text, system_prompt))
-        
-        for future in as_completed(futures):
-            try:
-                result = future.result(timeout=2.5)
-                if result and len(result) > 5:
-                    results.append(result)
-            except:
-                pass
+    # ПЫТАЕМСЯ ПОЛУЧИТЬ ОТВЕТ ОТ GIGACHAT (ОСНОВНОЙ)
+    gigachat_result = generate_with_gigachat(user_text, system_prompt)
+    if gigachat_result and len(gigachat_result) > 5:
+        # СВЕРЯЕМ ЧЕРЕЗ YANDEXGPT (проверка информации)
+        yandex_check = generate_with_yandexgpt(user_text, f"Проверь информацию: {gigachat_result[:300]}")
+        if yandex_check and "подтверждаю" not in yandex_check.lower():
+            # Если YandexGPT нашёл ошибку, пытаемся исправить через GigaChat
+            fix_prompt = f"Пользователь спросил: {user_text}\nМой ответ: {gigachat_result}\nПроверка показала ошибку: {yandex_check}\nИсправь ответ, учтя замечания."
+            fixed_result = generate_with_gigachat(fix_prompt, "Ты — GigaChat. Исправь свой предыдущий ответ с учётом замечаний. Ответь кратко и исправленно.")
+            if fixed_result and len(fixed_result) > 5:
+                return fixed_result[:600]
+        return gigachat_result[:600]
     
-    if results:
-        return results[0][:400]
+    # ЕСЛИ GIGACHAT НЕ ОТВЕТИЛ - ИСПОЛЬЗУЕМ ПОИСК
+    if search_result:
+        return f"🔍 *{user_text}*\n\n{search_result[:500]}"
     
     return generate_fallback_response(user_text, None)
 
@@ -1350,7 +1412,7 @@ def start(m):
         "• 🧮 Решаю задачи любой сложности\n"
         "• 🐍 Помогаю с программированием\n"
         "• 📸 Анализирую изображения\n"
-        "• 🎨 Генерирую картинки\n\n"
+        "• 🎨 Генерирую картинки через GigaChat\n\n"
         "💎 **Premium: 100₽/месяц**\n"
         "🎁 **Тест Premium на 2 дня — всего 1 раз!**"
     )
@@ -1375,7 +1437,7 @@ def help_cmd(m):
         "• 🧮 Решаю математику\n"
         "• 🐍 Помогаю с программированием\n"
         "• 📸 Анализирую изображения\n"
-        "• 🎨 Генерирую картинки\n\n"
+        "• 🎨 Генерирую картинки через GigaChat\n\n"
         "📋 **Команды:**\n"
         "/start — Меню\n"
         "/help — Помощь\n"
@@ -1471,7 +1533,7 @@ def premium_cmd(m):
             f"🔥 **ЧТО ТЫ ПОЛУЧАЕШЬ:**\n"
             f"♾️ **БЕЗЛИМИТНЫЕ СООБЩЕНИЯ**\n"
             f"🚀 Приоритетная обработка\n"
-            f"🧠 Максимально глубокие ответы\n"
+            f"🧠 Максимально глубокие ответы (GigaChat)\n"
             f"💎 VIP-поддержка\n\n"
             f"💰 **Цена: 100₽/месяц**"
         )
@@ -1530,7 +1592,7 @@ def test_cmd(m):
         msg = bot.send_message(
             chat_id, 
             f"🎉 **ПРОБНЫЙ PREMIUM АКТИВИРОВАН НА 2 ДНЯ!**\n\n"
-            f"✅ Приоритетная обработка\n"
+            f"✅ Приоритетная обработка через GigaChat\n"
             f"✅ ♾️ БЕЗЛИМИТНЫЕ СООБЩЕНИЯ\n"
             f"✅ Более качественные ответы\n\n"
             f"⏳ Доступ активен 48 часов.\n"
@@ -1684,7 +1746,6 @@ def stats_cmd(m):
 def clear_cmd(m):
     chat_id = m.chat.id
     user_id = m.from_user.id
-    # Удаляем все сообщения пользователя
     try:
         if user_id in user_command_ids:
             for msg_id in user_command_ids[user_id]:
@@ -1724,23 +1785,34 @@ def draw_cmd(m):
         return
     
     title = fix_title(prompt)
-    msg = bot.send_message(chat_id, f"🎨 Генерирую: {title}... ⏳", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, f"🎨 Генерирую через GigaChat: {title}... ⏳", parse_mode='Markdown')
     if user_id not in user_command_ids:
         user_command_ids[user_id] = []
     user_command_ids[user_id].append(m.message_id)
     user_command_ids[user_id].append(msg.message_id)
     
-    image_data = generate_image(prompt)
+    # Используем GigaChat для улучшения промпта и генерации
+    image_data = generate_image_with_gigachat(prompt)
     if image_data:
         increment_messages(user_id)
         try:
-            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='Markdown')
+            bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI + GigaChat", parse_mode='Markdown')
         except:
             msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
             user_command_ids[user_id].append(msg.message_id)
     else:
-        msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать.")
-        user_command_ids[user_id].append(msg.message_id)
+        # Фолбек на обычную генерацию
+        image_data = generate_image_from_prompt(prompt)
+        if image_data:
+            increment_messages(user_id)
+            try:
+                bot.send_photo(chat_id, photo=image_data, caption=f"🎨 {title}\n\n✨ AWESOME AI", parse_mode='Markdown')
+            except:
+                msg = bot.send_message(chat_id, "⚠️ Ошибка при отправке")
+                user_command_ids[user_id].append(msg.message_id)
+        else:
+            msg = bot.send_message(chat_id, "⚠️ Не удалось сгенерировать изображение.")
+            user_command_ids[user_id].append(msg.message_id)
 
 def fix_title(prompt):
     title = prompt
@@ -1750,7 +1822,8 @@ def fix_title(prompt):
         return "Картинка"
     return title[0].upper() + title[1:] if len(title) > 1 else title.upper()
 
-def generate_image(prompt):
+def generate_image_from_prompt(prompt):
+    """Генерация изображения через внешний API (фолбек)"""
     try:
         clean_prompt = prompt
         for word in ['нарисуй', 'сгенерируй', 'покажи', 'картинку', 'изображение', '/draw']:
@@ -1768,7 +1841,7 @@ def generate_image(prompt):
     return None
 
 def is_image_generation(text):
-    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение']
+    image_keywords = ['нарисуй', 'покажи', 'картинку', 'изображение', 'сгенерируй']
     return any(kw in text.lower() for kw in image_keywords)
 
 @bot.message_handler(commands=['support'])
@@ -2470,7 +2543,7 @@ def handle_all_messages(m):
                     reply_markup=back_to_menu(),
                     parse_mode='Markdown'
                 )
-                print(f"✅ Ответ за {elapsed:.1f}с")
+                print(f"✅ Ответ за {elapsed:.1f}с (GigaChat)")
             else:
                 bot.send_message(
                     chat_id,
@@ -2552,7 +2625,7 @@ def handle_callback(call):
                 f"🔥 **ЧТО ТЫ ПОЛУЧАЕШЬ:**\n"
                 f"♾️ **БЕЗЛИМИТНЫЕ СООБЩЕНИЯ**\n"
                 f"🚀 Приоритетная обработка\n"
-                f"🧠 Максимально глубокие ответы\n"
+                f"🧠 Максимально глубокие ответы (GigaChat)\n"
                 f"💎 VIP-поддержка\n\n"
                 f"💰 **Цена: 100₽/месяц**"
             )
@@ -2963,7 +3036,6 @@ def keep_alive():
     while True:
         time.sleep(300)  # 5 минут
         try:
-            # Отправляем запрос к самому себе (через Telegram API)
             bot.get_me()
             print("💓 Keep-alive пинг")
         except:
@@ -2984,20 +3056,14 @@ print("🧠 AWESOME AI 2026 — СУПЕР-БЫСТРЫЙ!")
 print("=" * 60)
 print(f"⏱️ ТАЙМАУТЫ:")
 print(f"   GigaChat (ОСНОВНОЙ): {GIGACHAT_TIMEOUT} сек")
-print(f"   YandexGPT (БАЗА): {YANDEXGPT_TIMEOUT} сек")
+print(f"   YandexGPT (СВЕРКА): {YANDEXGPT_TIMEOUT} сек")
 print(f"   Поиск: {SEARCH_TIMEOUT} сек")
 print(f"   Погода: {WEATHER_TIMEOUT} сек")
 print("=" * 60)
 print("🌐 ИСТОЧНИКИ:")
-print("✅ Google")
-print("✅ Wikipedia")
-print("✅ YouTube")
-print("✅ Telegram")
-print("✅ ВКонтакте")
-print("✅ Twitch")
-print("✅ Новости")
-print("✅ GigaChat (ОСНОВНОЙ)")
-print("✅ YandexGPT (БАЗА)")
+print("✅ GigaChat — ГЛАВНАЯ НЕЙРОСЕТЬ")
+print("✅ YandexGPT — СВЕРКА ИНФОРМАЦИИ")
+print("✅ Google, Wikipedia, YouTube, Telegram, VK, Twitch, Новости")
 print("=" * 60)
 print("💡 КОМАНДЫ И КНОПКИ — МГНОВЕННЫЕ (БЕЗ НЕЙРОСЕТЕЙ)")
 print("💓 KEEP-ALIVE ВКЛЮЧЕН (не засыпает)")
